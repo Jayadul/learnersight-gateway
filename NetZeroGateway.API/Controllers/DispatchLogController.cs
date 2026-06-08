@@ -1,0 +1,50 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using NetZeroGateway.Application.DTOs;
+using NetZeroGateway.Application.Interfaces;
+using NetZeroGateway.Domain.Enums;
+
+namespace NetZeroGateway.API.Controllers;
+
+[ApiController]
+[Authorize]
+[Route("api/dispatch-logs")]
+[Tags("Admin")]
+public class DispatchLogController(IDispatchJobRepository repo) : ControllerBase
+{
+    [HttpGet]
+    public async Task<IActionResult> GetAll(
+        [FromQuery] DateTimeOffset? dateFrom,
+        [FromQuery] DateTimeOffset? dateTo,
+        [FromQuery] ChannelType?    channelType,
+        [FromQuery] JobStatus?      status,
+        [FromQuery] string?         toNumber,
+        [FromQuery] int             page     = 1,
+        [FromQuery] int             pageSize = 10)
+    {
+        var (items, total) = await repo.GetPagedAsync(
+            page, pageSize, dateFrom, dateTo, channelType, status, toNumber);
+
+        return Ok(new PagedResult<DispatchJobDto>
+        {
+            Items = items.Select(j => new DispatchJobDto
+            {
+                Id                  = j.Id,
+                ChannelType         = j.ChannelType,
+                ToNumber            = j.ToNumber,
+                MessageContent      = j.MessageContent,
+                Status              = j.Status,
+                ProviderMessageId   = j.ProviderMessageId,
+                ProviderRawResponse = j.ProviderRawResponse,
+                FailureReason       = j.FailureReason,
+                SentAt              = j.SentAt,
+                IsFallback          = j.IsFallback,
+                FallbackFromJobId   = j.FallbackFromJobId,
+                CreatedAt           = j.CreatedAt
+            }).ToList(),
+            TotalCount = total,
+            Page       = page,
+            PageSize   = pageSize
+        });
+    }
+}

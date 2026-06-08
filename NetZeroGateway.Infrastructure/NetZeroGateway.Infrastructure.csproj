@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\NetZeroGateway.Domain\NetZeroGateway.Domain.csproj" />
+    <ProjectReference Include="..\NetZeroGateway.Application\NetZeroGateway.Application.csproj" />
+    <PackageReference Include="BCrypt.Net-Next"                              Version="4.0.3" />
+    <PackageReference Include="EFCore.NamingConventions"                    Version="8.0.3" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore"               Version="8.0.7" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design"        Version="8.0.7" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL"       Version="8.0.4" />
+    <PackageReference Include="Microsoft.Extensions.Http"                   Version="8.0.1" />
+    <PackageReference Include="Polly"                                       Version="8.4.1" />
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience"        Version="8.9.1" />
+    <PackageReference Include="Serilog.AspNetCore"                          Version="8.0.2" />
+    <PackageReference Include="Serilog.Sinks.Seq"                           Version="7.0.1" />
+    <PackageReference Include="Serilog.Sinks.Console"                       Version="5.0.1" />
+    <PackageReference Include="Serilog.Enrichers.Environment"               Version="2.3.0" />
+    <PackageReference Include="Serilog.Enrichers.Thread"                    Version="3.1.0" />
+    <PackageReference Include="Serilog.Enrichers.CorrelationId"             Version="3.0.1" />
+  </ItemGroup>
+</Project>
