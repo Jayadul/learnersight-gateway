@@ -9,7 +9,7 @@ namespace NetZeroGateway.API.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/channel-configs")]
-[Tags("Admin")]
+[ApiExplorerSettings(GroupName = "admin")]
 public class ChannelConfigController(IChannelConfigService service) : ControllerBase
 {
     [HttpGet]

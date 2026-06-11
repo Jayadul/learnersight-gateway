@@ -8,8 +8,8 @@ using NetZeroGateway.Infrastructure.HttpClients;
 namespace NetZeroGateway.Infrastructure.Strategies;
 
 public class SmsSender(
-    IReveSmsClient              client,
-    ILogger<SmsSender>          logger
+    IReveSmsClient client,
+    ILogger<SmsSender> logger
 ) : IChannelSender
 {
     public ChannelType ChannelType => ChannelType.SMS;
@@ -29,7 +29,7 @@ public class SmsSender(
                 job.ToNumber, job.MessageContent, ct);
 
             job.ProviderRawResponse = JsonSerializer.Serialize(r);
-            job.ProviderMessageId   = r.Message_ID;
+            job.ProviderMessageId = r.Message_ID;
 
             if (r.Status == "0")
             {
@@ -40,7 +40,7 @@ public class SmsSender(
             }
             else
             {
-                job.Status        = JobStatus.Failed;
+                job.Status = JobStatus.Failed;
                 job.FailureReason = r.Text;
                 logger.LogWarning(
                     "[SMS] Failed for {ToNumber} | Reason={Reason}", job.ToNumber, r.Text);
@@ -48,7 +48,7 @@ public class SmsSender(
         }
         catch (Exception ex)
         {
-            job.Status        = JobStatus.Failed;
+            job.Status = JobStatus.Failed;
             job.FailureReason = ex.Message;
             logger.LogError(ex, "[SMS] Exception dispatching to {ToNumber}", job.ToNumber);
         }

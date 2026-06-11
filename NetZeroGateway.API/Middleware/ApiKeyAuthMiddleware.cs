@@ -30,7 +30,7 @@ public class ApiKeyAuthMiddleware(RequestDelegate next, ILogger<ApiKeyAuthMiddle
             ? await ctx.Request.ReadFormAsync()
             : null;
 
-        var apiKey    = form?["apikey"].FirstOrDefault()    ?? "";
+        var apiKey = form?["apikey"].FirstOrDefault() ?? "";
         var secretKey = form?["secretkey"].FirstOrDefault() ?? "";
         ctx.Request.Body.Position = 0;
 
@@ -53,7 +53,7 @@ public class ApiKeyAuthMiddleware(RequestDelegate next, ILogger<ApiKeyAuthMiddle
 
         // 2. Validate shared secret header (soft-fail when no config exists yet)
         var xSoftRepo = ctx.RequestServices.GetRequiredService<IXSoftAppConfigRepository>();
-        var xSoftCfg  = await xSoftRepo.GetActiveAsync();
+        var xSoftCfg = await xSoftRepo.GetActiveAsync();
 
         if (xSoftCfg is not null)
         {
@@ -81,7 +81,7 @@ public class ApiKeyAuthMiddleware(RequestDelegate next, ILogger<ApiKeyAuthMiddle
 
     private static Task Reject(HttpContext ctx)
     {
-        ctx.Response.StatusCode  = 401;
+        ctx.Response.StatusCode = 401;
         ctx.Response.ContentType = "application/json";
         return ctx.Response.WriteAsync(
             JsonSerializer.Serialize(new { Status = "101", Text = "REJECTD" }));

@@ -8,7 +8,7 @@ namespace NetZeroGateway.API.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/manual-send")]
-[Tags("Admin")]
+[ApiExplorerSettings(GroupName = "admin")]
 public class ManualSendController(IManualSendService service) : ControllerBase
 {
     [HttpPost]

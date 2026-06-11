@@ -10,8 +10,8 @@ namespace NetZeroGateway.Application.Interfaces;
 public interface IVoiceReportGateway
 {
     Task<VoiceReportSyncResponse> GetCombinedReportAsync(
-        string        owner,
-        string        password,
+        string owner,
+        string password,
         DateTimeOffset from,
         DateTimeOffset to,
         CancellationToken ct = default);

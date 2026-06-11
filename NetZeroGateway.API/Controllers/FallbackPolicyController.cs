@@ -8,7 +8,7 @@ namespace NetZeroGateway.API.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/fallback-policies")]
-[Tags("Admin")]
+[ApiExplorerSettings(GroupName = "admin")]
 public class FallbackPolicyController(IFallbackPolicyService service) : ControllerBase
 {
     [HttpGet]

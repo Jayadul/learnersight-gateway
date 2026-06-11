@@ -8,9 +8,9 @@ namespace NetZeroGateway.Domain.Entities;
 /// </summary>
 public class XSoftAppConfig : BaseEntity
 {
-    public string  Label             { get; set; } = "x-soft";
-    public string  BaseUrl           { get; set; } = string.Empty;
-    public string  SharedSecretHash  { get; set; } = string.Empty;
-    public bool    IsActive          { get; set; } = true;
-    public string? Description       { get; set; }
+    public string Label { get; set; } = "x-soft";
+    public string BaseUrl { get; set; } = string.Empty;
+    public string SharedSecretHash { get; set; } = string.Empty;
+    public bool IsActive { get; set; } = true;
+    public string? Description { get; set; }
 }

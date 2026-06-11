@@ -1,20 +1,19 @@
 using Microsoft.EntityFrameworkCore;
 using NetZeroGateway.Domain.Entities;
-using NetZeroGateway.Domain.Enums;
 
 namespace NetZeroGateway.Infrastructure.Persistence;
 
 public class NetZeroGatewayDbContext(DbContextOptions<NetZeroGatewayDbContext> options)
     : DbContext(options)
 {
-    public DbSet<AdminUser>       AdminUsers       => Set<AdminUser>();
-    public DbSet<XSoftApiKey>     XSoftApiKeys     => Set<XSoftApiKey>();
-    public DbSet<XSoftAppConfig>  XSoftAppConfigs  => Set<XSoftAppConfig>();
-    public DbSet<ChannelConfig>   ChannelConfigs   => Set<ChannelConfig>();
-    public DbSet<MessageRequest>  MessageRequests  => Set<MessageRequest>();
-    public DbSet<DispatchJob>     DispatchJobs     => Set<DispatchJob>();
-    public DbSet<FallbackPolicy>  FallbackPolicies => Set<FallbackPolicy>();
-    public DbSet<ApiLog>          ApiLogs          => Set<ApiLog>();
+    public DbSet<AdminUser> AdminUsers => Set<AdminUser>();
+    public DbSet<XSoftApiKey> XSoftApiKeys => Set<XSoftApiKey>();
+    public DbSet<XSoftAppConfig> XSoftAppConfigs => Set<XSoftAppConfig>();
+    public DbSet<ChannelConfig> ChannelConfigs => Set<ChannelConfig>();
+    public DbSet<MessageRequest> MessageRequests => Set<MessageRequest>();
+    public DbSet<DispatchJob> DispatchJobs => Set<DispatchJob>();
+    public DbSet<FallbackPolicy> FallbackPolicies => Set<FallbackPolicy>();
+    public DbSet<ApiLog> ApiLogs => Set<ApiLog>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -70,12 +69,17 @@ public class NetZeroGatewayDbContext(DbContextOptions<NetZeroGatewayDbContext> o
             e.Property(x => x.OverallStatus).HasConversion<string>().HasMaxLength(50);
             e.Property(x => x.Source).HasConversion<string>().HasMaxLength(50);
             e.Property(x => x.ParsedChannels)
-             .HasColumnType("jsonb")
-             .HasConversion(
-                 v => System.Text.Json.JsonSerializer.Serialize(
-                     v, (System.Text.Json.JsonSerializerOptions?)null),
-                 v => System.Text.Json.JsonSerializer.Deserialize<List<string>>(
-                     v, (System.Text.Json.JsonSerializerOptions?)null) ?? new());
+ .HasColumnType("jsonb")
+ .HasConversion(
+     v => System.Text.Json.JsonSerializer.Serialize(
+         v, (System.Text.Json.JsonSerializerOptions?)null),
+     v => System.Text.Json.JsonSerializer.Deserialize<List<string>>(
+         v, (System.Text.Json.JsonSerializerOptions?)null) ?? new())
+ .Metadata.SetValueComparer(
+     new Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer<List<string>>(
+         (a, b) => a != null && b != null && a.SequenceEqual(b),
+         v => v.Aggregate(0, (acc, s) => HashCode.Combine(acc, s.GetHashCode())),
+         v => v.ToList()));
             e.HasMany(x => x.Jobs)
              .WithOne(j => j.MessageRequest)
              .HasForeignKey(j => j.MessageRequestId)

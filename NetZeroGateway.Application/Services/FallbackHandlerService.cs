@@ -8,17 +8,17 @@ using NetZeroGateway.Domain.Enums;
 namespace NetZeroGateway.Application.Services;
 
 public class FallbackHandlerService(
-    IDispatchJobRepository      jobRepo,
-    IFallbackPolicyRepository   policyRepo,
-    IChannelConfigRepository    configRepo,
-    IEncryptionService          enc,
-    IChannelSenderFactory       senderFactory,
+    IDispatchJobRepository jobRepo,
+    IFallbackPolicyRepository policyRepo,
+    IChannelConfigRepository configRepo,
+    IEncryptionService enc,
+    IChannelSenderFactory senderFactory,
     ILogger<FallbackHandlerService> logger
 ) : IFallbackHandlerService
 {
     public async Task HandleAsync(Guid messageRequestId)
     {
-        var jobs     = await jobRepo.GetByMessageRequestIdAsync(messageRequestId);
+        var jobs = await jobRepo.GetByMessageRequestIdAsync(messageRequestId);
         var policies = await policyRepo.GetActiveGlobalPoliciesAsync();
 
         var failedPrimary = jobs
@@ -47,15 +47,15 @@ public class FallbackHandlerService(
 
             var fallbackJob = new DispatchJob
             {
-                MessageRequestId  = job.MessageRequestId,
-                ChannelType       = policy.FallbackChannel,
-                ChannelConfigId   = fallbackConfig.Id,
-                MessageContent    = job.MessageContent,
-                MediaUrl          = job.MediaUrl,
-                ToNumber          = job.ToNumber,
-                IsFallback        = true,
+                MessageRequestId = job.MessageRequestId,
+                ChannelType = policy.FallbackChannel,
+                ChannelConfigId = fallbackConfig.Id,
+                MessageContent = job.MessageContent,
+                MediaUrl = job.MediaUrl,
+                ToNumber = job.ToNumber,
+                IsFallback = true,
                 FallbackFromJobId = job.Id,
-                Status            = JobStatus.Pending
+                Status = JobStatus.Pending
             };
             await jobRepo.AddAsync(fallbackJob);
             await jobRepo.SaveChangesAsync();

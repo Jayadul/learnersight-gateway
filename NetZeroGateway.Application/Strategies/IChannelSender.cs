@@ -18,7 +18,7 @@ public interface IChannelSender
     /// Never throws — all exceptions caught and reflected in job.Status.
     /// </summary>
     Task SendAsync(
-        DispatchJob                 job,
-        Dictionary<string, string>  config,
-        CancellationToken           ct = default);
+        DispatchJob job,
+        Dictionary<string, string> config,
+        CancellationToken ct = default);
 }

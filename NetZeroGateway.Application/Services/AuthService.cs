@@ -8,14 +8,14 @@ namespace NetZeroGateway.Application.Services;
 
 public class AuthService(
     IAdminUserRepository repo,
-    IJwtService          jwt,
+    IJwtService jwt,
     ILogger<AuthService> logger
 ) : IAuthService
 {
     public async Task<LoginResponse> LoginAsync(LoginRequest request)
     {
         var users = await repo.FindByUsernameAsync(request.Username);
-        var user  = users.FirstOrDefault(u => u.IsActive)
+        var user = users.FirstOrDefault(u => u.IsActive)
             ?? throw new UnauthorizedException("Invalid username or password.");
 
         if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
@@ -29,9 +29,9 @@ public class AuthService(
 
         return new LoginResponse
         {
-            AccessToken  = jwt.IssueAccessToken(user),
+            AccessToken = jwt.IssueAccessToken(user),
             RefreshToken = jwt.IssueRefreshToken(user),
-            ExpiresIn    = 900
+            ExpiresIn = 900
         };
     }
 
@@ -51,9 +51,9 @@ public class AuthService(
 
         return new LoginResponse
         {
-            AccessToken  = jwt.IssueAccessToken(user),
+            AccessToken = jwt.IssueAccessToken(user),
             RefreshToken = jwt.IssueRefreshToken(user),
-            ExpiresIn    = 900
+            ExpiresIn = 900
         };
     }
 }

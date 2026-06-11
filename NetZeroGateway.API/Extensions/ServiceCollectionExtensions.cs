@@ -26,14 +26,14 @@ public static class ServiceCollectionExtensions
                 .UseSnakeCaseNamingConvention());
 
         // Repositories (Application.Interfaces → Infrastructure implementations)
-        services.AddScoped<IAdminUserRepository,       AdminUserRepository>();
-        services.AddScoped<IXSoftApiKeyRepository,     XSoftApiKeyRepository>();
-        services.AddScoped<IXSoftAppConfigRepository,  XSoftAppConfigRepository>();
-        services.AddScoped<IChannelConfigRepository,   ChannelConfigRepository>();
-        services.AddScoped<IMessageRequestRepository,  MessageRequestRepository>();
-        services.AddScoped<IDispatchJobRepository,     DispatchJobRepository>();
-        services.AddScoped<IApiLogRepository,          ApiLogRepository>();
-        services.AddScoped<IFallbackPolicyRepository,  FallbackPolicyRepository>();
+        services.AddScoped<IAdminUserRepository, AdminUserRepository>();
+        services.AddScoped<IXSoftApiKeyRepository, XSoftApiKeyRepository>();
+        services.AddScoped<IXSoftAppConfigRepository, XSoftAppConfigRepository>();
+        services.AddScoped<IChannelConfigRepository, ChannelConfigRepository>();
+        services.AddScoped<IMessageRequestRepository, MessageRequestRepository>();
+        services.AddScoped<IDispatchJobRepository, DispatchJobRepository>();
+        services.AddScoped<IApiLogRepository, ApiLogRepository>();
+        services.AddScoped<IFallbackPolicyRepository, FallbackPolicyRepository>();
 
         // Encryption
         services.AddScoped<IEncryptionService, AesEncryptionService>();
@@ -42,9 +42,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IVoiceReportGateway, VoiceReportGateway>();
 
         // ── HTTP Clients (centralized — base URLs from config, Polly from config) ──
-        var retryCount    = config.GetValue<int>("HttpClients:Retry:MaxAttempts",    3);
-        var retryDelay    = config.GetValue<int>("HttpClients:Retry:DelaySeconds",   2);
-        var timeoutSec    = config.GetValue<int>("HttpClients:TimeoutSeconds",       30);
+        var retryCount = config.GetValue<int>("HttpClients:Retry:MaxAttempts", 3);
+        var retryDelay = config.GetValue<int>("HttpClients:Retry:DelaySeconds", 2);
+        var timeoutSec = config.GetValue<int>("HttpClients:TimeoutSeconds", 30);
 
         services
             .AddHttpClient<IReveSmsClient, ReveSmsClient>(client =>
@@ -97,21 +97,21 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddApplicationServices(
         this IServiceCollection services)
     {
-        services.AddScoped<IEncryptionService,             AesEncryptionService>();
-        services.AddScoped<ITemplateParserService,         TemplateParserService>();
-        services.AddScoped<IXSoftApiKeyService,            XSoftApiKeyService>();
-        services.AddScoped<IAuthService,                   AuthService>();
-        services.AddScoped<IJwtService,                    JwtService>();
-        services.AddScoped<IChannelConfigService,          ChannelConfigService>();
-        services.AddScoped<IFallbackPolicyService,         FallbackPolicyService>();
-        services.AddScoped<IFallbackHandlerService,        FallbackHandlerService>();
-        services.AddScoped<IChannelDispatchService,        ChannelDispatchService>();
-        services.AddScoped<ISendTextOrchestratorService,   SendTextOrchestratorService>();
-        services.AddScoped<IManualSendService,             ManualSendService>();
-        services.AddScoped<IDashboardService,              DashboardService>();
-        services.AddScoped<IApiLogService,                 ApiLogService>();
-        services.AddScoped<IAdminUserService,              AdminUserService>();
-        services.AddScoped<IVoiceReportService,            VoiceReportService>();
+        services.AddScoped<IEncryptionService, AesEncryptionService>();
+        services.AddScoped<ITemplateParserService, TemplateParserService>();
+        services.AddScoped<IXSoftApiKeyService, XSoftApiKeyService>();
+        services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IJwtService, JwtService>();
+        services.AddScoped<IChannelConfigService, ChannelConfigService>();
+        services.AddScoped<IFallbackPolicyService, FallbackPolicyService>();
+        services.AddScoped<IFallbackHandlerService, FallbackHandlerService>();
+        services.AddScoped<IChannelDispatchService, ChannelDispatchService>();
+        services.AddScoped<ISendTextOrchestratorService, SendTextOrchestratorService>();
+        services.AddScoped<IManualSendService, ManualSendService>();
+        services.AddScoped<IDashboardService, DashboardService>();
+        services.AddScoped<IApiLogService, ApiLogService>();
+        services.AddScoped<IAdminUserService, AdminUserService>();
+        services.AddScoped<IVoiceReportService, VoiceReportService>();
         return services;
     }
 
@@ -128,13 +128,13 @@ public static class ServiceCollectionExtensions
                 opts.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidateIssuerSigningKey = true,
-                    IssuerSigningKey         = new SymmetricSecurityKey(key),
-                    ValidateIssuer           = true,
-                    ValidIssuer              = config["Jwt:Issuer"],
-                    ValidateAudience         = true,
-                    ValidAudience            = config["Jwt:Audience"],
-                    ValidateLifetime         = true,
-                    ClockSkew                = TimeSpan.Zero
+                    IssuerSigningKey = new SymmetricSecurityKey(key),
+                    ValidateIssuer = true,
+                    ValidIssuer = config["Jwt:Issuer"],
+                    ValidateAudience = true,
+                    ValidAudience = config["Jwt:Audience"],
+                    ValidateLifetime = true,
+                    ClockSkew = TimeSpan.Zero
                 };
             });
 
@@ -161,19 +161,20 @@ public static class ServiceCollectionExtensions
 
     // ── Centralized Polly resilience config (driven by appsettings) ───────
     private static void ConfigureResilience(
-        HttpStandardResilienceOptions opts, int retryCount, int retryDelaySeconds)
+    HttpStandardResilienceOptions opts, int retryCount, int retryDelaySeconds)
     {
         opts.Retry.MaxRetryAttempts = retryCount;
-        opts.Retry.BackoffType      = Polly.DelayBackoffType.Exponential;
-        opts.Retry.UseJitter        = true;
-        opts.Retry.Delay            = TimeSpan.FromSeconds(retryDelaySeconds);
+        opts.Retry.BackoffType = Polly.DelayBackoffType.Exponential;
+        opts.Retry.UseJitter = true;
+        opts.Retry.Delay = TimeSpan.FromSeconds(retryDelaySeconds);
 
-        opts.CircuitBreaker.SamplingDuration  = TimeSpan.FromSeconds(30);
+        // SamplingDuration must be > 2 × AttemptTimeout (Polly validation rule).
+        // AttemptTimeout=25s → minimum SamplingDuration is 51s. Using 60s.
+        opts.AttemptTimeout.Timeout = TimeSpan.FromSeconds(25);
+        opts.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(60);
         opts.CircuitBreaker.MinimumThroughput = 5;
-        opts.CircuitBreaker.FailureRatio      = 0.5;
-        opts.CircuitBreaker.BreakDuration     = TimeSpan.FromSeconds(15);
-
-        opts.AttemptTimeout.Timeout      = TimeSpan.FromSeconds(25);
-        opts.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(90);
+        opts.CircuitBreaker.FailureRatio = 0.5;
+        opts.CircuitBreaker.BreakDuration = TimeSpan.FromSeconds(15);
+        opts.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(120);
     }
 }

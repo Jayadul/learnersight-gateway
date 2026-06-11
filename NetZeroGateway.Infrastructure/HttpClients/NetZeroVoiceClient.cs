@@ -19,13 +19,13 @@ public class NetZeroVoiceClient(HttpClient http, ILogger<NetZeroVoiceClient> log
 
         var payload = new
         {
-            actionId           = "runCampaign",
+            actionId = "runCampaign",
             owner,
             password,
             campaignId,
             authUserId,
             lotNumber,
-            service            = "campaign",
+            service = "campaign",
             destinationNumbers
         };
 

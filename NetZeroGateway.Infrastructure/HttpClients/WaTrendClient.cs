@@ -16,9 +16,9 @@ public class WaTrendClient(HttpClient http, ILogger<WaTrendClient> logger) : IWa
         var payload = new
         {
             number,
-            type         = "text",
+            type = "text",
             message,
-            instance_id  = instanceId,
+            instance_id = instanceId,
             access_token = accessToken
         };
         return PostAsync(payload, number, ct);
@@ -31,10 +31,10 @@ public class WaTrendClient(HttpClient http, ILogger<WaTrendClient> logger) : IWa
         var payload = new
         {
             number,
-            type         = "media",
+            type = "media",
             message,
-            media_url    = mediaUrl,
-            instance_id  = instanceId,
+            media_url = mediaUrl,
+            instance_id = instanceId,
             access_token = accessToken
         };
         return PostAsync(payload, number, ct);

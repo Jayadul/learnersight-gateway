@@ -15,17 +15,22 @@ public class ApiLogService(IApiLogRepository repo) : IApiLogService
 
         return new PagedResult<ApiLogDto>
         {
-            Items      = items.Select(l => new ApiLogDto
+            Items = items.Select(l => new ApiLogDto
             {
-                Id = l.Id, ApiKey = l.ApiKey, ToUser = l.ToUser,
-                RawBody = l.RawBody, ResponseBody = l.ResponseBody,
-                CallerIp = l.CallerIp, ResponseStatus = l.ResponseStatus,
-                DurationMs = l.DurationMs, RequestedAt = l.RequestedAt,
+                Id = l.Id,
+                ApiKey = l.ApiKey,
+                ToUser = l.ToUser,
+                RawBody = l.RawBody,
+                ResponseBody = l.ResponseBody,
+                CallerIp = l.CallerIp,
+                ResponseStatus = l.ResponseStatus,
+                DurationMs = l.DurationMs,
+                RequestedAt = l.RequestedAt,
                 MessageRequestId = l.MessageRequestId
             }).ToList(),
             TotalCount = total,
-            Page       = page,
-            PageSize   = size
+            Page = page,
+            PageSize = size
         };
     }
 }

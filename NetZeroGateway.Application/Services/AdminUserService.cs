@@ -18,11 +18,11 @@ public class AdminUserService(IAdminUserRepository repo) : IAdminUserService
     {
         var u = new AdminUser
         {
-            Username     = req.Username,
+            Username = req.Username,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(req.Password),
-            Email        = req.Email,
-            Role         = req.Role,
-            IsActive     = true
+            Email = req.Email,
+            Role = req.Role,
+            IsActive = true
         };
         await repo.AddAsync(u);
         await repo.SaveChangesAsync();
@@ -32,8 +32,8 @@ public class AdminUserService(IAdminUserRepository repo) : IAdminUserService
     public async Task<AdminUserDto> UpdateAsync(Guid id, UpdateAdminUserRequest req)
     {
         var u = await repo.GetByIdAsync(id) ?? throw new NotFoundException($"User {id} not found.");
-        u.Email    = req.Email;
-        u.Role     = req.Role;
+        u.Email = req.Email;
+        u.Role = req.Role;
         u.IsActive = req.IsActive;
         if (!string.IsNullOrWhiteSpace(req.NewPassword))
             u.PasswordHash = BCrypt.Net.BCrypt.HashPassword(req.NewPassword);
@@ -51,8 +51,12 @@ public class AdminUserService(IAdminUserRepository repo) : IAdminUserService
 
     private static AdminUserDto ToDto(AdminUser u) => new()
     {
-        Id = u.Id, Username = u.Username, Email = u.Email,
-        Role = u.Role, IsActive = u.IsActive,
-        LastLoginAt = u.LastLoginAt, CreatedAt = u.CreatedAt
+        Id = u.Id,
+        Username = u.Username,
+        Email = u.Email,
+        Role = u.Role,
+        IsActive = u.IsActive,
+        LastLoginAt = u.LastLoginAt,
+        CreatedAt = u.CreatedAt
     };
 }

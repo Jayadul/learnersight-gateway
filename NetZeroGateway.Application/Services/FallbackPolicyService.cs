@@ -17,12 +17,12 @@ public class FallbackPolicyService(IFallbackPolicyRepository repo) : IFallbackPo
     {
         var e = new FallbackPolicy
         {
-            Name            = req.Name,
-            TriggerChannel  = req.TriggerChannel,
+            Name = req.Name,
+            TriggerChannel = req.TriggerChannel,
             FallbackChannel = req.FallbackChannel,
-            IsGlobal        = req.IsGlobal,
-            Description     = req.Description,
-            IsActive        = false
+            IsGlobal = req.IsGlobal,
+            Description = req.Description,
+            IsActive = false
         };
         await repo.AddAsync(e);
         await repo.SaveChangesAsync();
@@ -58,8 +58,13 @@ public class FallbackPolicyService(IFallbackPolicyRepository repo) : IFallbackPo
 
     private static FallbackPolicyDto ToDto(FallbackPolicy e) => new()
     {
-        Id = e.Id, Name = e.Name, TriggerChannel = e.TriggerChannel,
-        FallbackChannel = e.FallbackChannel, IsActive = e.IsActive,
-        IsGlobal = e.IsGlobal, Description = e.Description, CreatedAt = e.CreatedAt
+        Id = e.Id,
+        Name = e.Name,
+        TriggerChannel = e.TriggerChannel,
+        FallbackChannel = e.FallbackChannel,
+        IsActive = e.IsActive,
+        IsGlobal = e.IsGlobal,
+        Description = e.Description,
+        CreatedAt = e.CreatedAt
     };
 }

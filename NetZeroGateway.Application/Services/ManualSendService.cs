@@ -8,8 +8,8 @@ using NetZeroGateway.Domain.Enums;
 namespace NetZeroGateway.Application.Services;
 
 public class ManualSendService(
-    IMessageRequestRepository  msgRepo,
-    IServiceScopeFactory       scopeFactory,
+    IMessageRequestRepository msgRepo,
+    IServiceScopeFactory scopeFactory,
     ILogger<ManualSendService> logger
 ) : IManualSendService
 {
@@ -32,14 +32,14 @@ public class ManualSendService(
 
         var msgRequest = new MessageRequest
         {
-            ApiKey            = "admin-panel",
-            CallerID          = request.CallerID ?? "",
-            ToUser            = request.ToNumbers,
+            ApiKey = "admin-panel",
+            CallerID = request.CallerID ?? "",
+            ToUser = request.ToNumbers,
             RawMessageContent = request.Message,
-            ParsedChannels    = [request.ChannelType.ToString()],
-            OverallStatus     = MessageStatus.Pending,
-            ReceivedAt        = DateTimeOffset.UtcNow,
-            Source            = MessageSource.AdminPanel
+            ParsedChannels = [request.ChannelType.ToString()],
+            OverallStatus = MessageStatus.Pending,
+            ReceivedAt = DateTimeOffset.UtcNow,
+            Source = MessageSource.AdminPanel
         };
         await msgRepo.AddAsync(msgRequest);
         await msgRepo.SaveChangesAsync();
@@ -48,13 +48,13 @@ public class ManualSendService(
             "[MANUAL_SEND] Queued. RequestId={Id} Channel={Channel} Numbers={Count}",
             msgRequest.Id, request.ChannelType, numbers.Count);
 
-        var capturedId     = msgRequest.Id;
+        var capturedId = msgRequest.Id;
         var capturedToUser = request.ToNumbers;
-        var capturedJobs   = jobs;
+        var capturedJobs = jobs;
 
         _ = Task.Run(async () =>
         {
-            using var scope     = scopeFactory.CreateScope();
+            using var scope = scopeFactory.CreateScope();
             var dispatchService = scope.ServiceProvider
                 .GetRequiredService<IChannelDispatchService>();
             try
@@ -71,8 +71,8 @@ public class ManualSendService(
         return new ManualSendResponse
         {
             MessageRequestId = msgRequest.Id,
-            Status           = "queued",
-            TotalNumbers     = numbers.Count
+            Status = "queued",
+            TotalNumbers = numbers.Count
         };
     }
 }

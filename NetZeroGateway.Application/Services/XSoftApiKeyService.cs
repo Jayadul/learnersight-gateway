@@ -7,21 +7,21 @@ using NetZeroGateway.Domain.Entities;
 namespace NetZeroGateway.Application.Services;
 
 public class XSoftApiKeyService(
-    IXSoftApiKeyRepository      repo,
+    IXSoftApiKeyRepository repo,
     ILogger<XSoftApiKeyService> logger
 ) : IXSoftApiKeyService
 {
     public async Task<GenerateApiKeyResponse> GenerateAsync(string label)
     {
-        var rawApiKey    = Convert.ToHexString(RandomNumberGenerator.GetBytes(16)).ToLowerInvariant();
+        var rawApiKey = Convert.ToHexString(RandomNumberGenerator.GetBytes(16)).ToLowerInvariant();
         var rawSecretKey = Convert.ToHexString(RandomNumberGenerator.GetBytes(8)).ToLowerInvariant();
 
         var entity = new XSoftApiKey
         {
-            Label         = label,
-            ApiKeyHash    = BCrypt.Net.BCrypt.HashPassword(rawApiKey),
+            Label = label,
+            ApiKeyHash = BCrypt.Net.BCrypt.HashPassword(rawApiKey),
             SecretKeyHash = BCrypt.Net.BCrypt.HashPassword(rawSecretKey),
-            IsActive      = true
+            IsActive = true
         };
         await repo.AddAsync(entity);
         await repo.SaveChangesAsync();
@@ -30,10 +30,10 @@ public class XSoftApiKeyService(
 
         return new GenerateApiKeyResponse
         {
-            Id        = entity.Id,
-            ApiKey    = rawApiKey,
+            Id = entity.Id,
+            ApiKey = rawApiKey,
             SecretKey = rawSecretKey,
-            Label     = label
+            Label = label
         };
     }
 
@@ -59,11 +59,11 @@ public class XSoftApiKeyService(
         var keys = await repo.GetAllAsync();
         return keys.Select(k => new XSoftApiKeyDto
         {
-            Id         = k.Id,
-            Label      = k.Label,
-            IsActive   = k.IsActive,
+            Id = k.Id,
+            Label = k.Label,
+            IsActive = k.IsActive,
             LastUsedAt = k.LastUsedAt,
-            CreatedAt  = k.CreatedAt
+            CreatedAt = k.CreatedAt
         }).ToList();
     }
 

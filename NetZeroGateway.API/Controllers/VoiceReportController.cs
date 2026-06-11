@@ -8,7 +8,7 @@ namespace NetZeroGateway.API.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/voice-reports")]
-[Tags("Admin")]
+[ApiExplorerSettings(GroupName = "admin")]
 public class VoiceReportController(IVoiceReportService service) : ControllerBase
 {
     [HttpPost("sync")]

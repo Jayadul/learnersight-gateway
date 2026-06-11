@@ -18,10 +18,10 @@ public class DispatchJobRepository(NetZeroGatewayDbContext db)
         ChannelType? channelType, JobStatus? status, string? toNumber)
     {
         var q = _set.AsQueryable();
-        if (from        is not null) q = q.Where(j => j.CreatedAt   >= from);
-        if (to          is not null) q = q.Where(j => j.CreatedAt   <= to);
+        if (from is not null) q = q.Where(j => j.CreatedAt >= from);
+        if (to is not null) q = q.Where(j => j.CreatedAt <= to);
         if (channelType is not null) q = q.Where(j => j.ChannelType == channelType);
-        if (status      is not null) q = q.Where(j => j.Status      == status);
+        if (status is not null) q = q.Where(j => j.Status == status);
         if (!string.IsNullOrEmpty(toNumber))
             q = q.Where(j => j.ToNumber.Contains(toNumber));
 

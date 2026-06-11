@@ -8,7 +8,7 @@ using NetZeroGateway.Infrastructure.HttpClients;
 namespace NetZeroGateway.Infrastructure.Strategies;
 
 public class WhatsAppMediaSender(
-    IWaTrendClient               client,
+    IWaTrendClient client,
     ILogger<WhatsAppMediaSender> logger
 ) : IChannelSender
 {
@@ -38,7 +38,7 @@ public class WhatsAppMediaSender(
             }
             else
             {
-                job.Status        = JobStatus.Failed;
+                job.Status = JobStatus.Failed;
                 job.FailureReason = r.Status;
                 logger.LogWarning(
                     "[WA_MEDIA] Failed for {ToNumber} | Status={Status}", job.ToNumber, r.Status);
@@ -46,7 +46,7 @@ public class WhatsAppMediaSender(
         }
         catch (Exception ex)
         {
-            job.Status        = JobStatus.Failed;
+            job.Status = JobStatus.Failed;
             job.FailureReason = ex.Message;
             logger.LogError(ex, "[WA_MEDIA] Exception dispatching to {ToNumber}", job.ToNumber);
         }

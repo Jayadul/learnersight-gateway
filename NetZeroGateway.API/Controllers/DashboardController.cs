@@ -7,7 +7,7 @@ namespace NetZeroGateway.API.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/dashboard")]
-[Tags("Admin")]
+[ApiExplorerSettings(GroupName = "admin")]
 public class DashboardController(IDashboardService service) : ControllerBase
 {
     [HttpGet("summary")]

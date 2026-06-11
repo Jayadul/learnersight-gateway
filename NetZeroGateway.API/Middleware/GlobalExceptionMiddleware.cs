@@ -5,8 +5,8 @@ using NetZeroGateway.Application.Exceptions;
 namespace NetZeroGateway.API.Middleware;
 
 public class GlobalExceptionMiddleware(
-    RequestDelegate                     next,
-    ILogger<GlobalExceptionMiddleware>  logger)
+    RequestDelegate next,
+    ILogger<GlobalExceptionMiddleware> logger)
 {
     public async Task InvokeAsync(HttpContext ctx)
     {
@@ -64,7 +64,7 @@ public class GlobalExceptionMiddleware(
         var pd = new ProblemDetails
         {
             Status = status,
-            Title  = title,
+            Title = title,
             Detail = detail
         };
         if (traceId is not null) pd.Extensions["traceId"] = traceId;

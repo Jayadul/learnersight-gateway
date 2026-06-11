@@ -8,8 +8,8 @@ using NetZeroGateway.Infrastructure.HttpClients;
 namespace NetZeroGateway.Infrastructure.Strategies;
 
 public class VoiceSender(
-    INetZeroVoiceClient     client,
-    ILogger<VoiceSender>    logger
+    INetZeroVoiceClient client,
+    ILogger<VoiceSender> logger
 ) : IChannelSender
 {
     public ChannelType ChannelType => ChannelType.Voice;
@@ -39,22 +39,22 @@ public class VoiceSender(
 
             if (r.IsSuccess)
             {
-                job.Status        = JobStatus.Sent;
-                job.SentAt        = DateTimeOffset.UtcNow;
-                job.CampaignId    = r.TaskId ?? job.CampaignId;
+                job.Status = JobStatus.Sent;
+                job.SentAt = DateTimeOffset.UtcNow;
+                job.CampaignId = r.TaskId ?? job.CampaignId;
                 logger.LogInformation(
                     "[VOICE] Campaign queued OK. TaskId={TaskId}", r.TaskId);
             }
             else
             {
-                job.Status        = JobStatus.Failed;
+                job.Status = JobStatus.Failed;
                 job.FailureReason = r.Message;
                 logger.LogWarning("[VOICE] Campaign failed | Reason={Reason}", r.Message);
             }
         }
         catch (Exception ex)
         {
-            job.Status        = JobStatus.Failed;
+            job.Status = JobStatus.Failed;
             job.FailureReason = ex.Message;
             logger.LogError(ex, "[VOICE] Exception dispatching campaign");
         }

@@ -14,8 +14,8 @@ public class ApiLogRepository(NetZeroGatewayDbContext db)
         int? responseStatus, string? apiKey)
     {
         var q = _set.AsQueryable();
-        if (from           is not null) q = q.Where(l => l.RequestedAt    >= from);
-        if (to             is not null) q = q.Where(l => l.RequestedAt    <= to);
+        if (from is not null) q = q.Where(l => l.RequestedAt >= from);
+        if (to is not null) q = q.Where(l => l.RequestedAt <= to);
         if (responseStatus is not null) q = q.Where(l => l.ResponseStatus == responseStatus);
         if (!string.IsNullOrEmpty(apiKey))
             q = q.Where(l => l.ApiKey != null && l.ApiKey.Contains(apiKey));

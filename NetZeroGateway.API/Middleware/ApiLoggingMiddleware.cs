@@ -27,9 +27,9 @@ public class ApiLoggingMiddleware(RequestDelegate next, ILogger<ApiLoggingMiddle
         ctx.Request.Body.Position = 0;
 
         // Swap response stream to capture output
-        var originalBody     = ctx.Response.Body;
-        using var captureMs  = new MemoryStream();
-        ctx.Response.Body    = captureMs;
+        var originalBody = ctx.Response.Body;
+        using var captureMs = new MemoryStream();
+        ctx.Response.Body = captureMs;
 
         var sw = Stopwatch.StartNew();
         await next(ctx);
@@ -52,7 +52,7 @@ public class ApiLoggingMiddleware(RequestDelegate next, ILogger<ApiLoggingMiddle
             if (ctx.Request.HasFormContentType)
             {
                 ctx.Request.Body.Position = 0;
-                var form  = await ctx.Request.ReadFormAsync();
+                var form = await ctx.Request.ReadFormAsync();
                 ctx.Request.Body.Position = 0;
                 apiKeyVal = form["apikey"].FirstOrDefault();
                 toUserVal = form["toUser"].FirstOrDefault();
@@ -68,14 +68,14 @@ public class ApiLoggingMiddleware(RequestDelegate next, ILogger<ApiLoggingMiddle
 
             await repo.AddAsync(new ApiLog
             {
-                ApiKey         = apiKeyVal,
-                ToUser         = toUserVal,
-                RawBody        = reqBody,
-                ResponseBody   = respBody,
-                CallerIp       = ctx.Connection.RemoteIpAddress?.ToString() ?? "",
+                ApiKey = apiKeyVal,
+                ToUser = toUserVal,
+                RawBody = reqBody,
+                ResponseBody = respBody,
+                CallerIp = ctx.Connection.RemoteIpAddress?.ToString() ?? "",
                 ResponseStatus = ctx.Response.StatusCode,
-                DurationMs     = sw.ElapsedMilliseconds,
-                RequestedAt    = DateTimeOffset.UtcNow
+                DurationMs = sw.ElapsedMilliseconds,
+                RequestedAt = DateTimeOffset.UtcNow
             });
             await repo.SaveChangesAsync();
 

@@ -5,7 +5,7 @@ namespace NetZeroGateway.Application.Services;
 
 public interface IJwtService
 {
-    string            IssueAccessToken(AdminUser user);
-    string            IssueRefreshToken(AdminUser user);
-    ClaimsPrincipal?  ValidateRefreshToken(string token);
+    string IssueAccessToken(AdminUser user);
+    string IssueRefreshToken(AdminUser user);
+    ClaimsPrincipal? ValidateRefreshToken(string token);
 }

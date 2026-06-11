@@ -44,14 +44,12 @@ try
 
         c.DocInclusionPredicate((docName, apiDesc) =>
         {
-            var tags = apiDesc.ActionDescriptor.EndpointMetadata
-                .OfType<Swashbuckle.AspNetCore.Annotations.SwaggerOperationAttribute>()
-                .SelectMany(a => a.Tags ?? [])
-                .ToHashSet();
+            var groupName = apiDesc.ActionDescriptor.EndpointMetadata
+                .OfType<Microsoft.AspNetCore.Mvc.ApiExplorerSettingsAttribute>()
+                .FirstOrDefault()?.GroupName;
 
-            return docName == "gateway"
-                ? tags.Contains("Gateway")
-                : tags.Contains("Admin");
+            // If no group set, include in admin doc by default
+            return groupName == docName || (groupName is null && docName == "admin");
         });
 
         var jwtScheme = new OpenApiSecurityScheme
@@ -104,6 +102,7 @@ try
             c.SwaggerEndpoint("/swagger/gateway/swagger.json", "Gateway API");
             c.SwaggerEndpoint("/swagger/admin/swagger.json", "Admin API");
             c.RoutePrefix = "swagger";
+            c.DocumentTitle = "NetZeroGateway API";
         });
     }
 

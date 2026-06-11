@@ -11,8 +11,8 @@ namespace NetZeroGateway.Application.Services;
 /// </summary>
 public class VoiceReportService(
     IChannelConfigRepository configRepo,
-    IEncryptionService       enc,
-    IVoiceReportGateway      reportGateway
+    IEncryptionService enc,
+    IVoiceReportGateway reportGateway
 ) : IVoiceReportService
 {
     public async Task<VoiceReportSyncResponse> SyncAsync(VoiceReportSyncRequest req)
@@ -21,10 +21,10 @@ public class VoiceReportService(
             ?? throw new NotFoundException("No active Voice channel config found.");
 
         var plain = enc.Decrypt(config.ConfigJson);
-        var cfg   = JsonSerializer.Deserialize<Dictionary<string, string>>(plain)
+        var cfg = JsonSerializer.Deserialize<Dictionary<string, string>>(plain)
             ?? throw new InvalidOperationException("Invalid voice config JSON.");
 
-        var owner    = cfg.GetValueOrDefault("owner",    "");
+        var owner = cfg.GetValueOrDefault("owner", "");
         var password = cfg.GetValueOrDefault("password", "");
 
         var result = await reportGateway.GetCombinedReportAsync(owner, password, req.From, req.To);
@@ -32,7 +32,7 @@ public class VoiceReportService(
         return new VoiceReportSyncResponse
         {
             TotalRecords = result.TotalRecords,
-            Records      = result.Records
+            Records = result.Records
         };
     }
 }

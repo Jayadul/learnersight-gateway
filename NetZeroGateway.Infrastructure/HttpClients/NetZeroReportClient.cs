@@ -16,17 +16,17 @@ public class NetZeroReportClient(HttpClient http, ILogger<NetZeroReportClient> l
     {
         var qs = new Dictionary<string, string>
         {
-            ["service"]         = "campaign",
-            ["actionId"]        = "getCombinedDetailedReport",
+            ["service"] = "campaign",
+            ["actionId"] = "getCombinedDetailedReport",
             ["aggregationType"] = "Detailed",
-            ["contType"]        = "SuccessfulAndFailed",
-            ["fromTime"]        = from.UtcDateTime.ToString(Fmt),
-            ["toTime"]          = to.UtcDateTime.ToString(Fmt),
-            ["download"]        = "false",
-            ["owner"]           = owner,
-            ["password"]        = password,
-            ["offset"]          = "0",
-            ["limit"]           = "100"
+            ["contType"] = "SuccessfulAndFailed",
+            ["fromTime"] = from.UtcDateTime.ToString(Fmt),
+            ["toTime"] = to.UtcDateTime.ToString(Fmt),
+            ["download"] = "false",
+            ["owner"] = owner,
+            ["password"] = password,
+            ["offset"] = "0",
+            ["limit"] = "100"
         };
         var query = string.Join("&",
             qs.Select(kv => $"{kv.Key}={Uri.EscapeDataString(kv.Value)}"))

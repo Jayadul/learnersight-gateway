@@ -9,12 +9,12 @@ using NetZeroGateway.Domain.Enums;
 namespace NetZeroGateway.Application.Services;
 
 public class ChannelDispatchService(
-    IMessageRequestRepository   msgRepo,
-    IDispatchJobRepository      jobRepo,
-    IChannelConfigRepository    configRepo,
-    IEncryptionService          enc,
-    IChannelSenderFactory       senderFactory,
-    IFallbackHandlerService     fallbackHandler,
+    IMessageRequestRepository msgRepo,
+    IDispatchJobRepository jobRepo,
+    IChannelConfigRepository configRepo,
+    IEncryptionService enc,
+    IChannelSenderFactory senderFactory,
+    IFallbackHandlerService fallbackHandler,
     ILogger<ChannelDispatchService> logger
 ) : IChannelDispatchService
 {
@@ -48,9 +48,9 @@ public class ChannelDispatchService(
 
             allTasks.Add(job.ChannelType switch
             {
-                ChannelType.SMS   => DispatchSmsAsync(messageRequestId, config.Id, job, cfg, numbers),
+                ChannelType.SMS => DispatchSmsAsync(messageRequestId, config.Id, job, cfg, numbers),
                 ChannelType.Voice => DispatchVoiceAsync(messageRequestId, config.Id, job, cfg, numbers),
-                _                 => DispatchPerNumberAsync(messageRequestId, config.Id, job, cfg, numbers)
+                _ => DispatchPerNumberAsync(messageRequestId, config.Id, job, cfg, numbers)
             });
         }
 
@@ -83,7 +83,7 @@ public class ChannelDispatchService(
         List<string> numbers)
     {
         var sender = senderFactory.GetSender(job.ChannelType);
-        var tasks  = numbers.Select(async number =>
+        var tasks = numbers.Select(async number =>
         {
             var dispatchJob = await CreateJobAsync(requestId, configId, job, number);
             await sender.SendAsync(dispatchJob, cfg);
@@ -112,13 +112,13 @@ public class ChannelDispatchService(
         var dispatchJob = new DispatchJob
         {
             MessageRequestId = requestId,
-            ChannelType      = job.ChannelType,
-            ChannelConfigId  = configId,
-            MessageContent   = job.Message,
-            MediaUrl         = job.MediaUrl,
-            CampaignId       = job.CampaignId,
-            ToNumber         = toNumber,
-            Status           = JobStatus.Pending
+            ChannelType = job.ChannelType,
+            ChannelConfigId = configId,
+            MessageContent = job.Message,
+            MediaUrl = job.MediaUrl,
+            CampaignId = job.CampaignId,
+            ToNumber = toNumber,
+            Status = JobStatus.Pending
         };
         await jobRepo.AddAsync(dispatchJob);
         await jobRepo.SaveChangesAsync();
@@ -131,12 +131,12 @@ public class ChannelDispatchService(
         if (request is null) return;
 
         var primaryJobs = request.Jobs.Where(j => !j.IsFallback).ToList();
-        var sentCount   = primaryJobs.Count(j => j.Status == JobStatus.Sent);
+        var sentCount = primaryJobs.Count(j => j.Status == JobStatus.Sent);
         var failedCount = primaryJobs.Count(j => j.Status == JobStatus.Failed);
 
-        request.OverallStatus = failedCount == 0  ? MessageStatus.Success
-                              : sentCount   == 0  ? MessageStatus.Failed
-                                                  : MessageStatus.PartialSuccess;
+        request.OverallStatus = failedCount == 0 ? MessageStatus.Success
+                              : sentCount == 0 ? MessageStatus.Failed
+                              : MessageStatus.PartialSuccess;
         msgRepo.Update(request);
         await msgRepo.SaveChangesAsync();
 

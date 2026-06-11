@@ -9,7 +9,7 @@ namespace NetZeroGateway.Application.Services;
 
 public class ChannelConfigService(
     IChannelConfigRepository repo,
-    IEncryptionService       enc
+    IEncryptionService enc
 ) : IChannelConfigService
 {
     public async Task<List<ChannelConfigDto>> GetAllAsync(ChannelType? filter)
@@ -28,11 +28,11 @@ public class ChannelConfigService(
     {
         var entity = new ChannelConfig
         {
-            ChannelType  = req.ChannelType,
+            ChannelType = req.ChannelType,
             ProviderName = req.ProviderName,
-            Label        = req.Label,
-            ConfigJson   = enc.Encrypt(req.ConfigJson),
-            IsActive     = false
+            Label = req.Label,
+            ConfigJson = enc.Encrypt(req.ConfigJson),
+            IsActive = false
         };
         await repo.AddAsync(entity);
         await repo.SaveChangesAsync();
@@ -44,8 +44,8 @@ public class ChannelConfigService(
         var entity = await repo.GetByIdAsync(id)
             ?? throw new NotFoundException($"ChannelConfig {id} not found.");
         entity.ProviderName = req.ProviderName;
-        entity.Label        = req.Label;
-        entity.ConfigJson   = enc.Encrypt(req.ConfigJson);
+        entity.Label = req.Label;
+        entity.ConfigJson = enc.Encrypt(req.ConfigJson);
         repo.Update(entity);
         await repo.SaveChangesAsync();
         return ToDto(entity);
@@ -82,7 +82,7 @@ public class ChannelConfigService(
         try
         {
             var plain = enc.Decrypt(c.ConfigJson);
-            var dict  = JsonSerializer.Deserialize<Dictionary<string, string>>(plain);
+            var dict = JsonSerializer.Deserialize<Dictionary<string, string>>(plain);
             if (dict is not null)
                 foreach (var kv in dict)
                     masked[kv.Key] = IsSecret(kv.Key) ? "***" : kv.Value;
@@ -91,14 +91,14 @@ public class ChannelConfigService(
 
         return new ChannelConfigDto
         {
-            Id           = c.Id,
-            ChannelType  = c.ChannelType,
+            Id = c.Id,
+            ChannelType = c.ChannelType,
             ProviderName = c.ProviderName,
-            Label        = c.Label,
-            IsActive     = c.IsActive,
+            Label = c.Label,
+            IsActive = c.IsActive,
             ConfigFields = masked,
-            CreatedAt    = c.CreatedAt,
-            UpdatedAt    = c.UpdatedAt
+            CreatedAt = c.CreatedAt,
+            UpdatedAt = c.UpdatedAt
         };
     }
 
