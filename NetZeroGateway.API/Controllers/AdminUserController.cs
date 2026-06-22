@@ -8,7 +8,6 @@ namespace NetZeroGateway.API.Controllers;
 [ApiController]
 [Authorize(Roles = "SuperAdmin")]
 [Route("api/admin/users")]
-[ApiExplorerSettings(GroupName = "admin")]
 public class AdminUserController(IAdminUserService service) : ControllerBase
 {
     [HttpGet]

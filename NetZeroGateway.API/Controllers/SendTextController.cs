@@ -7,7 +7,6 @@ namespace NetZeroGateway.API.Controllers;
 
 [ApiController]
 [Route("sendtext")]
-[ApiExplorerSettings(GroupName = "gateway")]
 public class SendTextController(ISendTextOrchestratorService orchestrator) : ControllerBase
 {
     /// <summary>

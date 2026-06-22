@@ -1,0 +1,53 @@
+{
+  "Authorization": {
+    "Gateway": {
+      "SwaggerGroupName": "gateway",
+      "EndpointPath": "/sendtext",
+      "XSoftTokenHeader": "X-XSoft-Token"
+    },
+    "Admin": {
+      "SwaggerGroupName": "admin",
+      "CorsPolicy": "DefaultCors",
+      "JwtTokenType": "type",
+      "JwtAccessTokenValue": "access",
+      "JwtRefreshTokenValue": "refresh"
+    },
+    "Swagger": {
+      "GatewayTitle": "NetZeroGateway — Gateway API",
+      "GatewayDescription": "REVE SMS-compatible endpoint. x-soft calls POST /sendtext — zero config changes needed.",
+      "AdminTitle": "NetZeroGateway — Admin API",
+      "AdminDescription": "Admin panel: channel configs, logs, dashboard, users, fallback policies.",
+      "SecuritySchemeId": "Bearer"
+    }
+  },
+  "Providers": {
+    "Sms": {
+      "BaseUrl": "http://smpp.revesms.com:7788",
+      "SendPath": "/sendtext"
+    },
+    "WhatsApp": {
+      "BaseUrl": "https://app.watrend.com",
+      "SendPath": "/api/send",
+      "TextType": "text",
+      "MediaType": "media"
+    },
+    "Voice": {
+      "BaseUrl": "http://api.sms.netzero.com.bd:8000",
+      "CampaignPath": "/api/v1/run-campaign",
+      "ActionId": "runCampaign",
+      "Service": "campaign",
+      "LotNumber": "1"
+    },
+    "VoiceReport": {
+      "BaseUrl": "http://api.sms.netzero.com.bd:8000",
+      "ReportPath": "/api/v1/combined-report",
+      "ActionId": "getCombinedDetailedReport",
+      "AggregationType": "Detailed",
+      "ContType": "SuccessfulAndFailed",
+      "Service": "campaign",
+      "DefaultOffset": "0",
+      "DefaultLimit": "100",
+      "Fields": "StartTime,Destination,CallState,DisplayNameSent,ConnectTime,EndTime"
+    }
+  }
+}

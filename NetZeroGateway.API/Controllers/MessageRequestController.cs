@@ -9,7 +9,6 @@ namespace NetZeroGateway.API.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/message-requests")]
-[ApiExplorerSettings(GroupName = "admin")]
 public class MessageRequestController(IMessageRequestRepository repo) : ControllerBase
 {
     [HttpGet]

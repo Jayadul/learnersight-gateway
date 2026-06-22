@@ -1,4 +1,5 @@
 using NetZeroGateway.Application.Interfaces;
+using NetZeroGateway.Application.Utilities;
 using NetZeroGateway.Domain.Entities;
 using System.Diagnostics;
 using System.Text;
@@ -13,40 +14,34 @@ public class ApiLoggingMiddleware(RequestDelegate next, ILogger<ApiLoggingMiddle
 {
     public async Task InvokeAsync(HttpContext ctx)
     {
+        var config = ctx.RequestServices.GetRequiredService<IConfiguration>();
+        var endpointPath = config[ConfigKeys.GatewayEndpointPath] ?? "/sendtext";
+
         if (ctx.Request.Method != "POST" ||
-            !ctx.Request.Path.Equals("/sendtext", StringComparison.OrdinalIgnoreCase))
+            !ctx.Request.Path.Equals(endpointPath, StringComparison.OrdinalIgnoreCase))
         {
-            await next(ctx);
-            return;
+            await next(ctx); return;
         }
 
-        // Buffer request so it can be read more than once
         ctx.Request.EnableBuffering();
-
         var reqBody = await ReadBodyAsync(ctx.Request);
         ctx.Request.Body.Position = 0;
 
-        // Swap response stream to capture output
         var originalBody = ctx.Response.Body;
-        using var captureMs = new MemoryStream();
-        ctx.Response.Body = captureMs;
+        using var capture = new MemoryStream();
+        ctx.Response.Body = capture;
 
         var sw = Stopwatch.StartNew();
         await next(ctx);
         sw.Stop();
 
-        // Read captured response
-        captureMs.Position = 0;
-        var respBody = await new StreamReader(captureMs).ReadToEndAsync();
-
-        // Copy back to real stream
-        captureMs.Position = 0;
-        await captureMs.CopyToAsync(originalBody);
+        capture.Position = 0;
+        var respBody = await new StreamReader(capture).ReadToEndAsync();
+        capture.Position = 0;
+        await capture.CopyToAsync(originalBody);
         ctx.Response.Body = originalBody;
 
-        // Extract apikey / toUser from form (best-effort)
-        string? apiKeyVal = null;
-        string? toUserVal = null;
+        string? apiKeyVal = null, toUserVal = null;
         try
         {
             if (ctx.Request.HasFormContentType)
@@ -58,14 +53,12 @@ public class ApiLoggingMiddleware(RequestDelegate next, ILogger<ApiLoggingMiddle
                 toUserVal = form["toUser"].FirstOrDefault();
             }
         }
-        catch { /* swallow — logging must never break the pipeline */ }
+        catch { /* never break pipeline */ }
 
-        // Persist log record
         try
         {
             await using var scope = ctx.RequestServices.CreateAsyncScope();
             var repo = scope.ServiceProvider.GetRequiredService<IApiLogRepository>();
-
             await repo.AddAsync(new ApiLog
             {
                 ApiKey = apiKeyVal,
@@ -78,26 +71,24 @@ public class ApiLoggingMiddleware(RequestDelegate next, ILogger<ApiLoggingMiddle
                 RequestedAt = DateTimeOffset.UtcNow
             });
             await repo.SaveChangesAsync();
-
-            logger.LogInformation(
-                "[API_LOG] {Status} in {Ms}ms | To={ToUser} | IP={Ip}",
-                ctx.Response.StatusCode, sw.ElapsedMilliseconds, toUserVal,
-                ctx.Connection.RemoteIpAddress);
+            logger.LogInformation("[API_LOG] {Status} {Ms}ms | To={To} | IP={Ip}",
+                ctx.Response.StatusCode, sw.ElapsedMilliseconds,
+                toUserVal, ctx.Connection.RemoteIpAddress);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "[API_LOG] Failed to persist API log record");
+            logger.LogError(ex, "[API_LOG] Failed to persist log record");
         }
     }
 
-    private static async Task<string> ReadBodyAsync(HttpRequest request)
+    private static async Task<string> ReadBodyAsync(HttpRequest req)
     {
         try
         {
-            request.Body.Position = 0;
-            using var reader = new StreamReader(request.Body, Encoding.UTF8, leaveOpen: true);
-            var body = await reader.ReadToEndAsync();
-            request.Body.Position = 0;
+            req.Body.Position = 0;
+            using var r = new StreamReader(req.Body, Encoding.UTF8, leaveOpen: true);
+            var body = await r.ReadToEndAsync();
+            req.Body.Position = 0;
             return body;
         }
         catch { return "(unreadable)"; }

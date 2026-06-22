@@ -9,7 +9,6 @@ namespace NetZeroGateway.API.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/dispatch-logs")]
-[ApiExplorerSettings(GroupName = "admin")]
 public class DispatchLogController(IDispatchJobRepository repo) : ControllerBase
 {
     [HttpGet]

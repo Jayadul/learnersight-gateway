@@ -1,57 +1,55 @@
-using System.Text;
-using System.Text.Json;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using NetZeroGateway.Infrastructure.HttpClients.Models;
+using System.Text;
+using System.Text.Json;
 
 namespace NetZeroGateway.Infrastructure.HttpClients;
 
-public class WaTrendClient(HttpClient http, ILogger<WaTrendClient> logger) : IWaTrendClient
+public class WaTrendClient(
+    HttpClient http, IConfiguration config, ILogger<WaTrendClient> logger)
+    : IWaTrendClient
 {
+    private string SendPath => config["Providers:WhatsApp:SendPath"] ?? "/api/send";
+    private string TextType => config["Providers:WhatsApp:TextType"] ?? "text";
+    private string MediaType => config["Providers:WhatsApp:MediaType"] ?? "media";
+
     private static readonly JsonSerializerOptions _opts = new() { PropertyNamingPolicy = null };
 
     public Task<WaTrendResponse> SendTextAsync(
         string instanceId, string accessToken,
-        string number, string message, CancellationToken ct = default)
-    {
-        var payload = new
+        string number, string message, CancellationToken ct = default) =>
+        PostAsync(new
         {
             number,
-            type = "text",
+            type = TextType,
             message,
             instance_id = instanceId,
             access_token = accessToken
-        };
-        return PostAsync(payload, number, ct);
-    }
+        }, number, ct);
 
     public Task<WaTrendResponse> SendMediaAsync(
         string instanceId, string accessToken,
-        string number, string message, string mediaUrl, CancellationToken ct = default)
-    {
-        var payload = new
+        string number, string message, string mediaUrl, CancellationToken ct = default) =>
+        PostAsync(new
         {
             number,
-            type = "media",
+            type = MediaType,
             message,
             media_url = mediaUrl,
             instance_id = instanceId,
             access_token = accessToken
-        };
-        return PostAsync(payload, number, ct);
-    }
+        }, number, ct);
 
-    private async Task<WaTrendResponse> PostAsync(object payload, string number, CancellationToken ct)
+    private async Task<WaTrendResponse> PostAsync(
+        object payload, string number, CancellationToken ct)
     {
-        logger.LogInformation("[WATREND] POST /api/send to={Number}", number);
-
+        logger.LogInformation("[WATREND] POST {Path} to={Number}", SendPath, number);
         var content = new StringContent(
             JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-
-        var resp = await http.PostAsync("/api/send", content, ct);
+        var resp = await http.PostAsync(SendPath, content, ct);
         var body = await resp.Content.ReadAsStringAsync(ct);
-
-        logger.LogDebug("[WATREND] Raw response for {Number}: {Body}", number, body);
-
+        logger.LogDebug("[WATREND] Response for {Number}: {Body}", number, body);
         try
         {
             return JsonSerializer.Deserialize<WaTrendResponse>(body, _opts)
@@ -59,7 +57,7 @@ public class WaTrendClient(HttpClient http, ILogger<WaTrendClient> logger) : IWa
         }
         catch (JsonException ex)
         {
-            logger.LogError(ex, "[WATREND] JSON parse error for {Number}. Body={Body}", number, body);
+            logger.LogError(ex, "[WATREND] Parse error for {Number}. Body={Body}", number, body);
             return new WaTrendResponse { Status = "error" };
         }
     }

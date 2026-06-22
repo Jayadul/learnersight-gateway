@@ -5,6 +5,7 @@ using Microsoft.IdentityModel.Tokens;
 using NetZeroGateway.Application.Interfaces;
 using NetZeroGateway.Application.Services;
 using NetZeroGateway.Application.Strategies;
+using NetZeroGateway.Application.Utilities;
 using NetZeroGateway.Infrastructure.HttpClients;
 using NetZeroGateway.Infrastructure.Persistence;
 using NetZeroGateway.Infrastructure.Repositories;
@@ -16,16 +17,22 @@ namespace NetZeroGateway.API.Extensions;
 
 public static class ServiceCollectionExtensions
 {
+    /// <summary>Registers MVC + SwaggerGroupConvention (groups from authorization.json).</summary>
+    public static IMvcBuilder AddControllersWithSwaggerGroups(
+        this IServiceCollection services, IConfiguration config)
+        => services.AddControllers(opts =>
+            opts.Conventions.Add(new SwaggerGroupConvention(config)));
+
     // ── Infrastructure ────────────────────────────────────────────────────
     public static IServiceCollection AddInfrastructure(
         this IServiceCollection services, IConfiguration config)
     {
-        // EF Core (PostgreSQL + snake_case naming)
+        // EF Core
         services.AddDbContext<NetZeroGatewayDbContext>(opts =>
             opts.UseNpgsql(config.GetConnectionString("DefaultConnection"))
                 .UseSnakeCaseNamingConvention());
 
-        // Repositories (Application.Interfaces → Infrastructure implementations)
+        // Repositories
         services.AddScoped<IAdminUserRepository, AdminUserRepository>();
         services.AddScoped<IXSoftApiKeyRepository, XSoftApiKeyRepository>();
         services.AddScoped<IXSoftAppConfigRepository, XSoftAppConfigRepository>();
@@ -35,55 +42,49 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IApiLogRepository, ApiLogRepository>();
         services.AddScoped<IFallbackPolicyRepository, FallbackPolicyRepository>();
 
-        // Encryption
+        // Encryption + voice gateway
         services.AddScoped<IEncryptionService, AesEncryptionService>();
-
-        // Voice report gateway abstraction
         services.AddScoped<IVoiceReportGateway, VoiceReportGateway>();
 
-        // ── HTTP Clients (centralized — base URLs from config, Polly from config) ──
-        var retryCount = config.GetValue<int>("HttpClients:Retry:MaxAttempts", 3);
-        var retryDelay = config.GetValue<int>("HttpClients:Retry:DelaySeconds", 2);
-        var timeoutSec = config.GetValue<int>("HttpClients:TimeoutSeconds", 30);
+        // HTTP clients — base URLs + Polly from config
+        var retryCount = config.GetValue<int>(ConfigKeys.RetryMaxAttempts, 3);
+        var retryDelay = config.GetValue<int>(ConfigKeys.RetryDelaySeconds, 2);
+        var timeout = config.GetValue<int>(ConfigKeys.TimeoutSeconds, 30);
+        var rptTimeout = config.GetValue<int>(ConfigKeys.ReportTimeoutSeconds, 60);
 
         services
-            .AddHttpClient<IReveSmsClient, ReveSmsClient>(client =>
+            .AddHttpClient<IReveSmsClient, ReveSmsClient>(c =>
             {
-                client.BaseAddress = new Uri(
-                    config["Providers:Sms:BaseUrl"] ?? "http://smpp.revesms.com:7788");
-                client.Timeout = TimeSpan.FromSeconds(timeoutSec);
+                c.BaseAddress = new Uri(config[ConfigKeys.SmsBaseUrl]!);
+                c.Timeout = TimeSpan.FromSeconds(timeout);
             })
-            .AddStandardResilienceHandler(o => ConfigureResilience(o, retryCount, retryDelay));
+            .AddStandardResilienceHandler(o => Resilience(o, retryCount, retryDelay));
 
         services
-            .AddHttpClient<IWaTrendClient, WaTrendClient>(client =>
+            .AddHttpClient<IWaTrendClient, WaTrendClient>(c =>
             {
-                client.BaseAddress = new Uri(
-                    config["Providers:WhatsApp:BaseUrl"] ?? "https://app.watrend.com");
-                client.Timeout = TimeSpan.FromSeconds(timeoutSec);
+                c.BaseAddress = new Uri(config[ConfigKeys.WhatsAppBaseUrl]!);
+                c.Timeout = TimeSpan.FromSeconds(timeout);
             })
-            .AddStandardResilienceHandler(o => ConfigureResilience(o, retryCount, retryDelay));
+            .AddStandardResilienceHandler(o => Resilience(o, retryCount, retryDelay));
 
         services
-            .AddHttpClient<INetZeroVoiceClient, NetZeroVoiceClient>(client =>
+            .AddHttpClient<INetZeroVoiceClient, NetZeroVoiceClient>(c =>
             {
-                client.BaseAddress = new Uri(
-                    config["Providers:Voice:BaseUrl"] ?? "http://api.sms.netzero.com.bd:8000");
-                client.Timeout = TimeSpan.FromSeconds(timeoutSec);
+                c.BaseAddress = new Uri(config[ConfigKeys.VoiceBaseUrl]!);
+                c.Timeout = TimeSpan.FromSeconds(timeout);
             })
-            .AddStandardResilienceHandler(o => ConfigureResilience(o, retryCount, retryDelay));
+            .AddStandardResilienceHandler(o => Resilience(o, retryCount, retryDelay));
 
         services
-            .AddHttpClient<INetZeroReportClient, NetZeroReportClient>(client =>
+            .AddHttpClient<INetZeroReportClient, NetZeroReportClient>(c =>
             {
-                client.BaseAddress = new Uri(
-                    config["Providers:VoiceReport:BaseUrl"] ?? "http://api.sms.netzero.com.bd:8000");
-                client.Timeout = TimeSpan.FromSeconds(
-                    config.GetValue<int>("HttpClients:ReportTimeoutSeconds", 60));
+                c.BaseAddress = new Uri(config[ConfigKeys.VoiceReportBaseUrl]!);
+                c.Timeout = TimeSpan.FromSeconds(rptTimeout);
             })
-            .AddStandardResilienceHandler(o => ConfigureResilience(o, retryCount, retryDelay));
+            .AddStandardResilienceHandler(o => Resilience(o, retryCount, retryDelay));
 
-        // ── Channel sender strategies (Factory pattern) ───────────────────
+        // Channel sender strategies
         services.AddScoped<IChannelSender, SmsSender>();
         services.AddScoped<IChannelSender, WhatsAppTextSender>();
         services.AddScoped<IChannelSender, WhatsAppMediaSender>();
@@ -115,43 +116,41 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
-    // ── JWT Auth ──────────────────────────────────────────────────────────
+    // ── JWT ───────────────────────────────────────────────────────────────
     public static IServiceCollection AddJwtAuth(
         this IServiceCollection services, IConfiguration config)
     {
-        var key = Encoding.UTF8.GetBytes(config["Jwt:Key"]!);
-
+        var key = Encoding.UTF8.GetBytes(config[ConfigKeys.JwtKey]!);
         services
             .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-            .AddJwtBearer(opts =>
+            .AddJwtBearer(o =>
             {
-                opts.TokenValidationParameters = new TokenValidationParameters
+                o.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidateIssuerSigningKey = true,
                     IssuerSigningKey = new SymmetricSecurityKey(key),
                     ValidateIssuer = true,
-                    ValidIssuer = config["Jwt:Issuer"],
+                    ValidIssuer = config[ConfigKeys.JwtIssuer],
                     ValidateAudience = true,
-                    ValidAudience = config["Jwt:Audience"],
+                    ValidAudience = config[ConfigKeys.JwtAudience],
                     ValidateLifetime = true,
                     ClockSkew = TimeSpan.Zero
                 };
             });
-
         services.AddAuthorization();
         return services;
     }
 
-    // ── CORS (origins loaded from DB at startup + appsettings fallback) ───
+    // ── CORS ──────────────────────────────────────────────────────────────
     public static IServiceCollection AddCorsPolicy(
         this IServiceCollection services, IConfiguration config)
     {
-        // Static origins from config; DB-loaded origins added in Program.cs after seed
-        var configOrigins = config.GetSection("Cors:AllowedOrigins").Get<string[]>()
-                            ?? ["http://localhost:4200"];
+        var origins = config.GetSection(ConfigKeys.CorsAllowedOrigins).Get<string[]>()
+                         ?? ["http://localhost:4200"];
+        var policyName = config[ConfigKeys.AdminCorsPolicy] ?? "DefaultCors";
 
-        services.AddCors(opts => opts.AddPolicy("DefaultCors", p =>
-            p.WithOrigins(configOrigins)
+        services.AddCors(opts => opts.AddPolicy(policyName, p =>
+            p.WithOrigins(origins)
              .AllowAnyMethod()
              .AllowAnyHeader()
              .AllowCredentials()));
@@ -159,22 +158,19 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
-    // ── Centralized Polly resilience config (driven by appsettings) ───────
-    private static void ConfigureResilience(
-    HttpStandardResilienceOptions opts, int retryCount, int retryDelaySeconds)
+    // ── Polly ─────────────────────────────────────────────────────────────
+    private static void Resilience(
+        HttpStandardResilienceOptions o, int retryCount, int retryDelay)
     {
-        opts.Retry.MaxRetryAttempts = retryCount;
-        opts.Retry.BackoffType = Polly.DelayBackoffType.Exponential;
-        opts.Retry.UseJitter = true;
-        opts.Retry.Delay = TimeSpan.FromSeconds(retryDelaySeconds);
-
-        // SamplingDuration must be > 2 × AttemptTimeout (Polly validation rule).
-        // AttemptTimeout=25s → minimum SamplingDuration is 51s. Using 60s.
-        opts.AttemptTimeout.Timeout = TimeSpan.FromSeconds(25);
-        opts.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(60);
-        opts.CircuitBreaker.MinimumThroughput = 5;
-        opts.CircuitBreaker.FailureRatio = 0.5;
-        opts.CircuitBreaker.BreakDuration = TimeSpan.FromSeconds(15);
-        opts.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(120);
+        o.Retry.MaxRetryAttempts = retryCount;
+        o.Retry.BackoffType = Polly.DelayBackoffType.Exponential;
+        o.Retry.UseJitter = true;
+        o.Retry.Delay = TimeSpan.FromSeconds(retryDelay);
+        o.AttemptTimeout.Timeout = TimeSpan.FromSeconds(25);
+        o.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(60);
+        o.CircuitBreaker.MinimumThroughput = 5;
+        o.CircuitBreaker.FailureRatio = 0.5;
+        o.CircuitBreaker.BreakDuration = TimeSpan.FromSeconds(15);
+        o.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(120);
     }
 }

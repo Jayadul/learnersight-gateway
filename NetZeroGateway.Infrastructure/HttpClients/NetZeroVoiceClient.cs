@@ -1,42 +1,44 @@
-using System.Text;
-using System.Text.Json;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using NetZeroGateway.Infrastructure.HttpClients.Models;
+using System.Text;
+using System.Text.Json;
 
 namespace NetZeroGateway.Infrastructure.HttpClients;
 
-public class NetZeroVoiceClient(HttpClient http, ILogger<NetZeroVoiceClient> logger)
+public class NetZeroVoiceClient(
+    HttpClient http, IConfiguration config, ILogger<NetZeroVoiceClient> logger)
     : INetZeroVoiceClient
 {
+    private string CampaignPath => config["Providers:Voice:CampaignPath"] ?? "/api/v1/run-campaign";
+    private string ActionId => config["Providers:Voice:ActionId"] ?? "runCampaign";
+    private string Service => config["Providers:Voice:Service"] ?? "campaign";
+
     public async Task<NetZeroVoiceResponse> RunCampaignAsync(
         string owner, string password, string authUserId,
         string campaignId, string lotNumber,
         List<string> destinationNumbers, CancellationToken ct = default)
     {
         logger.LogInformation(
-            "[VOICE] POST /api/v1/run-campaign campaign={Campaign} count={Count}",
-            campaignId, destinationNumbers.Count);
+            "[VOICE] POST {Path} campaign={Campaign} count={Count}",
+            CampaignPath, campaignId, destinationNumbers.Count);
 
         var payload = new
         {
-            actionId = "runCampaign",
+            actionId = ActionId,
             owner,
             password,
             campaignId,
             authUserId,
             lotNumber,
-            service = "campaign",
+            service = Service,
             destinationNumbers
         };
-
         var content = new StringContent(
             JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-
-        var resp = await http.PostAsync("/api/v1/run-campaign", content, ct);
+        var resp = await http.PostAsync(CampaignPath, content, ct);
         var body = await resp.Content.ReadAsStringAsync(ct);
-
-        logger.LogDebug("[VOICE] Raw response: {Body}", body);
-
+        logger.LogDebug("[VOICE] Response: {Body}", body);
         try
         {
             return JsonSerializer.Deserialize<NetZeroVoiceResponse>(body)
@@ -44,7 +46,7 @@ public class NetZeroVoiceClient(HttpClient http, ILogger<NetZeroVoiceClient> log
         }
         catch (JsonException ex)
         {
-            logger.LogError(ex, "[VOICE] JSON parse error. Body={Body}", body);
+            logger.LogError(ex, "[VOICE] Parse error. Body={Body}", body);
             return new NetZeroVoiceResponse { Status = "error", Message = ex.Message };
         }
     }

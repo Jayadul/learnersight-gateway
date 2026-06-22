@@ -7,7 +7,6 @@ namespace NetZeroGateway.API.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/apikeys")]
-[ApiExplorerSettings(GroupName = "admin")]
 public class XSoftApiKeyController(IXSoftApiKeyService service) : ControllerBase
 {
     [HttpGet]

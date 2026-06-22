@@ -1,12 +1,12 @@
-using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using NetZeroGateway.Application.Exceptions;
+using NetZeroGateway.Application.Utilities;
+using System.Text.Json;
 
 namespace NetZeroGateway.API.Middleware;
 
 public class GlobalExceptionMiddleware(
-    RequestDelegate next,
-    ILogger<GlobalExceptionMiddleware> logger)
+    RequestDelegate next, ILogger<GlobalExceptionMiddleware> logger)
 {
     public async Task InvokeAsync(HttpContext ctx)
     {
@@ -16,58 +16,52 @@ public class GlobalExceptionMiddleware(
 
     private async Task HandleAsync(HttpContext ctx, Exception ex)
     {
+        var config = ctx.RequestServices.GetRequiredService<IConfiguration>();
+        var endpointPath = config[ConfigKeys.GatewayEndpointPath] ?? "/sendtext";
         var path = ctx.Request.Path.Value ?? "";
+
         ctx.Response.ContentType = "application/json";
 
-        switch (ex)
+        var isGateway = path.Equals(endpointPath, StringComparison.OrdinalIgnoreCase);
+
+        (int status, string body) = ex switch
         {
-            case UnauthorizedException:
-                logger.LogWarning("Unauthorized: {Path} — {Message}", path, ex.Message);
-                ctx.Response.StatusCode = 401;
-                await ctx.Response.WriteAsync(IsGatewayPath(path)
-                    ? JsonSerializer.Serialize(new { Status = "101", Text = "REJECTD" })
-                    : JsonSerializer.Serialize(ProblemOf(401, "Unauthorized", ex.Message)));
-                return;
+            UnauthorizedException =>
+                (401, isGateway
+                    ? Reve("101", "REJECTD")
+                    : Problem(401, "Unauthorized", ex.Message)),
 
-            case NotFoundException:
-                logger.LogWarning("NotFound: {Path} — {Message}", path, ex.Message);
-                ctx.Response.StatusCode = 404;
-                await ctx.Response.WriteAsync(IsGatewayPath(path)
-                    ? JsonSerializer.Serialize(new { Status = "404", Text = ex.Message })
-                    : JsonSerializer.Serialize(ProblemOf(404, "Not Found", ex.Message)));
-                return;
+            NotFoundException =>
+                (404, isGateway
+                    ? Reve("404", ex.Message)
+                    : Problem(404, "Not Found", ex.Message)),
 
-            case InvalidOperationException:
-                logger.LogWarning("BadRequest: {Path} — {Message}", path, ex.Message);
-                ctx.Response.StatusCode = 400;
-                await ctx.Response.WriteAsync(JsonSerializer.Serialize(
-                    ProblemOf(400, "Bad Request", ex.Message)));
-                return;
+            InvalidOperationException =>
+                (400, Problem(400, "Bad Request", ex.Message)),
 
-            default:
-                logger.LogError(ex, "Unhandled exception on {Path}", path);
-                ctx.Response.StatusCode = 500;
-                await ctx.Response.WriteAsync(IsGatewayPath(path)
-                    ? JsonSerializer.Serialize(new { Status = "101", Text = "REJECTD" })
-                    : JsonSerializer.Serialize(ProblemOf(500, "Internal Server Error",
-                        "An unexpected error occurred.", ctx.TraceIdentifier)));
-                return;
-        }
+            _ =>
+                (500, isGateway
+                    ? Reve("101", "REJECTD")
+                    : Problem(500, "Internal Server Error",
+                        "An unexpected error occurred.", ctx.TraceIdentifier))
+        };
+
+        if (status >= 500)
+            logger.LogError(ex, "Unhandled exception on {Path}", path);
+        else
+            logger.LogWarning("{ExType} on {Path}: {Msg}", ex.GetType().Name, path, ex.Message);
+
+        ctx.Response.StatusCode = status;
+        await ctx.Response.WriteAsync(body);
     }
 
-    private static bool IsGatewayPath(string path)
-        => path.Equals("/sendtext", StringComparison.OrdinalIgnoreCase);
+    private static string Reve(string status, string text) =>
+        JsonSerializer.Serialize(new { Status = status, Text = text });
 
-    private static object ProblemOf(
-        int status, string title, string detail, string? traceId = null)
+    private static string Problem(int status, string title, string detail, string? traceId = null)
     {
-        var pd = new ProblemDetails
-        {
-            Status = status,
-            Title = title,
-            Detail = detail
-        };
+        var pd = new ProblemDetails { Status = status, Title = title, Detail = detail };
         if (traceId is not null) pd.Extensions["traceId"] = traceId;
-        return pd;
+        return JsonSerializer.Serialize(pd);
     }
 }

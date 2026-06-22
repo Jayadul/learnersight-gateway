@@ -6,7 +6,6 @@ namespace NetZeroGateway.API.Controllers;
 
 [ApiController]
 [Route("api/auth")]
-[ApiExplorerSettings(GroupName = "admin")]
 public class AuthController(IAuthService service) : ControllerBase
 {
     [HttpPost("login")]

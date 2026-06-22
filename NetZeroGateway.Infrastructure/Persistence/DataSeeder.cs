@@ -1,164 +1,408 @@
 using BCrypt.Net;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using NetZeroGateway.Application.Services;
 using NetZeroGateway.Domain.Entities;
 using NetZeroGateway.Domain.Enums;
+using System.Text.Json;
 
 namespace NetZeroGateway.Infrastructure.Persistence;
 
+/// <summary>
+/// Idempotent seeder — runs on every startup.
+/// Strategy per entity:
+///   - ADD  if the record does not exist (matched by natural key)
+///   - UPDATE if it exists but config-driven values have changed
+///   - SKIP  if nothing has changed (no DB write at all)
+/// Passwords and secrets are NEVER re-hashed on update unless the raw
+/// value in config has changed — detected via BCrypt.Verify.
+/// </summary>
 public static class DataSeeder
 {
     public static async Task SeedAsync(IServiceProvider sp)
     {
         var db = sp.GetRequiredService<NetZeroGatewayDbContext>();
         var enc = sp.GetRequiredService<IEncryptionService>();
+        var config = sp.GetRequiredService<IConfiguration>();
         var logger = sp.GetRequiredService<ILogger<NetZeroGatewayDbContext>>();
 
-        if (await db.AdminUsers.AnyAsync()) return;
+        logger.LogInformation("[SEED] Starting idempotent seed check");
 
-        logger.LogInformation("[SEED] No data found — seeding initial data");
+        await SeedAdminUsersAsync(db, config, logger);
+        await SeedXSoftApiKeyAsync(db, config, logger);
+        await SeedXSoftAppConfigAsync(db, config, logger);
+        await SeedChannelConfigsAsync(db, enc, config, logger);
+        await SeedFallbackPoliciesAsync(db, config, logger);
 
-        // ── Admin users ───────────────────────────────────────────────────
-        db.AdminUsers.AddRange(
-            new AdminUser
-            {
-                Username = "admin",
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin@123"),
-                Email = "admin@netzero.com",
-                Role = AdminRole.SuperAdmin,
-                IsActive = true
-            },
-            new AdminUser
-            {
-                Username = "operator",
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Operator@123"),
-                Email = "operator@netzero.com",
-                Role = AdminRole.Admin,
-                IsActive = true
-            });
+        logger.LogInformation("[SEED] Seed check complete");
+    }
 
-        // ── XSoft API key ─────────────────────────────────────────────────
-        const string rawApiKey = "xsoft_api_key_default";
-        const string rawSecretKey = "xsoft_secret_default";
-        db.XSoftApiKeys.Add(new XSoftApiKey
+    // ── Admin Users ───────────────────────────────────────────────────────
+    private static async Task SeedAdminUsersAsync(
+        NetZeroGatewayDbContext db,
+        IConfiguration config,
+        ILogger logger)
+    {
+        var users = config.GetSection("Seed:AdminUsers").Get<List<SeedAdminUser>>() ?? [];
+
+        foreach (var cfg in users)
         {
-            Label = "x-soft-default",
-            ApiKeyHash = BCrypt.Net.BCrypt.HashPassword(rawApiKey),
-            SecretKeyHash = BCrypt.Net.BCrypt.HashPassword(rawSecretKey),
-            IsActive = true
-        });
+            var existing = await db.AdminUsers
+                .FirstOrDefaultAsync(u => u.Username == cfg.Username);
 
-        // ── XSoft App Config (base URL + shared secret for header auth) ───
-        const string rawXSoftSecret = "xsoft_shared_secret_default";
-        db.XSoftAppConfigs.Add(new XSoftAppConfig
-        {
-            Label = "x-soft",
-            BaseUrl = "http://localhost:5050",   // update from admin panel
-            SharedSecretHash = BCrypt.Net.BCrypt.HashPassword(rawXSoftSecret),
-            IsActive = true,
-            Description = "ASP.NET MVC 4.2 calling application"
-        });
-
-        Console.WriteLine($"[SEED] XSoft API Key      : {rawApiKey}");
-        Console.WriteLine($"[SEED] XSoft Secret Key   : {rawSecretKey}");
-        Console.WriteLine($"[SEED] XSoft Header Token : {rawXSoftSecret}");
-        logger.LogInformation("[SEED] XSoft credentials printed to console (shown once only)");
-
-        // ── Channel configs — generic labels, actual provider keys as placeholders ──
-        var smsJson = """
+            if (existing is null)
             {
-              "apikey":    "REPLACE_WITH_SMS_PROVIDER_API_KEY",
-              "secretkey": "REPLACE_WITH_SMS_PROVIDER_SECRET",
-              "callerID":  "REPLACE_WITH_CALLER_ID",
-              "baseUrl":   "http://smpp.revesms.com:7788"
+                db.AdminUsers.Add(new AdminUser
+                {
+                    Username = cfg.Username,
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(cfg.Password),
+                    Email = cfg.Email,
+                    Role = Enum.Parse<AdminRole>(cfg.Role),
+                    IsActive = true
+                });
+                logger.LogInformation("[SEED] AdminUser ADD: {Username}", cfg.Username);
             }
-            """;
-
-        var wpTextJson = """
+            else
             {
-              "instance_id":  "REPLACE_WITH_INSTANCE_ID",
-              "access_token": "REPLACE_WITH_ACCESS_TOKEN",
-              "baseUrl":      "https://app.watrend.com"
+                var changed = false;
+
+                // Only rehash password if the raw config value no longer matches the stored hash
+                if (!BCrypt.Net.BCrypt.Verify(cfg.Password, existing.PasswordHash))
+                {
+                    existing.PasswordHash = BCrypt.Net.BCrypt.HashPassword(cfg.Password);
+                    changed = true;
+                    logger.LogInformation("[SEED] AdminUser UPDATE password: {Username}", cfg.Username);
+                }
+
+                if (existing.Email != cfg.Email)
+                {
+                    existing.Email = cfg.Email;
+                    changed = true;
+                }
+
+                var role = Enum.Parse<AdminRole>(cfg.Role);
+                if (existing.Role != role)
+                {
+                    existing.Role = role;
+                    changed = true;
+                }
+
+                if (changed)
+                {
+                    db.AdminUsers.Update(existing);
+                    logger.LogInformation("[SEED] AdminUser UPDATE: {Username}", cfg.Username);
+                }
+                else
+                {
+                    logger.LogDebug("[SEED] AdminUser SKIP (no change): {Username}", cfg.Username);
+                }
             }
-            """;
-
-        var wpMediaJson = """
-            {
-              "instance_id":  "REPLACE_WITH_INSTANCE_ID",
-              "access_token": "REPLACE_WITH_ACCESS_TOKEN",
-              "baseUrl":      "https://app.watrend.com"
-            }
-            """;
-
-        var voiceJson = """
-            {
-              "owner":      "REPLACE_WITH_OWNER",
-              "password":   "REPLACE_WITH_PASSWORD",
-              "authUserId": "REPLACE_WITH_AUTH_USER_ID",
-              "lotNumber":  "1",
-              "campaignId": "REPLACE_WITH_CAMPAIGN_ID",
-              "baseUrl":    "http://api.sms.netzero.com.bd:8000"
-            }
-            """;
-
-        db.ChannelConfigs.AddRange(
-            new ChannelConfig
-            {
-                ChannelType = ChannelType.SMS,
-                ProviderName = "SMS Provider",
-                Label = "SMS Default",
-                IsActive = true,
-                ConfigJson = enc.Encrypt(smsJson.Trim())
-            },
-            new ChannelConfig
-            {
-                ChannelType = ChannelType.WP_Text,
-                ProviderName = "WhatsApp Provider",
-                Label = "WhatsApp Text Default",
-                IsActive = true,
-                ConfigJson = enc.Encrypt(wpTextJson.Trim())
-            },
-            new ChannelConfig
-            {
-                ChannelType = ChannelType.WP_Media,
-                ProviderName = "WhatsApp Provider",
-                Label = "WhatsApp Media Default",
-                IsActive = true,
-                ConfigJson = enc.Encrypt(wpMediaJson.Trim())
-            },
-            new ChannelConfig
-            {
-                ChannelType = ChannelType.Voice,
-                ProviderName = "Voice Provider",
-                Label = "Voice Campaign Default",
-                IsActive = true,
-                ConfigJson = enc.Encrypt(voiceJson.Trim())
-            });
-
-        // ── Fallback policies ─────────────────────────────────────────────
-        db.FallbackPolicies.AddRange(
-            new FallbackPolicy
-            {
-                Name = "WhatsApp fails → SMS",
-                TriggerChannel = ChannelType.WP_Text,
-                FallbackChannel = ChannelType.SMS,
-                IsActive = true,
-                IsGlobal = true,
-                Description = "Fallback to SMS when WhatsApp text delivery fails"
-            },
-            new FallbackPolicy
-            {
-                Name = "Voice fails → SMS",
-                TriggerChannel = ChannelType.Voice,
-                FallbackChannel = ChannelType.SMS,
-                IsActive = false,
-                IsGlobal = true,
-                Description = "Fallback to SMS when voice call fails"
-            });
+        }
 
         await db.SaveChangesAsync();
-        logger.LogInformation("[SEED] Seed complete — {Count} entities created", 11);
     }
+
+    // ── XSoft API Key ─────────────────────────────────────────────────────
+    private static async Task SeedXSoftApiKeyAsync(
+        NetZeroGatewayDbContext db,
+        IConfiguration config,
+        ILogger logger)
+    {
+        var cfg = config.GetSection("Seed:XSoftApiKey");
+        var label = cfg["Label"] ?? "x-soft-default";
+        var rawApiKey = cfg["ApiKey"] ?? "";
+        var rawSecretKey = cfg["SecretKey"] ?? "";
+
+        var existing = await db.XSoftApiKeys
+            .FirstOrDefaultAsync(k => k.Label == label);
+
+        if (existing is null)
+        {
+            db.XSoftApiKeys.Add(new XSoftApiKey
+            {
+                Label = label,
+                ApiKeyHash = BCrypt.Net.BCrypt.HashPassword(rawApiKey),
+                SecretKeyHash = BCrypt.Net.BCrypt.HashPassword(rawSecretKey),
+                IsActive = true
+            });
+            Console.WriteLine($"[SEED] XSoft API Key      : {rawApiKey}");
+            Console.WriteLine($"[SEED] XSoft Secret Key   : {rawSecretKey}");
+            logger.LogInformation("[SEED] XSoftApiKey ADD: {Label} (credentials printed to console)", label);
+        }
+        else
+        {
+            var changed = false;
+
+            if (!BCrypt.Net.BCrypt.Verify(rawApiKey, existing.ApiKeyHash))
+            {
+                existing.ApiKeyHash = BCrypt.Net.BCrypt.HashPassword(rawApiKey);
+                changed = true;
+                Console.WriteLine($"[SEED] XSoft API Key (updated) : {rawApiKey}");
+            }
+
+            if (!BCrypt.Net.BCrypt.Verify(rawSecretKey, existing.SecretKeyHash))
+            {
+                existing.SecretKeyHash = BCrypt.Net.BCrypt.HashPassword(rawSecretKey);
+                changed = true;
+                Console.WriteLine($"[SEED] XSoft Secret Key (updated) : {rawSecretKey}");
+            }
+
+            if (changed)
+            {
+                db.XSoftApiKeys.Update(existing);
+                logger.LogInformation("[SEED] XSoftApiKey UPDATE: {Label}", label);
+            }
+            else
+            {
+                logger.LogDebug("[SEED] XSoftApiKey SKIP (no change): {Label}", label);
+            }
+        }
+
+        await db.SaveChangesAsync();
+    }
+
+    // ── XSoft App Config ──────────────────────────────────────────────────
+    private static async Task SeedXSoftAppConfigAsync(
+        NetZeroGatewayDbContext db,
+        IConfiguration config,
+        ILogger logger)
+    {
+        var cfg = config.GetSection("Seed:XSoftAppConfig");
+        var label = cfg["Label"] ?? "x-soft";
+        var baseUrl = cfg["BaseUrl"] ?? "http://localhost:5050";
+        var rawSecret = cfg["SharedSecret"] ?? "";
+        var description = cfg["Description"] ?? "";
+
+        var existing = await db.XSoftAppConfigs
+            .FirstOrDefaultAsync(c => c.Label == label);
+
+        if (existing is null)
+        {
+            db.XSoftAppConfigs.Add(new XSoftAppConfig
+            {
+                Label = label,
+                BaseUrl = baseUrl,
+                SharedSecretHash = BCrypt.Net.BCrypt.HashPassword(rawSecret),
+                IsActive = true,
+                Description = description
+            });
+            Console.WriteLine($"[SEED] XSoft Header Token : {rawSecret}");
+            logger.LogInformation("[SEED] XSoftAppConfig ADD: {Label} BaseUrl={Url}", label, baseUrl);
+        }
+        else
+        {
+            var changed = false;
+
+            if (existing.BaseUrl != baseUrl)
+            {
+                existing.BaseUrl = baseUrl;
+                changed = true;
+            }
+
+            if (existing.Description != description)
+            {
+                existing.Description = description;
+                changed = true;
+            }
+
+            if (!BCrypt.Net.BCrypt.Verify(rawSecret, existing.SharedSecretHash))
+            {
+                existing.SharedSecretHash = BCrypt.Net.BCrypt.HashPassword(rawSecret);
+                changed = true;
+                Console.WriteLine($"[SEED] XSoft Header Token (updated) : {rawSecret}");
+            }
+
+            if (changed)
+            {
+                db.XSoftAppConfigs.Update(existing);
+                logger.LogInformation("[SEED] XSoftAppConfig UPDATE: {Label}", label);
+            }
+            else
+            {
+                logger.LogDebug("[SEED] XSoftAppConfig SKIP (no change): {Label}", label);
+            }
+        }
+
+        await db.SaveChangesAsync();
+    }
+
+    // ── Channel Configs ───────────────────────────────────────────────────
+    private static async Task SeedChannelConfigsAsync(
+        NetZeroGatewayDbContext db,
+        IEncryptionService enc,
+        IConfiguration config,
+        ILogger logger)
+    {
+        var items = config.GetSection("Seed:ChannelConfigs")
+            .Get<List<SeedChannelConfig>>() ?? [];
+
+        foreach (var item in items)
+        {
+            var channelType = Enum.Parse<ChannelType>(item.ChannelType);
+            var plainJson = JsonSerializer.Serialize(item.Config,
+                new JsonSerializerOptions { WriteIndented = false });
+
+            var existing = await db.ChannelConfigs
+                .FirstOrDefaultAsync(c => c.ChannelType == channelType
+                                       && c.Label == item.Label);
+
+            if (existing is null)
+            {
+                db.ChannelConfigs.Add(new ChannelConfig
+                {
+                    ChannelType = channelType,
+                    ProviderName = item.ProviderName,
+                    Label = item.Label,
+                    IsActive = true,
+                    ConfigJson = enc.Encrypt(plainJson)
+                });
+                logger.LogInformation("[SEED] ChannelConfig ADD: {Type} / {Label}",
+                    item.ChannelType, item.Label);
+            }
+            else
+            {
+                var changed = false;
+
+                // Decrypt existing to compare — only re-encrypt if config actually changed
+                string existingPlain;
+                try { existingPlain = enc.Decrypt(existing.ConfigJson); }
+                catch { existingPlain = ""; }
+
+                // Normalize both sides before comparing
+                var normalizedNew = NormalizeJson(plainJson);
+                var normalizedExisting = NormalizeJson(existingPlain);
+
+                if (normalizedExisting != normalizedNew)
+                {
+                    existing.ConfigJson = enc.Encrypt(plainJson);
+                    changed = true;
+                }
+
+                if (existing.ProviderName != item.ProviderName)
+                {
+                    existing.ProviderName = item.ProviderName;
+                    changed = true;
+                }
+
+                if (changed)
+                {
+                    db.ChannelConfigs.Update(existing);
+                    logger.LogInformation("[SEED] ChannelConfig UPDATE: {Type} / {Label}",
+                        item.ChannelType, item.Label);
+                }
+                else
+                {
+                    logger.LogDebug("[SEED] ChannelConfig SKIP (no change): {Type} / {Label}",
+                        item.ChannelType, item.Label);
+                }
+            }
+        }
+
+        await db.SaveChangesAsync();
+    }
+
+    // ── Fallback Policies ─────────────────────────────────────────────────
+    private static async Task SeedFallbackPoliciesAsync(
+        NetZeroGatewayDbContext db,
+        IConfiguration config,
+        ILogger logger)
+    {
+        var items = config.GetSection("Seed:FallbackPolicies")
+            .Get<List<SeedFallbackPolicy>>() ?? [];
+
+        foreach (var item in items)
+        {
+            var triggerChannel = Enum.Parse<ChannelType>(item.TriggerChannel);
+            var fallbackChannel = Enum.Parse<ChannelType>(item.FallbackChannel);
+
+            var existing = await db.FallbackPolicies
+                .FirstOrDefaultAsync(p => p.Name == item.Name);
+
+            if (existing is null)
+            {
+                db.FallbackPolicies.Add(new FallbackPolicy
+                {
+                    Name = item.Name,
+                    TriggerChannel = triggerChannel,
+                    FallbackChannel = fallbackChannel,
+                    IsActive = item.IsActive,
+                    IsGlobal = item.IsGlobal,
+                    Description = item.Description
+                });
+                logger.LogInformation("[SEED] FallbackPolicy ADD: {Name}", item.Name);
+            }
+            else
+            {
+                var changed = false;
+
+                if (existing.TriggerChannel != triggerChannel) { existing.TriggerChannel = triggerChannel; changed = true; }
+                if (existing.FallbackChannel != fallbackChannel) { existing.FallbackChannel = fallbackChannel; changed = true; }
+                if (existing.IsActive != item.IsActive) { existing.IsActive = item.IsActive; changed = true; }
+                if (existing.IsGlobal != item.IsGlobal) { existing.IsGlobal = item.IsGlobal; changed = true; }
+                if (existing.Description != item.Description) { existing.Description = item.Description; changed = true; }
+
+                if (changed)
+                {
+                    db.FallbackPolicies.Update(existing);
+                    logger.LogInformation("[SEED] FallbackPolicy UPDATE: {Name}", item.Name);
+                }
+                else
+                {
+                    logger.LogDebug("[SEED] FallbackPolicy SKIP (no change): {Name}", item.Name);
+                }
+            }
+        }
+
+        await db.SaveChangesAsync();
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Deserialize and re-serialize JSON to get a canonical form for comparison.
+    /// Prevents false positives from whitespace or key-ordering differences.
+    /// </summary>
+    private static string NormalizeJson(string json)
+    {
+        try
+        {
+            var doc = JsonDocument.Parse(json);
+            return JsonSerializer.Serialize(doc,
+                new JsonSerializerOptions { WriteIndented = false });
+        }
+        catch
+        {
+            return json;
+        }
+    }
+}
+
+// ── Config binding models (local to this file) ────────────────────────────
+
+file sealed class SeedAdminUser
+{
+    public string Username { get; set; } = "";
+    public string Password { get; set; } = "";
+    public string Email { get; set; } = "";
+    public string Role { get; set; } = "Admin";
+}
+
+file sealed class SeedChannelConfig
+{
+    public string ChannelType { get; set; } = "";
+    public string ProviderName { get; set; } = "";
+    public string Label { get; set; } = "";
+    public Dictionary<string, string> Config { get; set; } = [];
+}
+
+file sealed class SeedFallbackPolicy
+{
+    public string Name { get; set; } = "";
+    public string TriggerChannel { get; set; } = "";
+    public string FallbackChannel { get; set; } = "";
+    public bool IsActive { get; set; }
+    public bool IsGlobal { get; set; }
+    public string? Description { get; set; }
 }

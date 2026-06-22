@@ -7,7 +7,6 @@ namespace NetZeroGateway.API.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/api-logs")]
-[ApiExplorerSettings(GroupName = "admin")]
 public class ApiLogController(IApiLogService service) : ControllerBase
 {
     [HttpGet]

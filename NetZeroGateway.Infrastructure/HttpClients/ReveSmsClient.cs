@@ -1,17 +1,21 @@
-using System.Text.Json;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using NetZeroGateway.Infrastructure.HttpClients.Models;
+using System.Text.Json;
 
 namespace NetZeroGateway.Infrastructure.HttpClients;
 
-public class ReveSmsClient(HttpClient http, ILogger<ReveSmsClient> logger) : IReveSmsClient
+public class ReveSmsClient(
+    HttpClient http, IConfiguration config, ILogger<ReveSmsClient> logger)
+    : IReveSmsClient
 {
+    private string SendPath => config["Providers:Sms:SendPath"] ?? "/sendtext";
+
     public async Task<ReveSmsResponse> SendAsync(
         string apiKey, string secretKey, string callerID,
         string toUser, string message, CancellationToken ct = default)
     {
-        logger.LogInformation("[REVE_SMS] POST /sendtext to={To}", toUser);
-
+        logger.LogInformation("[REVE_SMS] POST {Path} to={To}", SendPath, toUser);
         var form = new FormUrlEncodedContent([
             new("apikey",         apiKey),
             new("secretkey",      secretKey),
@@ -19,12 +23,9 @@ public class ReveSmsClient(HttpClient http, ILogger<ReveSmsClient> logger) : IRe
             new("toUser",         toUser),
             new("messageContent", message)
         ]);
-
-        var resp = await http.PostAsync("/sendtext", form, ct);
+        var resp = await http.PostAsync(SendPath, form, ct);
         var body = await resp.Content.ReadAsStringAsync(ct);
-
-        logger.LogDebug("[REVE_SMS] Raw response: {Body}", body);
-
+        logger.LogDebug("[REVE_SMS] Response: {Body}", body);
         try
         {
             return JsonSerializer.Deserialize<ReveSmsResponse>(body)
@@ -32,7 +33,7 @@ public class ReveSmsClient(HttpClient http, ILogger<ReveSmsClient> logger) : IRe
         }
         catch (JsonException ex)
         {
-            logger.LogError(ex, "[REVE_SMS] JSON parse error. Body={Body}", body);
+            logger.LogError(ex, "[REVE_SMS] Parse error. Body={Body}", body);
             return new ReveSmsResponse { Status = "ERR", Text = ex.Message };
         }
     }
