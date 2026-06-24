@@ -4,9 +4,7 @@ namespace NetZeroGateway.Domain.Entities;
 
 public class MessageRequest : BaseEntity
 {
-    public string ApiKey { get; set; } = string.Empty;
     public string CallerID { get; set; } = string.Empty;
-    /// <summary>Comma-separated as received from x-soft.</summary>
     public string ToUser { get; set; } = string.Empty;
     public string RawMessageContent { get; set; } = string.Empty;
     public List<string> ParsedChannels { get; set; } = new();

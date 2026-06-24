@@ -32,7 +32,6 @@ public class ManualSendService(
 
         var msgRequest = new MessageRequest
         {
-            ApiKey = "admin-panel",
             CallerID = request.CallerID ?? "",
             ToUser = request.ToNumbers,
             RawMessageContent = request.Message,

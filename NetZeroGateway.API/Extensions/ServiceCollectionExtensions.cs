@@ -17,11 +17,10 @@ namespace NetZeroGateway.API.Extensions;
 
 public static class ServiceCollectionExtensions
 {
-    /// <summary>Registers MVC + SwaggerGroupConvention (groups from authorization.json).</summary>
-    public static IMvcBuilder AddControllersWithSwaggerGroups(
+    public static IMvcBuilder AddControllersWithAuthPolicy(
         this IServiceCollection services, IConfiguration config)
         => services.AddControllers(opts =>
-            opts.Conventions.Add(new SwaggerGroupConvention(config)));
+            opts.Conventions.Add(new AuthorizationPolicyConvention(config)));
 
     // ── Infrastructure ────────────────────────────────────────────────────
     public static IServiceCollection AddInfrastructure(
@@ -34,8 +33,6 @@ public static class ServiceCollectionExtensions
 
         // Repositories
         services.AddScoped<IAdminUserRepository, AdminUserRepository>();
-        services.AddScoped<IXSoftApiKeyRepository, XSoftApiKeyRepository>();
-        services.AddScoped<IXSoftAppConfigRepository, XSoftAppConfigRepository>();
         services.AddScoped<IChannelConfigRepository, ChannelConfigRepository>();
         services.AddScoped<IMessageRequestRepository, MessageRequestRepository>();
         services.AddScoped<IDispatchJobRepository, DispatchJobRepository>();
@@ -100,7 +97,6 @@ public static class ServiceCollectionExtensions
     {
         services.AddScoped<IEncryptionService, AesEncryptionService>();
         services.AddScoped<ITemplateParserService, TemplateParserService>();
-        services.AddScoped<IXSoftApiKeyService, XSoftApiKeyService>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IJwtService, JwtService>();
         services.AddScoped<IChannelConfigService, ChannelConfigService>();

@@ -11,7 +11,6 @@ public static class WebApplicationExtensions
 
         app.UseMiddleware<GlobalExceptionMiddleware>();
         app.UseMiddleware<ApiLoggingMiddleware>();
-        app.UseMiddleware<ApiKeyAuthMiddleware>();
         app.UseRouting();
         app.UseCors(corsPolicy);
         app.UseAuthentication();

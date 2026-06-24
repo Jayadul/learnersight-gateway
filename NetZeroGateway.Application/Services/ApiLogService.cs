@@ -8,17 +8,16 @@ public class ApiLogService(IApiLogRepository repo) : IApiLogService
     public async Task<PagedResult<ApiLogDto>> GetPagedAsync(
         int page, int size,
         DateTimeOffset? from, DateTimeOffset? to,
-        int? responseStatus, string? apiKey)
+        int? responseStatus)
     {
         var (items, total) = await repo.GetPagedAsync(
-            page, size, from, to, responseStatus, apiKey);
+            page, size, from, to, responseStatus);
 
         return new PagedResult<ApiLogDto>
         {
             Items = items.Select(l => new ApiLogDto
             {
                 Id = l.Id,
-                ApiKey = l.ApiKey,
                 ToUser = l.ToUser,
                 RawBody = l.RawBody,
                 ResponseBody = l.ResponseBody,

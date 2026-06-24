@@ -1,11 +1,9 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NetZeroGateway.Application.Services;
 
 namespace NetZeroGateway.API.Controllers;
 
 [ApiController]
-[Authorize]
 [Route("api/dashboard")]
 public class DashboardController(IDashboardService service) : ControllerBase
 {

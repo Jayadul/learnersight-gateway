@@ -31,8 +31,6 @@ public static class DataSeeder
         logger.LogInformation("[SEED] Starting idempotent seed check");
 
         await SeedAdminUsersAsync(db, config, logger);
-        await SeedXSoftApiKeyAsync(db, config, logger);
-        await SeedXSoftAppConfigAsync(db, config, logger);
         await SeedChannelConfigsAsync(db, enc, config, logger);
         await SeedFallbackPoliciesAsync(db, config, logger);
 
@@ -98,130 +96,6 @@ public static class DataSeeder
                 {
                     logger.LogDebug("[SEED] AdminUser SKIP (no change): {Username}", cfg.Username);
                 }
-            }
-        }
-
-        await db.SaveChangesAsync();
-    }
-
-    // ── XSoft API Key ─────────────────────────────────────────────────────
-    private static async Task SeedXSoftApiKeyAsync(
-        NetZeroGatewayDbContext db,
-        IConfiguration config,
-        ILogger logger)
-    {
-        var cfg = config.GetSection("Seed:XSoftApiKey");
-        var label = cfg["Label"] ?? "x-soft-default";
-        var rawApiKey = cfg["ApiKey"] ?? "";
-        var rawSecretKey = cfg["SecretKey"] ?? "";
-
-        var existing = await db.XSoftApiKeys
-            .FirstOrDefaultAsync(k => k.Label == label);
-
-        if (existing is null)
-        {
-            db.XSoftApiKeys.Add(new XSoftApiKey
-            {
-                Label = label,
-                ApiKeyHash = BCrypt.Net.BCrypt.HashPassword(rawApiKey),
-                SecretKeyHash = BCrypt.Net.BCrypt.HashPassword(rawSecretKey),
-                IsActive = true
-            });
-            Console.WriteLine($"[SEED] XSoft API Key      : {rawApiKey}");
-            Console.WriteLine($"[SEED] XSoft Secret Key   : {rawSecretKey}");
-            logger.LogInformation("[SEED] XSoftApiKey ADD: {Label} (credentials printed to console)", label);
-        }
-        else
-        {
-            var changed = false;
-
-            if (!BCrypt.Net.BCrypt.Verify(rawApiKey, existing.ApiKeyHash))
-            {
-                existing.ApiKeyHash = BCrypt.Net.BCrypt.HashPassword(rawApiKey);
-                changed = true;
-                Console.WriteLine($"[SEED] XSoft API Key (updated) : {rawApiKey}");
-            }
-
-            if (!BCrypt.Net.BCrypt.Verify(rawSecretKey, existing.SecretKeyHash))
-            {
-                existing.SecretKeyHash = BCrypt.Net.BCrypt.HashPassword(rawSecretKey);
-                changed = true;
-                Console.WriteLine($"[SEED] XSoft Secret Key (updated) : {rawSecretKey}");
-            }
-
-            if (changed)
-            {
-                db.XSoftApiKeys.Update(existing);
-                logger.LogInformation("[SEED] XSoftApiKey UPDATE: {Label}", label);
-            }
-            else
-            {
-                logger.LogDebug("[SEED] XSoftApiKey SKIP (no change): {Label}", label);
-            }
-        }
-
-        await db.SaveChangesAsync();
-    }
-
-    // ── XSoft App Config ──────────────────────────────────────────────────
-    private static async Task SeedXSoftAppConfigAsync(
-        NetZeroGatewayDbContext db,
-        IConfiguration config,
-        ILogger logger)
-    {
-        var cfg = config.GetSection("Seed:XSoftAppConfig");
-        var label = cfg["Label"] ?? "x-soft";
-        var baseUrl = cfg["BaseUrl"] ?? "http://localhost:5050";
-        var rawSecret = cfg["SharedSecret"] ?? "";
-        var description = cfg["Description"] ?? "";
-
-        var existing = await db.XSoftAppConfigs
-            .FirstOrDefaultAsync(c => c.Label == label);
-
-        if (existing is null)
-        {
-            db.XSoftAppConfigs.Add(new XSoftAppConfig
-            {
-                Label = label,
-                BaseUrl = baseUrl,
-                SharedSecretHash = BCrypt.Net.BCrypt.HashPassword(rawSecret),
-                IsActive = true,
-                Description = description
-            });
-            Console.WriteLine($"[SEED] XSoft Header Token : {rawSecret}");
-            logger.LogInformation("[SEED] XSoftAppConfig ADD: {Label} BaseUrl={Url}", label, baseUrl);
-        }
-        else
-        {
-            var changed = false;
-
-            if (existing.BaseUrl != baseUrl)
-            {
-                existing.BaseUrl = baseUrl;
-                changed = true;
-            }
-
-            if (existing.Description != description)
-            {
-                existing.Description = description;
-                changed = true;
-            }
-
-            if (!BCrypt.Net.BCrypt.Verify(rawSecret, existing.SharedSecretHash))
-            {
-                existing.SharedSecretHash = BCrypt.Net.BCrypt.HashPassword(rawSecret);
-                changed = true;
-                Console.WriteLine($"[SEED] XSoft Header Token (updated) : {rawSecret}");
-            }
-
-            if (changed)
-            {
-                db.XSoftAppConfigs.Update(existing);
-                logger.LogInformation("[SEED] XSoftAppConfig UPDATE: {Label}", label);
-            }
-            else
-            {
-                logger.LogDebug("[SEED] XSoftAppConfig SKIP (no change): {Label}", label);
             }
         }
 

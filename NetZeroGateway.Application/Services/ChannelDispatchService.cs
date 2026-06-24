@@ -31,8 +31,6 @@ public class ChannelDispatchService(
             messageRequestId, numbers.Count,
             string.Join(",", jobs.Select(j => j.ChannelType)));
 
-        var allTasks = new List<Task>();
-
         foreach (var job in jobs)
         {
             var config = await configRepo.GetActiveByChannelTypeAsync(job.ChannelType);
@@ -46,15 +44,19 @@ public class ChannelDispatchService(
             var cfg = JsonSerializer.Deserialize<Dictionary<string, string>>(
                 enc.Decrypt(config.ConfigJson)) ?? [];
 
-            allTasks.Add(job.ChannelType switch
+            switch (job.ChannelType)
             {
-                ChannelType.SMS => DispatchSmsAsync(messageRequestId, config.Id, job, cfg, numbers),
-                ChannelType.Voice => DispatchVoiceAsync(messageRequestId, config.Id, job, cfg, numbers),
-                _ => DispatchPerNumberAsync(messageRequestId, config.Id, job, cfg, numbers)
-            });
+                case ChannelType.SMS:
+                    await DispatchSmsAsync(messageRequestId, config.Id, job, cfg, numbers);
+                    break;
+                case ChannelType.Voice:
+                    await DispatchVoiceAsync(messageRequestId, config.Id, job, cfg, numbers);
+                    break;
+                default:
+                    await DispatchPerNumberAsync(messageRequestId, config.Id, job, cfg, numbers);
+                    break;
+            }
         }
-
-        await Task.WhenAll(allTasks);
 
         await fallbackHandler.HandleAsync(messageRequestId);
         await UpdateOverallStatusAsync(messageRequestId);
@@ -83,13 +85,12 @@ public class ChannelDispatchService(
         List<string> numbers)
     {
         var sender = senderFactory.GetSender(job.ChannelType);
-        var tasks = numbers.Select(async number =>
+        foreach (var number in numbers)
         {
             var dispatchJob = await CreateJobAsync(requestId, configId, job, number);
             await sender.SendAsync(dispatchJob, cfg);
             await jobRepo.SaveChangesAsync();
-        });
-        await Task.WhenAll(tasks);
+        }
     }
 
     // ── Voice — one call, full array ──────────────────────────────────────

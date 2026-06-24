@@ -2,7 +2,6 @@ namespace NetZeroGateway.Domain.Entities;
 
 public class ApiLog : BaseEntity
 {
-    public string? ApiKey { get; set; }
     public string? ToUser { get; set; }
     public string RawBody { get; set; } = string.Empty;
     public string ResponseBody { get; set; } = string.Empty;

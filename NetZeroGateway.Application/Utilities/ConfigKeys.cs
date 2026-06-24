@@ -33,9 +33,6 @@ public static class ConfigKeys
 
     // ── Authorization / Swagger (authorization.json) ───────────────────────
     public const string GatewayEndpointPath = "Authorization:Gateway:EndpointPath";
-    public const string GatewaySwaggerGroup = "Authorization:Gateway:SwaggerGroupName";
-    public const string GatewayTokenHeader = "Authorization:Gateway:XSoftTokenHeader";
-    public const string AdminSwaggerGroup = "Authorization:Admin:SwaggerGroupName";
     public const string AdminCorsPolicy = "Authorization:Admin:CorsPolicy";
     public const string JwtTokenTypeClaim = "Authorization:Admin:JwtTokenType";
     public const string JwtAccessTypeValue = "Authorization:Admin:JwtAccessTokenValue";

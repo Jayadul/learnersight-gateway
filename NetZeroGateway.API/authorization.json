@@ -1,12 +1,34 @@
 {
   "Authorization": {
+    "Defaults": {
+      "SwaggerGroup": "admin",
+      "RequireAuth": true,
+      "Roles": []
+    },
+    "Controllers": {
+      "SendText": {
+        "SwaggerGroup": "gateway",
+        "RequireAuth": false
+      },
+      "Auth": {
+        "RequireAuth": false
+      },
+      "AdminUser": {
+        "Roles": [ "SuperAdmin" ]
+      },
+      "ChannelConfig": {},
+      "FallbackPolicy": {},
+      "MessageRequest": {},
+      "DispatchLog": {},
+      "ApiLog": {},
+      "Dashboard": {},
+      "ManualSend": {},
+      "VoiceReport": {}
+    },
     "Gateway": {
-      "SwaggerGroupName": "gateway",
-      "EndpointPath": "/sendtext",
-      "XSoftTokenHeader": "X-XSoft-Token"
+      "EndpointPath": "/sendtext"
     },
     "Admin": {
-      "SwaggerGroupName": "admin",
       "CorsPolicy": "DefaultCors",
       "JwtTokenType": "type",
       "JwtAccessTokenValue": "access",
@@ -14,7 +36,7 @@
     },
     "Swagger": {
       "GatewayTitle": "NetZeroGateway — Gateway API",
-      "GatewayDescription": "REVE SMS-compatible endpoint. x-soft calls POST /sendtext — zero config changes needed.",
+      "GatewayDescription": "POST /sendtext — multi-channel message dispatch endpoint.",
       "AdminTitle": "NetZeroGateway — Admin API",
       "AdminDescription": "Admin panel: channel configs, logs, dashboard, users, fallback policies.",
       "SecuritySchemeId": "Bearer"

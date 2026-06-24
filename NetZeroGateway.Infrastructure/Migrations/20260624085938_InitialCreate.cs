@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace NetZeroGateway.Infrastructure.Persistence.Migrations
+namespace NetZeroGateway.Infrastructure.Migrations
 {
     /// <inheritdoc />
     public partial class InitialCreate : Migration
@@ -35,7 +35,6 @@ namespace NetZeroGateway.Infrastructure.Persistence.Migrations
                 columns: table => new
                 {
                     id = table.Column<Guid>(type: "uuid", nullable: false),
-                    api_key = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
                     to_user = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
                     raw_body = table.Column<string>(type: "text", nullable: false),
                     response_body = table.Column<string>(type: "text", nullable: false),
@@ -94,7 +93,6 @@ namespace NetZeroGateway.Infrastructure.Persistence.Migrations
                 columns: table => new
                 {
                     id = table.Column<Guid>(type: "uuid", nullable: false),
-                    api_key = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
                     caller_id = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     to_user = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: false),
                     raw_message_content = table.Column<string>(type: "text", nullable: false),
@@ -108,42 +106,6 @@ namespace NetZeroGateway.Infrastructure.Persistence.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("pk_message_requests", x => x.id);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "x_soft_api_keys",
-                columns: table => new
-                {
-                    id = table.Column<Guid>(type: "uuid", nullable: false),
-                    api_key_hash = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
-                    secret_key_hash = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
-                    label = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    is_active = table.Column<bool>(type: "boolean", nullable: false),
-                    last_used_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("pk_x_soft_api_keys", x => x.id);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "x_soft_app_configs",
-                columns: table => new
-                {
-                    id = table.Column<Guid>(type: "uuid", nullable: false),
-                    label = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    base_url = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
-                    shared_secret_hash = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
-                    is_active = table.Column<bool>(type: "boolean", nullable: false),
-                    description = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
-                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("pk_x_soft_app_configs", x => x.id);
                 });
 
             migrationBuilder.CreateTable(
@@ -253,12 +215,6 @@ namespace NetZeroGateway.Infrastructure.Persistence.Migrations
 
             migrationBuilder.DropTable(
                 name: "fallback_policies");
-
-            migrationBuilder.DropTable(
-                name: "x_soft_api_keys");
-
-            migrationBuilder.DropTable(
-                name: "x_soft_app_configs");
 
             migrationBuilder.DropTable(
                 name: "channel_configs");

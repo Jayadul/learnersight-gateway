@@ -41,7 +41,7 @@ public class ApiLoggingMiddleware(RequestDelegate next, ILogger<ApiLoggingMiddle
         await capture.CopyToAsync(originalBody);
         ctx.Response.Body = originalBody;
 
-        string? apiKeyVal = null, toUserVal = null;
+        string? toUserVal = null;
         try
         {
             if (ctx.Request.HasFormContentType)
@@ -49,7 +49,6 @@ public class ApiLoggingMiddleware(RequestDelegate next, ILogger<ApiLoggingMiddle
                 ctx.Request.Body.Position = 0;
                 var form = await ctx.Request.ReadFormAsync();
                 ctx.Request.Body.Position = 0;
-                apiKeyVal = form["apikey"].FirstOrDefault();
                 toUserVal = form["toUser"].FirstOrDefault();
             }
         }
@@ -61,7 +60,6 @@ public class ApiLoggingMiddleware(RequestDelegate next, ILogger<ApiLoggingMiddle
             var repo = scope.ServiceProvider.GetRequiredService<IApiLogRepository>();
             await repo.AddAsync(new ApiLog
             {
-                ApiKey = apiKeyVal,
                 ToUser = toUserVal,
                 RawBody = reqBody,
                 ResponseBody = respBody,

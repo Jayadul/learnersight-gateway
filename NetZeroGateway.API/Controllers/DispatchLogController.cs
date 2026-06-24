@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NetZeroGateway.Application.DTOs;
 using NetZeroGateway.Application.Interfaces;
@@ -7,7 +6,6 @@ using NetZeroGateway.Domain.Enums;
 namespace NetZeroGateway.API.Controllers;
 
 [ApiController]
-[Authorize]
 [Route("api/dispatch-logs")]
 public class DispatchLogController(IDispatchJobRepository repo) : ControllerBase
 {

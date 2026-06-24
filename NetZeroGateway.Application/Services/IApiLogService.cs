@@ -7,5 +7,5 @@ public interface IApiLogService
     Task<PagedResult<ApiLogDto>> GetPagedAsync(
         int page, int size,
         DateTimeOffset? from, DateTimeOffset? to,
-        int? responseStatus, string? apiKey);
+        int? responseStatus);
 }

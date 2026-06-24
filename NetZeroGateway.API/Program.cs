@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using NetZeroGateway.API.Extensions;
-using NetZeroGateway.Application.Interfaces;
+using NetZeroGateway.Application.Utilities;
 using NetZeroGateway.Infrastructure.Persistence;
 using Serilog;
 
@@ -14,6 +14,9 @@ try
 {
     var builder = WebApplication.CreateBuilder(args);
 
+    // ── Load authorization.json into config ────────────────────────────────
+    builder.Configuration.AddJsonFile("authorization.json", optional: false, reloadOnChange: true);
+
     // ── Serilog from appsettings ───────────────────────────────────────────
     builder.Host.UseSerilog((ctx, services, loggerConfig) =>
         loggerConfig.ReadFrom.Configuration(ctx.Configuration)
@@ -24,34 +27,32 @@ try
                     .Enrich.WithCorrelationId());
 
     // ── Services ───────────────────────────────────────────────────────────
-    builder.Services.AddControllers();
+    builder.Services.AddControllersWithAuthPolicy(builder.Configuration);
     builder.Services.AddEndpointsApiExplorer();
 
+    var cfg = builder.Configuration;
     builder.Services.AddSwaggerGen(c =>
     {
         c.SwaggerDoc("gateway", new OpenApiInfo
         {
-            Title = "NetZeroGateway — Gateway API",
+            Title = cfg[ConfigKeys.SwaggerGatewayTitle] ?? "Gateway API",
             Version = "v1",
-            Description = "REVE SMS-compatible endpoint. x-soft calls POST /sendtext — zero config changes needed."
+            Description = cfg[ConfigKeys.SwaggerGatewayDesc]
         });
         c.SwaggerDoc("admin", new OpenApiInfo
         {
-            Title = "NetZeroGateway — Admin API",
+            Title = cfg[ConfigKeys.SwaggerAdminTitle] ?? "Admin API",
             Version = "v1",
-            Description = "Admin panel: channel configs, logs, dashboard, users, fallback policies."
+            Description = cfg[ConfigKeys.SwaggerAdminDesc]
         });
 
         c.DocInclusionPredicate((docName, apiDesc) =>
         {
-            var groupName = apiDesc.ActionDescriptor.EndpointMetadata
-                .OfType<Microsoft.AspNetCore.Mvc.ApiExplorerSettingsAttribute>()
-                .FirstOrDefault()?.GroupName;
-
-            // If no group set, include in admin doc by default
+            var groupName = apiDesc.GroupName;
             return groupName == docName || (groupName is null && docName == "admin");
         });
 
+        var schemeId = cfg[ConfigKeys.SwaggerSecSchemeId] ?? "Bearer";
         var jwtScheme = new OpenApiSecurityScheme
         {
             BearerFormat = "JWT",
@@ -59,9 +60,9 @@ try
             In = ParameterLocation.Header,
             Type = SecuritySchemeType.Http,
             Scheme = "bearer",
-            Reference = new OpenApiReference { Id = "Bearer", Type = ReferenceType.SecurityScheme }
+            Reference = new OpenApiReference { Id = schemeId, Type = ReferenceType.SecurityScheme }
         };
-        c.AddSecurityDefinition("Bearer", jwtScheme);
+        c.AddSecurityDefinition(schemeId, jwtScheme);
         c.AddSecurityRequirement(new OpenApiSecurityRequirement { { jwtScheme, [] } });
     });
 
@@ -76,21 +77,8 @@ try
     using (var scope = app.Services.CreateScope())
     {
         var db = scope.ServiceProvider.GetRequiredService<NetZeroGatewayDbContext>();
-        await db.Database.MigrateAsync();          // needs using Microsoft.EntityFrameworkCore
+        await db.Database.MigrateAsync();
         await DataSeeder.SeedAsync(scope.ServiceProvider);
-
-        // ── Load x-soft base URL from DB and register as allowed CORS origin ──
-        var xSoftRepo = scope.ServiceProvider.GetRequiredService<IXSoftAppConfigRepository>();
-        var xSoftCfg = await xSoftRepo.GetActiveAsync();
-        if (xSoftCfg is not null && !string.IsNullOrEmpty(xSoftCfg.BaseUrl))
-        {
-            Log.Information("CORS: allowing x-soft origin from DB: {Url}", xSoftCfg.BaseUrl);
-            app.UseCors(policy => policy
-                .WithOrigins(xSoftCfg.BaseUrl)
-                .AllowAnyMethod()
-                .AllowAnyHeader()
-                .AllowCredentials());
-        }
     }
 
     // ── Swagger ────────────────────────────────────────────────────────────

@@ -11,14 +11,12 @@ public class ApiLogRepository(NetZeroGatewayDbContext db)
     public async Task<(List<ApiLog> Items, int Total)> GetPagedAsync(
         int page, int size,
         DateTimeOffset? from, DateTimeOffset? to,
-        int? responseStatus, string? apiKey)
+        int? responseStatus)
     {
         var q = _set.AsQueryable();
         if (from is not null) q = q.Where(l => l.RequestedAt >= from);
         if (to is not null) q = q.Where(l => l.RequestedAt <= to);
         if (responseStatus is not null) q = q.Where(l => l.ResponseStatus == responseStatus);
-        if (!string.IsNullOrEmpty(apiKey))
-            q = q.Where(l => l.ApiKey != null && l.ApiKey.Contains(apiKey));
 
         var total = await q.CountAsync();
         var items = await q.OrderByDescending(l => l.RequestedAt)

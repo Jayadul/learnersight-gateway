@@ -1,7 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using NetZeroGateway.Application.DTOs;
-using NetZeroGateway.Application.Exceptions;
 using NetZeroGateway.Application.Interfaces;
 using NetZeroGateway.Domain.Entities;
 using NetZeroGateway.Domain.Enums;
@@ -9,7 +8,6 @@ using NetZeroGateway.Domain.Enums;
 namespace NetZeroGateway.Application.Services;
 
 public class SendTextOrchestratorService(
-    IXSoftApiKeyService keyService,
     ITemplateParserService parser,
     IMessageRequestRepository msgRepo,
     IServiceScopeFactory scopeFactory,
@@ -18,21 +16,17 @@ public class SendTextOrchestratorService(
 {
     public async Task<SendTextResponse> ProcessAsync(SendTextRequest request)
     {
-        var valid = await keyService.ValidateAsync(request.ApiKey, request.SecretKey);
-        if (!valid) throw new UnauthorizedException("Invalid API key or secret key.");
-
         var jobs = parser.Parse(request.MessageContent);
 
         var msgRequest = new MessageRequest
         {
-            ApiKey = request.ApiKey,
-            CallerID = request.CallerID,
+            CallerID = request.CallerID ?? string.Empty,
             ToUser = request.ToUser,
             RawMessageContent = request.MessageContent,
             ParsedChannels = jobs.Select(j => j.ChannelType.ToString()).Distinct().ToList(),
             OverallStatus = MessageStatus.Pending,
             ReceivedAt = DateTimeOffset.UtcNow,
-            Source = MessageSource.XSoft
+            Source = MessageSource.Api
         };
         await msgRepo.AddAsync(msgRequest);
         await msgRepo.SaveChangesAsync();

@@ -1,2 +1,2 @@
 namespace NetZeroGateway.Domain.Enums;
-public enum MessageSource { XSoft = 0, AdminPanel = 1 }
+public enum MessageSource { Api = 0, AdminPanel = 1 }

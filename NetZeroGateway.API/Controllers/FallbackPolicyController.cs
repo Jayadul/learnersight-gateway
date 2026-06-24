@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NetZeroGateway.Application.DTOs;
 using NetZeroGateway.Application.Services;
@@ -6,7 +5,6 @@ using NetZeroGateway.Application.Services;
 namespace NetZeroGateway.API.Controllers;
 
 [ApiController]
-[Authorize]
 [Route("api/fallback-policies")]
 public class FallbackPolicyController(IFallbackPolicyService service) : ControllerBase
 {

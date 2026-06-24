@@ -7,8 +7,6 @@ public class NetZeroGatewayDbContext(DbContextOptions<NetZeroGatewayDbContext> o
     : DbContext(options)
 {
     public DbSet<AdminUser> AdminUsers => Set<AdminUser>();
-    public DbSet<XSoftApiKey> XSoftApiKeys => Set<XSoftApiKey>();
-    public DbSet<XSoftAppConfig> XSoftAppConfigs => Set<XSoftAppConfig>();
     public DbSet<ChannelConfig> ChannelConfigs => Set<ChannelConfig>();
     public DbSet<MessageRequest> MessageRequests => Set<MessageRequest>();
     public DbSet<DispatchJob> DispatchJobs => Set<DispatchJob>();
@@ -29,23 +27,6 @@ public class NetZeroGatewayDbContext(DbContextOptions<NetZeroGatewayDbContext> o
             e.HasIndex(x => x.Username).IsUnique();
         });
 
-        mb.Entity<XSoftApiKey>(e =>
-        {
-            e.HasKey(x => x.Id);
-            e.Property(x => x.ApiKeyHash).HasMaxLength(256).IsRequired();
-            e.Property(x => x.SecretKeyHash).HasMaxLength(256).IsRequired();
-            e.Property(x => x.Label).HasMaxLength(200).IsRequired();
-        });
-
-        mb.Entity<XSoftAppConfig>(e =>
-        {
-            e.HasKey(x => x.Id);
-            e.Property(x => x.Label).HasMaxLength(200).IsRequired();
-            e.Property(x => x.BaseUrl).HasMaxLength(500).IsRequired();
-            e.Property(x => x.SharedSecretHash).HasMaxLength(256).IsRequired();
-            e.Property(x => x.Description).HasMaxLength(500);
-        });
-
         mb.Entity<ChannelConfig>(e =>
         {
             e.HasKey(x => x.Id);
@@ -62,7 +43,6 @@ public class NetZeroGatewayDbContext(DbContextOptions<NetZeroGatewayDbContext> o
         mb.Entity<MessageRequest>(e =>
         {
             e.HasKey(x => x.Id);
-            e.Property(x => x.ApiKey).HasMaxLength(200);
             e.Property(x => x.CallerID).HasMaxLength(100);
             e.Property(x => x.ToUser).HasMaxLength(2000).IsRequired();
             e.Property(x => x.RawMessageContent).HasColumnType("text").IsRequired();
@@ -121,7 +101,6 @@ public class NetZeroGatewayDbContext(DbContextOptions<NetZeroGatewayDbContext> o
         mb.Entity<ApiLog>(e =>
         {
             e.HasKey(x => x.Id);
-            e.Property(x => x.ApiKey).HasMaxLength(200);
             e.Property(x => x.ToUser).HasMaxLength(2000);
             e.Property(x => x.RawBody).HasColumnType("text").IsRequired();
             e.Property(x => x.ResponseBody).HasColumnType("text").IsRequired();

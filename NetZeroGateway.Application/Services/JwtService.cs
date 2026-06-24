@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
+using NetZeroGateway.Application.Utilities;
 using NetZeroGateway.Domain.Entities;
 
 namespace NetZeroGateway.Application.Services;
