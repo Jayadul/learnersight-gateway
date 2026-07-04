@@ -10,6 +10,7 @@ using NetZeroGateway.Infrastructure.HttpClients;
 using NetZeroGateway.Infrastructure.Persistence;
 using NetZeroGateway.Infrastructure.Repositories;
 using NetZeroGateway.Infrastructure.Security;
+using NetZeroGateway.Infrastructure.Services;
 using NetZeroGateway.Infrastructure.Strategies;
 using System.Text;
 
@@ -39,15 +40,19 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IApiLogRepository, ApiLogRepository>();
         services.AddScoped<IFallbackPolicyRepository, FallbackPolicyRepository>();
 
-        // Encryption + voice gateway
+        // Encryption
         services.AddScoped<IEncryptionService, AesEncryptionService>();
-        services.AddScoped<IVoiceReportGateway, VoiceReportGateway>();
+
+        // Backup export (admin xlsx download)
+        services.AddScoped<IBackupExportService, BackupExportService>();
 
         // HTTP clients — base URLs + Polly from config
         var retryCount = config.GetValue<int>(ConfigKeys.RetryMaxAttempts, 3);
         var retryDelay = config.GetValue<int>(ConfigKeys.RetryDelaySeconds, 2);
         var timeout = config.GetValue<int>(ConfigKeys.TimeoutSeconds, 30);
-        var rptTimeout = config.GetValue<int>(ConfigKeys.ReportTimeoutSeconds, 60);
+        // WhatsApp (watrend) processes a real send inline and can take ~60s+ to respond,
+        // so it needs a much longer timeout than the other providers.
+        var waTimeout = config.GetValue<int>(ConfigKeys.WhatsAppTimeoutSeconds, 120);
 
         services
             .AddHttpClient<IReveSmsClient, ReveSmsClient>(c =>
@@ -61,23 +66,15 @@ public static class ServiceCollectionExtensions
             .AddHttpClient<IWaTrendClient, WaTrendClient>(c =>
             {
                 c.BaseAddress = new Uri(config[ConfigKeys.WhatsAppBaseUrl]!);
-                c.Timeout = TimeSpan.FromSeconds(timeout);
+                c.Timeout = TimeSpan.FromSeconds(waTimeout + 20);
             })
-            .AddStandardResilienceHandler(o => Resilience(o, retryCount, retryDelay));
+            .AddStandardResilienceHandler(o => Resilience(o, retryCount, retryDelay, waTimeout));
 
         services
             .AddHttpClient<INetZeroVoiceClient, NetZeroVoiceClient>(c =>
             {
                 c.BaseAddress = new Uri(config[ConfigKeys.VoiceBaseUrl]!);
                 c.Timeout = TimeSpan.FromSeconds(timeout);
-            })
-            .AddStandardResilienceHandler(o => Resilience(o, retryCount, retryDelay));
-
-        services
-            .AddHttpClient<INetZeroReportClient, NetZeroReportClient>(c =>
-            {
-                c.BaseAddress = new Uri(config[ConfigKeys.VoiceReportBaseUrl]!);
-                c.Timeout = TimeSpan.FromSeconds(rptTimeout);
             })
             .AddStandardResilienceHandler(o => Resilience(o, retryCount, retryDelay));
 
@@ -108,7 +105,6 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<IApiLogService, ApiLogService>();
         services.AddScoped<IAdminUserService, AdminUserService>();
-        services.AddScoped<IVoiceReportService, VoiceReportService>();
         return services;
     }
 
@@ -156,17 +152,19 @@ public static class ServiceCollectionExtensions
 
     // ── Polly ─────────────────────────────────────────────────────────────
     private static void Resilience(
-        HttpStandardResilienceOptions o, int retryCount, int retryDelay)
+        HttpStandardResilienceOptions o, int retryCount, int retryDelay,
+        int attemptTimeoutSeconds = 25)
     {
         o.Retry.MaxRetryAttempts = retryCount;
         o.Retry.BackoffType = Polly.DelayBackoffType.Exponential;
         o.Retry.UseJitter = true;
         o.Retry.Delay = TimeSpan.FromSeconds(retryDelay);
-        o.AttemptTimeout.Timeout = TimeSpan.FromSeconds(25);
-        o.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(60);
+        o.AttemptTimeout.Timeout = TimeSpan.FromSeconds(attemptTimeoutSeconds);
+        // Polly requires SamplingDuration >= 2x AttemptTimeout and TotalRequestTimeout >= AttemptTimeout.
+        o.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(Math.Max(60, attemptTimeoutSeconds * 2));
         o.CircuitBreaker.MinimumThroughput = 5;
         o.CircuitBreaker.FailureRatio = 0.5;
         o.CircuitBreaker.BreakDuration = TimeSpan.FromSeconds(15);
-        o.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(120);
+        o.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(Math.Max(120, attemptTimeoutSeconds + 10));
     }
 }

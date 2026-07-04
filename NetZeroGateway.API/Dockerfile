@@ -7,10 +7,12 @@ COPY NetZeroGateway.Application/NetZeroGateway.Application.csproj NetZeroGateway
 COPY NetZeroGateway.API/NetZeroGateway.API.csproj                 NetZeroGateway.API/
 RUN dotnet restore
 COPY . .
-RUN dotnet publish NetZeroGateway.API -c Release -o /app/publish
+RUN dotnet publish NetZeroGateway.API -c Release -o /app/publish --no-restore
 
 FROM mcr.microsoft.com/dotnet/aspnet:8.0
 WORKDIR /app
 COPY --from=build /app/publish .
+# Run as the non-root user provided by the .NET runtime image
+USER app
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "NetZeroGateway.API.dll"]

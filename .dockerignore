@@ -1,5 +1,46 @@
+# Build output
 **/bin/
 **/obj/
+**/out/
+**/publish/
+
+# Version control
 **/.git/
-**/*.user
+**/.gitignore
+**/.gitattributes
+.github/
+
+# IDE / editor
 .vs/
+.vscode/
+.idea/
+**/*.user
+**/*.suo
+**/*.userprefs
+*.swp
+
+# Docker
+**/Dockerfile*
+**/.dockerignore
+docker-compose*.yml
+
+# Claude / Spec Kit / agent tooling
+.claude/
+.claudeignore
+.specify/
+CLAUDE.md
+**/CLAUDE.md
+
+# Docs and non-build assets
+*.md
+LICENSE
+postman/
+
+# OS cruft
+**/.DS_Store
+**/Thumbs.db
+
+# Secrets / local config (never bake into images)
+**/appsettings.*.local.json
+**/*.env
+.env

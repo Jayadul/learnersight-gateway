@@ -23,7 +23,7 @@
       "ApiLog": {},
       "Dashboard": {},
       "ManualSend": {},
-      "VoiceReport": {}
+      "Backup": {}
     },
     "Gateway": {
       "EndpointPath": "/sendtext"
@@ -59,17 +59,6 @@
       "ActionId": "runCampaign",
       "Service": "campaign",
       "LotNumber": "1"
-    },
-    "VoiceReport": {
-      "BaseUrl": "http://api.sms.netzero.com.bd:8000",
-      "ReportPath": "/api/v1/combined-report",
-      "ActionId": "getCombinedDetailedReport",
-      "AggregationType": "Detailed",
-      "ContType": "SuccessfulAndFailed",
-      "Service": "campaign",
-      "DefaultOffset": "0",
-      "DefaultLimit": "100",
-      "Fields": "StartTime,Destination,CallState,DisplayNameSent,ConnectTime,EndTime"
     }
   }
 }

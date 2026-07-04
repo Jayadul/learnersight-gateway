@@ -24,7 +24,7 @@ public class ApiLoggingMiddleware(RequestDelegate next, ILogger<ApiLoggingMiddle
         }
 
         ctx.Request.EnableBuffering();
-        var reqBody = await ReadBodyAsync(ctx.Request);
+        var reqBody = MaskSecrets(await ReadBodyAsync(ctx.Request));
         ctx.Request.Body.Position = 0;
 
         var originalBody = ctx.Response.Body;
@@ -78,6 +78,11 @@ public class ApiLoggingMiddleware(RequestDelegate next, ILogger<ApiLoggingMiddle
             logger.LogError(ex, "[API_LOG] Failed to persist log record");
         }
     }
+
+    /// <summary>Never persist gateway credentials into api_logs (they'd surface in the admin UI and backups).</summary>
+    private static string MaskSecrets(string formBody) =>
+        System.Text.RegularExpressions.Regex.Replace(
+            formBody, "(apikey|secretkey)=[^&]*", "$1=***", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
     private static async Task<string> ReadBodyAsync(HttpRequest req)
     {

@@ -22,7 +22,8 @@ public class JwtService(IConfiguration config) : IJwtService
             new Claim(JwtRegisteredClaimNames.Sub,   user.Id.ToString()),
             new Claim(JwtRegisteredClaimNames.Name,  user.Username),
             new Claim(JwtRegisteredClaimNames.Email, user.Email),
-            new Claim(ClaimTypes.Role,               user.Role.ToString()),
+            new Claim(ClaimTypes.Role,               user.Role.ToString()), // for server-side authorization
+            new Claim("role",                        user.Role.ToString()), // short claim the SPA reads
             new Claim(TypeClaim,                     AccessValue)
         };
         return Build(claims, TimeSpan.FromMinutes(mins));

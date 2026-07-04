@@ -21,7 +21,7 @@ public static class ConfigKeys
 
     // ── HTTP Client / Polly ────────────────────────────────────────────────
     public const string TimeoutSeconds = "HttpClients:TimeoutSeconds";
-    public const string ReportTimeoutSeconds = "HttpClients:ReportTimeoutSeconds";
+    public const string WhatsAppTimeoutSeconds = "HttpClients:WhatsAppTimeoutSeconds";
     public const string RetryMaxAttempts = "HttpClients:Retry:MaxAttempts";
     public const string RetryDelaySeconds = "HttpClients:Retry:DelaySeconds";
 
@@ -29,7 +29,6 @@ public static class ConfigKeys
     public const string SmsBaseUrl = "Providers:Sms:BaseUrl";
     public const string WhatsAppBaseUrl = "Providers:WhatsApp:BaseUrl";
     public const string VoiceBaseUrl = "Providers:Voice:BaseUrl";
-    public const string VoiceReportBaseUrl = "Providers:VoiceReport:BaseUrl";
 
     // ── Authorization / Swagger (authorization.json) ───────────────────────
     public const string GatewayEndpointPath = "Authorization:Gateway:EndpointPath";
@@ -52,12 +51,4 @@ public static class ConfigKeys
     public const string VoiceActionId = "Providers:Voice:ActionId";
     public const string VoiceService = "Providers:Voice:Service";
     public const string VoiceDefaultLot = "Providers:Voice:LotNumber";
-    public const string VoiceReportPath = "Providers:VoiceReport:ReportPath";
-    public const string VoiceReportActionId = "Providers:VoiceReport:ActionId";
-    public const string VoiceReportAggType = "Providers:VoiceReport:AggregationType";
-    public const string VoiceReportContType = "Providers:VoiceReport:ContType";
-    public const string VoiceReportService = "Providers:VoiceReport:Service";
-    public const string VoiceReportOffset = "Providers:VoiceReport:DefaultOffset";
-    public const string VoiceReportLimit = "Providers:VoiceReport:DefaultLimit";
-    public const string VoiceReportFields = "Providers:VoiceReport:Fields";
 }

@@ -8,6 +8,7 @@
     <ProjectReference Include="..\NetZeroGateway.Domain\NetZeroGateway.Domain.csproj" />
     <ProjectReference Include="..\NetZeroGateway.Application\NetZeroGateway.Application.csproj" />
     <PackageReference Include="BCrypt.Net-Next"                              Version="4.0.3" />
+    <PackageReference Include="ClosedXML"                                    Version="0.104.2" />
     <PackageReference Include="EFCore.NamingConventions"                    Version="8.0.3" />
     <PackageReference Include="Microsoft.EntityFrameworkCore"               Version="8.0.7" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design"        Version="8.0.7" />

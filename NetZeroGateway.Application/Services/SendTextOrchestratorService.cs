@@ -1,3 +1,6 @@
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using NetZeroGateway.Application.DTOs;
@@ -10,12 +13,19 @@ namespace NetZeroGateway.Application.Services;
 public class SendTextOrchestratorService(
     ITemplateParserService parser,
     IMessageRequestRepository msgRepo,
+    IChannelConfigRepository configRepo,
+    IEncryptionService enc,
     IServiceScopeFactory scopeFactory,
     ILogger<SendTextOrchestratorService> logger
 ) : ISendTextOrchestratorService
 {
     public async Task<SendTextResponse> ProcessAsync(SendTextRequest request)
     {
+        if (!await IsAuthorizedAsync(request))
+        {
+            return SendTextResponse.Rejected();
+        }
+
         var jobs = parser.Parse(request.MessageContent);
 
         var msgRequest = new MessageRequest
@@ -59,4 +69,47 @@ public class SendTextOrchestratorService(
 
         return SendTextResponse.Accepted(msgRequest.Id);
     }
+
+    /// <summary>
+    /// Third-party callers must supply apikey/secretkey/callerID. Keys are validated
+    /// against the active SMS channel config, so rotating them in the admin panel
+    /// immediately applies here too.
+    /// </summary>
+    private async Task<bool> IsAuthorizedAsync(SendTextRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.ApiKey) ||
+            string.IsNullOrWhiteSpace(request.SecretKey) ||
+            string.IsNullOrWhiteSpace(request.CallerID))
+        {
+            logger.LogWarning("[GATEWAY_AUTH] Rejected — apikey/secretkey/callerID missing");
+            return false;
+        }
+
+        var config = await configRepo.GetActiveByChannelTypeAsync(ChannelType.SMS);
+        if (config is null)
+        {
+            logger.LogWarning("[GATEWAY_AUTH] Rejected — no active SMS config to validate against");
+            return false;
+        }
+
+        var cfg = JsonSerializer.Deserialize<Dictionary<string, string>>(
+            enc.Decrypt(config.ConfigJson)) ?? [];
+
+        var apiKeyOk = cfg.TryGetValue("apikey", out var expectedKey)
+                       && FixedTimeEquals(request.ApiKey, expectedKey);
+        var secretOk = cfg.TryGetValue("secretkey", out var expectedSecret)
+                       && FixedTimeEquals(request.SecretKey, expectedSecret);
+
+        if (!apiKeyOk || !secretOk)
+        {
+            logger.LogWarning("[GATEWAY_AUTH] Rejected — invalid apikey/secretkey. ToUser={ToUser}",
+                request.ToUser);
+            return false;
+        }
+        return true;
+    }
+
+    private static bool FixedTimeEquals(string provided, string expected) =>
+        CryptographicOperations.FixedTimeEquals(
+            Encoding.UTF8.GetBytes(provided), Encoding.UTF8.GetBytes(expected));
 }

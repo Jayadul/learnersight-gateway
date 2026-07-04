@@ -25,14 +25,14 @@ public class ManualSendService(
             {
                 ChannelType = request.ChannelType,
                 Message     = request.Message,
-                MediaUrl    = request.MediaUrl,
-                CampaignId  = request.CampaignId
+                MediaUrl    = request.MediaUrl
+                // CampaignId/CallerID come from the channel config, not user input
             }
         };
 
         var msgRequest = new MessageRequest
         {
-            CallerID = request.CallerID ?? "",
+            CallerID = "",
             ToUser = request.ToNumbers,
             RawMessageContent = request.Message,
             ParsedChannels = [request.ChannelType.ToString()],

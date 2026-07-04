@@ -48,8 +48,19 @@ public class WaTrendClient(
         var content = new StringContent(
             JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
         var resp = await http.PostAsync(SendPath, content, ct);
-        var body = await resp.Content.ReadAsStringAsync(ct);
+        var body = (await resp.Content.ReadAsStringAsync(ct)).Trim();
         logger.LogDebug("[WATREND] Response for {Number}: {Body}", number, body);
+
+        // watrend returns an empty array `[]` (or empty body) when the number can't be
+        // delivered — e.g. it isn't a reachable WhatsApp user. Treat as a clean failure.
+        if (string.IsNullOrWhiteSpace(body) || body.StartsWith('['))
+        {
+            logger.LogWarning(
+                "[WATREND] Non-success response for {Number} (number may not be on WhatsApp). Body={Body}",
+                number, body);
+            return new WaTrendResponse { Status = "error" };
+        }
+
         try
         {
             return JsonSerializer.Deserialize<WaTrendResponse>(body, _opts)

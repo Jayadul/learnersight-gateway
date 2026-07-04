@@ -6,6 +6,4 @@ public class ManualSendRequest
     public string ToNumbers { get; set; } = string.Empty;
     public string Message { get; set; } = string.Empty;
     public string? MediaUrl { get; set; }
-    public string? CampaignId { get; set; }
-    public string? CallerID { get; set; }
 }
