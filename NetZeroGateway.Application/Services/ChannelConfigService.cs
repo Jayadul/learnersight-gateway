@@ -57,7 +57,7 @@ public class ChannelConfigService(
             ?? throw new NotFoundException($"ChannelConfig {id} not found.");
         if (entity.IsActive)
             throw new InvalidOperationException(
-                "Cannot delete an active channel config. Deactivate it first.");
+                "This channel is currently active. Activate another configuration first, then delete this one.");
         repo.Delete(entity);
         await repo.SaveChangesAsync();
     }
