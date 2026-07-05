@@ -16,8 +16,12 @@
       "AdminUser": {
         "Roles": [ "SuperAdmin" ]
       },
-      "ChannelConfig": {},
-      "FallbackPolicy": {},
+      "ChannelConfig": {
+        "Roles": [ "SuperAdmin" ]
+      },
+      "FallbackPolicy": {
+        "Roles": [ "SuperAdmin" ]
+      },
       "MessageRequest": {},
       "DispatchLog": {},
       "ApiLog": {},
