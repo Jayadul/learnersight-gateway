@@ -62,3 +62,11 @@ with layer-specific conventions — those load automatically when you edit files
 - **Secrets**: channel provider credentials AES-encrypted in `channel_configs.config_json`
   (`IEncryptionService`); rotation via admin UI applies instantly.
 - **Logging**: Serilog → Seq (compose service, port 18082).
+- **Time**: UTC storage/processing everywhere; Dhaka (UTC+6) for display and job
+  schedules — see [conventions.md](conventions.md).
+- **Background jobs**: Hangfire (same Postgres DB, `hangfire` schema; no dashboard).
+  Recurring: `media-cleanup` — Fridays 00:00 server time, deletes expired Media Library
+  files and marks them Deleted. Register jobs in Program.cs via `IRecurringJobManager`.
+- **Media Library**: authenticated upload (`/api/media`) → local disk
+  (`Media:StoragePath`, Docker volume `mediadata`) → public unauthenticated serving at
+  `/media/{slug}` for use in outbound messages.

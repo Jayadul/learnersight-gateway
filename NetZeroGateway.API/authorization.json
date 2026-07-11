@@ -27,7 +27,12 @@
       "ApiLog": {},
       "Dashboard": {},
       "ManualSend": {},
-      "Backup": {}
+      "Backup": {},
+      "Media": {},
+      "PublicMedia": {
+        "SwaggerGroup": "gateway",
+        "RequireAuth": false
+      }
     },
     "Gateway": {
       "EndpointPath": "/sendtext"

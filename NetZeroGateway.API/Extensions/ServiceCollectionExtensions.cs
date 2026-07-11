@@ -1,3 +1,5 @@
+using Hangfire;
+using Hangfire.PostgreSql;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Http.Resilience;
@@ -39,6 +41,10 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IDispatchJobRepository, DispatchJobRepository>();
         services.AddScoped<IApiLogRepository, ApiLogRepository>();
         services.AddScoped<IFallbackPolicyRepository, FallbackPolicyRepository>();
+        services.AddScoped<IMediaFileRepository, MediaFileRepository>();
+
+        // Media file storage (local disk / Docker volume)
+        services.AddScoped<IMediaStorageService, LocalMediaStorageService>();
 
         // Encryption
         services.AddScoped<IEncryptionService, AesEncryptionService>();
@@ -105,6 +111,21 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<IApiLogService, ApiLogService>();
         services.AddScoped<IAdminUserService, AdminUserService>();
+        services.AddScoped<IMediaLibraryService, MediaLibraryService>();
+        return services;
+    }
+
+    // ── Background jobs (Hangfire, same Postgres database) ────────────────
+    public static IServiceCollection AddBackgroundJobs(
+        this IServiceCollection services, IConfiguration config)
+    {
+        services.AddHangfire(h => h
+            .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+            .UseSimpleAssemblyNameTypeSerializer()
+            .UseRecommendedSerializerSettings()
+            .UsePostgreSqlStorage(o =>
+                o.UseNpgsqlConnection(config.GetConnectionString("DefaultConnection"))));
+        services.AddHangfireServer();
         return services;
     }
 

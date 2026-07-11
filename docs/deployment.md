@@ -8,8 +8,8 @@ Load this when: building/pushing images, running the stack, debugging containers
 |---|---|---|---|
 | db | postgres:16-alpine | 15432 | volume `pgdata` |
 | seq | datalust/seq | 18082 | log viewer, volume `seqdata` |
-| api | built from this repo | 18081 | migrations+seed on startup |
-| web | built from `../learnersight-netzero-gateway-ui` | 18080 | nginx serves SPA, proxies `/api/` and `/sendtext` |
+| api | built from this repo | 18081 | migrations+seed on startup; volume `mediadata:/app/media` for Media Library files |
+| web | built from `../learnersight-netzero-gateway-ui` | 18080 | nginx serves SPA, proxies `/api/`, `/sendtext` and `/media/` |
 | backup | built from `../backup` | — | nightly exports, writes next to compose file |
 
 ```powershell
@@ -37,6 +37,17 @@ docker push learnersight/netzero-gateway-backup:latest
 Docker Hub free plan: 1 private repo max, no collaborators on private repos —
 that is why all three repos are public (client decision). Note the api image
 contains production appsettings; see releases/1.0.0.md → Known limitations.
+
+## Media Library
+
+- Files live in the `mediadata` volume (`/app/media` inside the api container) —
+  losing the volume breaks all shared links.
+- `Media__PublicBaseUrl` (compose env on `api`) is what public links are built from;
+  set it to the address message recipients can reach (the web service proxies
+  `/media/` to the API, so the client's domain or `http://<server-ip>:18080`).
+  Changing it only affects files uploaded afterwards.
+- Expired files are removed by the `media-cleanup` Hangfire job (Fridays 00:00
+  container-local time).
 
 ## Client package
 
