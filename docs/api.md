@@ -57,6 +57,9 @@ Simulator (SuperAdmin only). Postman collection: `postman/`.
   numeric suffix (`company-logo-2.png`) — the response's `storedFileName`/`publicUrl` are
   authoritative.
 - `publicUrl` is built from `Media:PublicBaseUrl` config at upload time.
+- The `/media/*` URL namespace at the web origin is reserved for these public files
+  (nginx proxies it to the API) — the admin page lives at `/media-library` for this
+  reason; never add an SPA route under `/media`.
 - Validation: max size `Media:MaxFileSizeMb` (default 25), extension allowlist
   `Media:AllowedExtensions`, expiry 1–3650 days.
 - Expired or deleted files return 404 from `/media/{fileName}`; a Hangfire job
