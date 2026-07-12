@@ -12,7 +12,8 @@ public class MediaFileRepository(NetZeroGatewayDbContext db)
     public async Task<(List<MediaFile> Items, int Total)> GetPagedAsync(
         int page, int size, string? search)
     {
-        var q = _set.AsQueryable();
+        // Soft-deleted rows stay in the table for audit history but are never listed.
+        var q = _set.Where(m => m.Status == MediaStatus.Active);
         if (!string.IsNullOrWhiteSpace(search))
         {
             var pattern = $"%{search.Trim()}%";

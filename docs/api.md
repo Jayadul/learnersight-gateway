@@ -48,7 +48,7 @@ Simulator (SuperAdmin only). Postman collection: `postman/`.
 | FallbackPolicy | `/api/fallback-policies` | CRUD + `PATCH /{id}/toggle-active` |
 | AdminUser | `/api/admin-users` | user CRUD |
 | Backup | `/api/backup/export?from=&to=` | xlsx download for a date range |
-| Media | `/api/media` | Media Library: multipart upload (`file`, `customName?`, `expiryDays=90`), paged list `?search=&page=&pageSize=`, detail, `DELETE /{id}` (removes file, keeps row as Deleted) |
+| Media | `/api/media` | Media Library: multipart upload (`file`, `customName?`, `expiryDays=90`), paged list `?search=&page=&pageSize=` (Active rows only — soft-deleted rows are audit history), detail, `DELETE /{id}` (removes file, keeps row as Deleted) |
 | PublicMedia | `/media/{fileName}` | **no auth** — serves uploaded files by slug; `?download=true` forces attachment |
 
 ## Media Library notes
