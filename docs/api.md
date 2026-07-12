@@ -25,7 +25,7 @@ Simulator (SuperAdmin only). Postman collection: `postman/`.
 
 - Wire format: **enums as integers** (ChannelType SMS=0, WP_Text=1, WP_Media=2, Voice=3;
   MessageStatus Pending=0, PartialSuccess=1, Success=2, Failed=3; JobStatus Pending=0,
-  Sent=1, Failed=2; AdminRole SuperAdmin=0, Admin=1).
+  Sent=1, Failed=2; AdminRole SuperAdmin=0, Admin=1; MediaStatus Active=0, Deleted=1).
 - Errors: ASP.NET ProblemDetails — clients must read `detail`/`title` (the UI error
   interceptor does).
 - Auth: `POST /api/auth/login` → access token (15 min) + refresh token (7 days);
@@ -48,6 +48,24 @@ Simulator (SuperAdmin only). Postman collection: `postman/`.
 | FallbackPolicy | `/api/fallback-policies` | CRUD + `PATCH /{id}/toggle-active` |
 | AdminUser | `/api/admin-users` | user CRUD |
 | Backup | `/api/backup/export?from=&to=` | xlsx download for a date range |
+| Media | `/api/media` | Media Library: multipart upload (`file`, `customName?`, `expiryDays=90`), paged list `?search=&page=&pageSize=` (Active rows only — soft-deleted rows are audit history), detail, `DELETE /{id}` (removes file, keeps row as Deleted) |
+| PublicMedia | `/media/{fileName}` | **no auth** — serves uploaded files by slug; `?download=true` forces attachment |
+
+## Media Library notes
+
+- Stored names are URL slugs (`Company Logo.png` → `company-logo.png`); duplicates get a
+  numeric suffix (`company-logo-2.png`) — the response's `storedFileName`/`publicUrl` are
+  authoritative.
+- `publicUrl` is built from `Media:PublicBaseUrl` config at upload time.
+- The `/media/*` URL namespace at the web origin is reserved for these public files
+  (nginx proxies it to the API) — the admin page lives at `/media-library` for this
+  reason; never add an SPA route under `/media`.
+- Validation: max size `Media:MaxFileSizeMb` (default 25), extension allowlist
+  `Media:AllowedExtensions`, expiry 1–3650 days.
+- Expired or deleted files return 404 from `/media/{fileName}`; a Hangfire job
+  (`media-cleanup`, Fridays 00:00 server time) deletes expired files from disk and marks
+  rows Deleted. Manual `DELETE /api/media/{id}` uses the same logic and records
+  `deletedAt`/`deletedBy` (`system` when the job did it); rows are never removed.
 
 ## Swagger
 

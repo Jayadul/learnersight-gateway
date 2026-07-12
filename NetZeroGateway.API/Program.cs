@@ -1,6 +1,8 @@
+using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using NetZeroGateway.API.Extensions;
+using NetZeroGateway.Application.Services;
 using NetZeroGateway.Application.Utilities;
 using NetZeroGateway.Infrastructure.Persistence;
 using Serilog;
@@ -68,6 +70,7 @@ try
 
     builder.Services.AddInfrastructure(builder.Configuration);
     builder.Services.AddApplicationServices();
+    builder.Services.AddBackgroundJobs(builder.Configuration);
     builder.Services.AddJwtAuth(builder.Configuration);
     builder.Services.AddCorsPolicy(builder.Configuration);
 
@@ -79,6 +82,14 @@ try
         var db = scope.ServiceProvider.GetRequiredService<NetZeroGatewayDbContext>();
         await db.Database.MigrateAsync();
         await DataSeeder.SeedAsync(scope.ServiceProvider);
+
+        // ── Recurring jobs — always scheduled in the business time zone ────
+        // Expired media cleanup: every Friday at 00:00 Dhaka time.
+        scope.ServiceProvider.GetRequiredService<IRecurringJobManager>().AddOrUpdate<IMediaLibraryService>(
+            "media-cleanup",
+            s => s.CleanupExpiredAsync(),
+            Cron.Weekly(DayOfWeek.Friday, 0, 0),
+            new RecurringJobOptions { TimeZone = AppTime.Resolve(app.Configuration) });
     }
 
     // ── Swagger ────────────────────────────────────────────────────────────

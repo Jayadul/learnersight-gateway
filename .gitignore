@@ -4,11 +4,11 @@ obj/
 *.user
 appsettings.Development.json
 
-# Claude Code / AI agent files
-.claude/
+# Claude Code — CLAUDE.md files and .claude/skills ARE versioned project docs;
+# ignore only machine-specific or generated files
+.claude/*
+!.claude/skills/
 .claudeignore
-CLAUDE.md
-**/CLAUDE.md
 
 # Spec Kit
 .specify/
@@ -20,3 +20,6 @@ NetZeroGateway-ProjectSummary.md
 
 # Auto-generated memory
 .claude/projects/
+
+# Media Library uploads (dev runtime data)
+NetZeroGateway.API/media/

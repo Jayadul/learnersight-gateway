@@ -12,6 +12,7 @@ public class NetZeroGatewayDbContext(DbContextOptions<NetZeroGatewayDbContext> o
     public DbSet<DispatchJob> DispatchJobs => Set<DispatchJob>();
     public DbSet<FallbackPolicy> FallbackPolicies => Set<FallbackPolicy>();
     public DbSet<ApiLog> ApiLogs => Set<ApiLog>();
+    public DbSet<MediaFile> MediaFiles => Set<MediaFile>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -107,6 +108,23 @@ public class NetZeroGatewayDbContext(DbContextOptions<NetZeroGatewayDbContext> o
             e.Property(x => x.CallerIp).HasMaxLength(50).IsRequired();
             e.HasIndex(x => x.RequestedAt);
             e.HasIndex(x => x.ResponseStatus);
+        });
+
+        mb.Entity<MediaFile>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.OriginalFileName).HasMaxLength(300).IsRequired();
+            e.Property(x => x.StoredFileName).HasMaxLength(300).IsRequired();
+            e.Property(x => x.PublicUrl).HasMaxLength(1000).IsRequired();
+            e.Property(x => x.Extension).HasMaxLength(20).IsRequired();
+            e.Property(x => x.ContentType).HasMaxLength(200).IsRequired();
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(50);
+            e.Property(x => x.CreatedBy).HasMaxLength(100).IsRequired();
+            e.Property(x => x.DeletedBy).HasMaxLength(100);
+            e.HasIndex(x => x.StoredFileName).IsUnique();
+            e.HasIndex(x => x.ExpiresAt);
+            e.HasIndex(x => x.Status);
+            e.HasIndex(x => x.CreatedAt);
         });
     }
 

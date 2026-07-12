@@ -42,6 +42,15 @@ public static class ConfigKeys
     public const string SwaggerAdminDesc = "Authorization:Swagger:AdminDescription";
     public const string SwaggerSecSchemeId = "Authorization:Swagger:SecuritySchemeId";
 
+    // ── App time zone (UTC storage, business-zone display) ────────────────
+    public const string AppTimeZone = "App:TimeZone";
+
+    // ── Media library ──────────────────────────────────────────────────────
+    public const string MediaStoragePath = "Media:StoragePath";
+    public const string MediaPublicBaseUrl = "Media:PublicBaseUrl";
+    public const string MediaMaxFileSizeMb = "Media:MaxFileSizeMb";
+    public const string MediaAllowedExtensions = "Media:AllowedExtensions";
+
     // ── Provider API paths (authorization.json) ────────────────────────────
     public const string SmsApiPath = "Providers:Sms:SendPath";
     public const string WhatsAppSendPath = "Providers:WhatsApp:SendPath";

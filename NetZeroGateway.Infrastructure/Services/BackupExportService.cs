@@ -2,6 +2,7 @@ using ClosedXML.Excel;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using NetZeroGateway.Application.Interfaces;
+using NetZeroGateway.Application.Utilities;
 using NetZeroGateway.Infrastructure.Persistence;
 
 namespace NetZeroGateway.Infrastructure.Services;
@@ -14,8 +15,9 @@ public class BackupExportService(
     public async Task<byte[]> ExportXlsxAsync(
         DateTimeOffset? from, DateTimeOffset? to, CancellationToken ct = default)
     {
-        var offset = TimeSpan.FromHours(config.GetValue("Backup:UtcOffsetHours", 6));
-        DateTime? Local(DateTimeOffset? d) => d?.ToOffset(offset).DateTime;
+        var tz = AppTime.Resolve(config);
+        var offset = tz.GetUtcOffset(DateTimeOffset.UtcNow);
+        DateTime? Local(DateTimeOffset? d) => d is null ? null : AppTime.ToAppTime(d.Value, tz).DateTime;
 
         // ── Log tables: apply the date range ──
         var msgQuery = db.MessageRequests.AsNoTracking();

@@ -12,6 +12,8 @@ RUN dotnet publish NetZeroGateway.API -c Release -o /app/publish --no-restore
 FROM mcr.microsoft.com/dotnet/aspnet:8.0
 WORKDIR /app
 COPY --from=build /app/publish .
+# Media Library storage — owned by the app user so the mounted volume is writable
+RUN mkdir -p /app/media && chown app:app /app/media
 # Run as the non-root user provided by the .NET runtime image
 USER app
 EXPOSE 8080

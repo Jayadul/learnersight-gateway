@@ -21,6 +21,8 @@ Load this when: writing SQL, adding migrations, changing entities, or inspecting
 | `channel_configs` | Provider credentials, AES-encrypted `config_json`, one active per channel |
 | `fallback_policies` | Trigger→fallback channel rules (`is_global`, `is_active`) |
 | `admin_users` | Dashboard users, BCrypt password hashes |
+| `media_files` | Media Library metadata; unique `stored_file_name`, status Active/Deleted |
+| `hangfire.*` | Hangfire background-job bookkeeping (own schema, created on startup) |
 | `__ef_migrations_history` | EF bookkeeping (excluded from backups) |
 
 ## Connections
