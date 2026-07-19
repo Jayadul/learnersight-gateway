@@ -23,8 +23,7 @@ docs via the backend `CLAUDE.md` loading table. Only open docs the diff implicat
 - `docs/conventions.md` — new cross-cutting pattern worth codifying?
 - CLAUDE.md ×3 (workspace root + both repos) — loading tables, skills list,
   non-negotiables still true.
-- `.claude/skills/` — recipes still match reality; update **both** copies
-  (versioned in this repo + live at workspace root).
+- `.claude/skills/` (this repo + ui repo) — recipes still match reality.
 - `docs/adr/` — was a load-bearing decision made? One-page ADR.
 - `docs/releases/` — current plan reflects done/descoped items.
 

@@ -32,9 +32,9 @@ affected doc section. 8. Summarize concisely — lead with what changed and what
 - Never load the full doc set; the CLAUDE.md table maps task → files.
 - Reference docs instead of restating them in answers.
 - Surgical edits; don't regenerate unchanged files; don't re-read files just edited.
-- Prefer the skills in `.claude/skills/` (workspace root) for recurring flows —
-  release-prep, verify-stack, ui-consistency-review, backend-endpoint, angular-feature,
-  bug-investigation, db-migration, docs-audit.
+- Prefer the skills in each repo's `.claude/skills/` for recurring flows — backend:
+  backend-endpoint, db-migration, bug-investigation, docs-audit, release-prep,
+  verify-stack; ui: angular-feature, ui-consistency-review.
 
 ## Model policy
 
