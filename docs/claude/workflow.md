@@ -33,7 +33,19 @@ affected doc section. 8. Summarize concisely — lead with what changed and what
 - Reference docs instead of restating them in answers.
 - Surgical edits; don't regenerate unchanged files; don't re-read files just edited.
 - Prefer the skills in `.claude/skills/` (workspace root) for recurring flows —
-  release-prep, verify-stack, ui-consistency-review, backend-endpoint, angular-feature.
+  release-prep, verify-stack, ui-consistency-review, backend-endpoint, angular-feature,
+  bug-investigation, db-migration, docs-audit.
+
+## Model policy
+
+- **Sonnet** is the default (`.claude/settings.json`) — all routine work: features,
+  bugfixes, tests, reviews, doc updates.
+- The team lead switches to **Opus** (`/model opus`) for planning-heavy sessions:
+  architecture, release planning, large refactor proposals.
+- **Fable** is escalation-only. If a task is genuinely hard (major redesign,
+  repo-wide migration, deep algorithmic work), recommend escalation with a one-line
+  justification and **wait for approval**. Never auto-escalate; never suggest Fable
+  for routine implementation.
 
 ## Known client red lines (do not re-propose)
 

@@ -1,8 +1,9 @@
 # Claude Skills — Proposal & Status
 
-Skills live at the **workspace root** `.claude/skills/` (they span both repos and the
-compose stack). ⚠️ The workspace root is un-versioned — back up this folder by keeping
-this document in sync with reality.
+Live skills load from the **workspace root** `.claude/skills/` (they span both repos
+and the compose stack); the **versioned source of truth** is this repo's
+`.claude/skills/`. Edit the versioned copy, then mirror to the root
+(see `.claude/skills/README.md`).
 
 ## Implemented (v1)
 
@@ -14,10 +15,16 @@ this document in sync with reality.
 | `backend-endpoint` | Add a .NET endpoint the project way (authorization.json, DTOs, DI, snake_case) | architecture.md + api.md | conventional endpoint | ~3k tokens/feature |
 | `angular-feature` | Add a UI page over shared primitives (model→service→thin page, dialog pattern) | frontend docs | conventional feature | ~3k tokens/feature + avoids ColumnDefDirective trap |
 
+## Implemented (v2, 2026-07-19)
+
+| Skill | Purpose | Load context | Output | Saves |
+|---|---|---|---|---|
+| `bug-investigation` | Logs-first triage: Seq → container logs → api_logs/dispatch_jobs → repro → root cause | deployment.md, database.md, testing.md as needed | root cause + minimal fix proposal + impact level | avoids shotgun fixes; ~2–4k tokens/bug |
+| `db-migration` | EF migration + snake_case check + backup-service impact scan + shipped-migration rules | database.md | safe migration incl. backup/ updates | prevents the R1 backup-SQL breakage class |
+| `docs-audit` | Diff-scoped doc drift check (api map, tables, CLAUDE.md tables, skills, ADRs) | diff + implicated docs only | Changed / Verified-current lists | replaces "re-read all docs" sweeps |
+
 ## Proposed for later (create when first needed, not before)
 
-- **db-migration** — EF migration + snake_case checks + backup-service impact scan.
-- **bug-investigation** — logs-first triage: Seq → api_logs → dispatch_jobs → repro.
 - **security-review** — project-specific checklist seeded from 1.0.0 known limitations
   (the built-in /security-review covers generic diff scanning).
 - **release-notes** — turn git log between tags into client-readable notes.

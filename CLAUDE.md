@@ -31,8 +31,9 @@ dotnet build                               # use -o <scratch> if VS holds file l
 | Verifying changes, smoke tests | `docs/testing.md` |
 | Branching, commits, cross-repo coordination | `docs/git.md` |
 | Shipping to the client, tagging, rollback | `docs/release-process.md` |
-| Collaboration rules, autonomy limits, token discipline | `docs/claude/workflow.md` |
+| Collaboration rules, autonomy limits, model policy | `docs/claude/workflow.md` |
 | Release history / known debt / lessons | `docs/releases/` |
+| Why it's built this way / revisiting a past decision | `docs/adr/` |
 
 Per-layer conventions load automatically from each project's own CLAUDE.md when you
 edit files there (API = auth/middleware wiring, Application = services/DTOs,

@@ -14,5 +14,6 @@ NetZero/                              ← Claude Code runs here
 ```
 
 On a fresh machine: clone both repos into a workspace folder and copy this
-`skills/` folder to `<workspace>/.claude/skills/` (paths inside the skills are
-relative to the workspace root). When editing a skill, update BOTH copies.
+`skills/` folder AND the sibling `settings.json` to `<workspace>/.claude/` (paths
+inside the skills are relative to the workspace root). When editing a skill or
+settings, edit here (versioned) first, then mirror to the root copy.

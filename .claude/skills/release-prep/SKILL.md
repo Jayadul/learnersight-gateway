@@ -26,5 +26,8 @@ Follow `learnersight-netzero-gateway/docs/release-process.md`. Condensed procedu
 8. **Report**: commit hashes with ranges, image digests, what the user can now see at
    http://localhost:18080.
 
+`.claude/` changed in the backend repo? Mirror `.claude/` (skills + settings.json)
+to the workspace root — the root copies are the live ones and must match.
+
 Numbered releases additionally: tag `vX.Y.Z` both repos, push version-pinned image
 tags, write `docs/releases/X.Y.Z.md`.
