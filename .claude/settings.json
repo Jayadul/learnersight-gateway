@@ -1,0 +1,21 @@
+{
+  "model": "sonnet",
+  "permissions": {
+    "deny": [
+      "Read(file_path:**/appsettings*.json)",
+      "Edit(file_path:**/appsettings*.json)",
+      "Write(file_path:**/appsettings*.json)",
+      "Read(file_path:**/.env*)",
+      "Edit(file_path:**/.env*)",
+      "Write(file_path:**/.env*)",
+      "Read(file_path:**/secrets*.json)",
+      "Edit(file_path:**/secrets*.json)",
+      "Write(file_path:**/secrets*.json)",
+      "Read(file_path:**/*.pfx)",
+      "Read(file_path:**/*.key)",
+      "Read(file_path:**/launchSettings.json)",
+      "Edit(file_path:**/launchSettings.json)",
+      "Write(file_path:**/launchSettings.json)"
+    ]
+  }
+}

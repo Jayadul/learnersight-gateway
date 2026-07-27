@@ -87,4 +87,4 @@ or files, or unsure where a standard lives. Feature-area details stay in their o
 | Branching, commits, cross-repo coordination | [git.md](git.md) |
 | Shipping / rollback | [release-process.md](release-process.md) |
 | Collaboration rules, approval protocol | [claude/workflow.md](claude/workflow.md) |
-| Feature recipes (step-by-step) | `.claude/skills/` (backend-endpoint, angular-feature, release-prep, verify-stack, ui-consistency-review) |
+| Feature recipes (step-by-step) | `.claude/skills/` in each repo — layout in [.claude/skills/README.md](../.claude/skills/README.md) |

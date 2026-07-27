@@ -8,6 +8,7 @@ appsettings.Development.json
 # ignore only machine-specific or generated files
 .claude/*
 !.claude/skills/
+!.claude/settings.json
 .claudeignore
 
 # Spec Kit

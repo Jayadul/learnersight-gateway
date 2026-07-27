@@ -6,10 +6,10 @@ Frontend lives in the sibling repo `../learnersight-netzero-gateway-ui`.
 
 Current baseline: **Release 1.0.0** — read `docs/releases/1.0.0.md` before large work.
 
-**Fresh machine?** Clone both repos into one workspace folder; docker compose and
-workflow skills live at the workspace root (see `.claude/skills/README.md` here for
-the layout and how to install the skills). This repo's `docs/` is the documentation
-hub for the whole product.
+**Fresh machine?** Clone both repos into one workspace folder; docker compose lives
+at the workspace root. Skills load from each repo's `.claude/skills/` automatically
+(layout + setup: `.claude/skills/README.md` here). This repo's `docs/` is the
+documentation hub for the whole product.
 
 ## Commands
 
@@ -31,8 +31,9 @@ dotnet build                               # use -o <scratch> if VS holds file l
 | Verifying changes, smoke tests | `docs/testing.md` |
 | Branching, commits, cross-repo coordination | `docs/git.md` |
 | Shipping to the client, tagging, rollback | `docs/release-process.md` |
-| Collaboration rules, autonomy limits, token discipline | `docs/claude/workflow.md` |
+| Collaboration rules, autonomy limits, model policy | `docs/claude/workflow.md` |
 | Release history / known debt / lessons | `docs/releases/` |
+| Why it's built this way / revisiting a past decision | `docs/adr/` |
 
 Per-layer conventions load automatically from each project's own CLAUDE.md when you
 edit files there (API = auth/middleware wiring, Application = services/DTOs,
