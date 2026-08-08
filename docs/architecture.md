@@ -48,8 +48,13 @@ with layer-specific conventions — those load automatically when you edit files
 
 ## Channel tags
 
-`[sms::text]` `[wp::text]` `[smswp::text]` `[wpmedia::text||url]` `[call::campaignId]`
+`[sms::text]` `[wp::text]` `[smswp::text]` `[wpmedia::text||url]`
+`[call::campaignId]` `[call::campaignId||lotNumber]`
 — no tag means the whole content goes as plain SMS. Full contract: [api.md](api.md).
+
+`||` is the one delimiter across tags: it splits media URL from caption, and lot number
+from campaign id. A `call` tag without a lot leaves the lot to the channel config; a
+supplied lot overrides it for that message only and is not stored on the dispatch job.
 
 ## Cross-cutting
 

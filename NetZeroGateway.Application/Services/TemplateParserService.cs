@@ -69,13 +69,23 @@ public partial class TemplateParserService : ITemplateParserService
                     }
 
                 case "call":
-                    jobs.Add(new ParsedChannelJob
                     {
-                        ChannelType = ChannelType.Voice,
-                        Message = content,
-                        CampaignId = content
-                    });
-                    break;
+                        // [call::campaignId] or [call::campaignId||lotNumber].
+                        // Same || convention as wpmedia; a bare campaign id keeps working
+                        // and leaves the lot to the channel config.
+                        var sep = content.IndexOf("||", StringComparison.Ordinal);
+                        var campaignId = sep >= 0 ? content[..sep].Trim() : content;
+                        var lotNumber = sep >= 0 ? content[(sep + 2)..].Trim() : null;
+
+                        jobs.Add(new ParsedChannelJob
+                        {
+                            ChannelType = ChannelType.Voice,
+                            Message = campaignId,
+                            CampaignId = campaignId,
+                            LotNumber = string.IsNullOrWhiteSpace(lotNumber) ? null : lotNumber
+                        });
+                        break;
+                    }
             }
         }
 

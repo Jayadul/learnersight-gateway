@@ -102,6 +102,12 @@ public class ChannelDispatchService(
         var dispatchJob = await CreateJobAsync(
             requestId, configId, job, string.Join(",", numbers));
 
+        // A lot number supplied per message ([call::campaignId||lotNumber]) overrides the
+        // channel's configured default. cfg is deserialized per job in DispatchAsync, so
+        // this overlay cannot leak into another job's dispatch.
+        if (!string.IsNullOrWhiteSpace(job.LotNumber))
+            cfg["lotNumber"] = job.LotNumber;
+
         var sender = senderFactory.GetSender(ChannelType.Voice);
         await sender.SendAsync(dispatchJob, cfg);
         await jobRepo.SaveChangesAsync();
