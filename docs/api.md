@@ -44,7 +44,7 @@ Simulator (SuperAdmin only). Postman collection: `postman/`.
 | DispatchLog | `/api/dispatch-logs` | paged delivery jobs |
 | ApiLog | `/api/api-logs` | gateway request audit (secrets masked) |
 | ManualSend | `/api/manual-send` | admin-initiated sends (creds from active configs) |
-| ChannelConfig | `/api/channel-configs` | CRUD + `/activate`; active config cannot be deleted |
+| ChannelConfig | `/api/channel-configs` | CRUD + `/activate`; active config cannot be deleted; reads mask secret fields as `***` — on `PUT`, a config field sent as `***` or omitted keeps its stored value, so saving back a masked read never overwrites credentials |
 | FallbackPolicy | `/api/fallback-policies` | CRUD + `PATCH /{id}/toggle-active` |
 | AdminUser | `/api/admin-users` | user CRUD |
 | Backup | `/api/backup/export?from=&to=` | xlsx download for a date range |
