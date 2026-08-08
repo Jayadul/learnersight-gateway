@@ -44,8 +44,14 @@ public class JwtService(IConfiguration config) : IJwtService
     {
         try
         {
-            var principal = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler()
-                .ValidateToken(token, ValidationParams(true), out _);
+            // MapInboundClaims must stay false: the default (true) rewrites "sub" to
+            // ClaimTypes.NameIdentifier, so RefreshAsync's FindFirst(Sub) returns null
+            // and every refresh fails with "Malformed refresh token."
+            var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler
+            {
+                MapInboundClaims = false
+            };
+            var principal = handler.ValidateToken(token, ValidationParams(true), out _);
             return principal.FindFirstValue(TypeClaim) == RefreshValue ? principal : null;
         }
         catch { return null; }
