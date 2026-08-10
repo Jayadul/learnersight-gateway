@@ -39,9 +39,10 @@ public class WhatsAppMediaSender(
             else
             {
                 job.Status = JobStatus.Failed;
-                job.FailureReason = r.Status;
+                job.FailureReason = r.FailureReason;
                 logger.LogWarning(
-                    "[WA_MEDIA] Failed for {ToNumber} | Status={Status}", job.ToNumber, r.Status);
+                    "[WA_MEDIA] Failed for {ToNumber} | Status={Status} | Reason={Reason}",
+                    job.ToNumber, r.Status, r.FailureReason);
             }
         }
         catch (Exception ex)
