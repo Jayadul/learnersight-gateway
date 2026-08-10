@@ -23,9 +23,14 @@ Simulator (SuperAdmin only). Postman collection: `postman/`.
 
 ## Admin API (`/api/*`, JWT Bearer)
 
-- Wire format: **enums as integers** (ChannelType SMS=0, WP_Text=1, WP_Media=2, Voice=3;
-  MessageStatus Pending=0, PartialSuccess=1, Success=2, Failed=3; JobStatus Pending=0,
-  Sent=1, Failed=2; AdminRole SuperAdmin=0, Admin=1; MediaStatus Active=0, Deleted=1).
+- Wire format: **enums as integers** (ChannelType SMS=0, WP=1, Voice=3 — **2 is retired**,
+  see below; MessageStatus Pending=0, PartialSuccess=1, Success=2, Failed=3; JobStatus
+  Pending=0, Sent=1, Failed=2; AdminRole SuperAdmin=0, Admin=1; MediaStatus Active=0,
+  Deleted=1).
+- **ChannelType 2 (`WP_Media`) no longer exists.** WhatsApp text and media were unified
+  into `WP=1`; a message is media when it carries a `mediaUrl`, not by channel type.
+  Sending `channelType=2` now returns 400. `Voice` deliberately stays 3, so Voice
+  integrations are unaffected — the gap at 2 is intentional and must not be reused.
 - Errors: ASP.NET ProblemDetails — clients must read `detail`/`title` (the UI error
   interceptor does).
 - Auth: `POST /api/auth/login` → access token (15 min) + refresh token (7 days);

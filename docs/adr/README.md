@@ -11,6 +11,7 @@ CLAUDE.md non-negotiables.
 | [0003](0003-snake-case-database-naming.md) | snake_case database naming |
 | [0004](0004-jwt-lifetimes-and-localstorage.md) | JWT 15 min/7 days + localStorage tokens |
 | [0005](0005-utc-storage-dhaka-display.md) | UTC storage, Dhaka display |
+| [0006](0006-unify-whatsapp-channel-type.md) | WhatsApp text + media unified into one channel (`WP=1`, 2 retired) |
 
 ## Adding one
 

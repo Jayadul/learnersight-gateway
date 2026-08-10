@@ -102,6 +102,17 @@ public static class DataSeeder
         await db.SaveChangesAsync();
     }
 
+    /// <summary>
+    /// Parses a seeded channel-type name, tolerating the pre-unification
+    /// <c>WP_Text</c>/<c>WP_Media</c> names. Without this an un-updated appsettings would
+    /// throw here and stop the app from starting, since seeding runs at boot.
+    /// </summary>
+    private static ChannelType ParseChannelType(string name) => name switch
+    {
+        "WP_Text" or "WP_Media" => ChannelType.WP,
+        _ => Enum.Parse<ChannelType>(name)
+    };
+
     // ── Channel Configs ───────────────────────────────────────────────────
     private static async Task SeedChannelConfigsAsync(
         NetZeroGatewayDbContext db,
@@ -114,7 +125,7 @@ public static class DataSeeder
 
         foreach (var item in items)
         {
-            var channelType = Enum.Parse<ChannelType>(item.ChannelType);
+            var channelType = ParseChannelType(item.ChannelType);
             var plainJson = JsonSerializer.Serialize(item.Config,
                 new JsonSerializerOptions { WriteIndented = false });
 
@@ -124,16 +135,22 @@ public static class DataSeeder
 
             if (existing is null)
             {
+                // Only one config per type may be active (unique partial index). A config
+                // file still listing WP_Text and WP_Media collapses both to WP, so the
+                // second one must come in deactivated instead of breaking the insert.
+                var activeExists = await db.ChannelConfigs
+                    .AnyAsync(c => c.ChannelType == channelType && c.IsActive);
+
                 db.ChannelConfigs.Add(new ChannelConfig
                 {
                     ChannelType = channelType,
                     ProviderName = item.ProviderName,
                     Label = item.Label,
-                    IsActive = true,
+                    IsActive = !activeExists,
                     ConfigJson = enc.Encrypt(plainJson)
                 });
-                logger.LogInformation("[SEED] ChannelConfig ADD: {Type} / {Label}",
-                    item.ChannelType, item.Label);
+                logger.LogInformation("[SEED] ChannelConfig ADD: {Type} / {Label} (active={Active})",
+                    channelType, item.Label, !activeExists);
             }
             else
             {
@@ -188,8 +205,18 @@ public static class DataSeeder
 
         foreach (var item in items)
         {
-            var triggerChannel = Enum.Parse<ChannelType>(item.TriggerChannel);
-            var fallbackChannel = Enum.Parse<ChannelType>(item.FallbackChannel);
+            var triggerChannel = ParseChannelType(item.TriggerChannel);
+            var fallbackChannel = ParseChannelType(item.FallbackChannel);
+
+            // A WP_Text -> WP_Media policy collapses to WP -> WP, which would make a
+            // channel fall back to itself. Skip rather than seed a nonsensical rule.
+            if (triggerChannel == fallbackChannel)
+            {
+                logger.LogWarning(
+                    "[SEED] FallbackPolicy SKIP: {Name} — trigger and fallback are both {Channel} "
+                    + "after the WhatsApp unification", item.Name, triggerChannel);
+                continue;
+            }
 
             var existing = await db.FallbackPolicies
                 .FirstOrDefaultAsync(p => p.Name == item.Name);

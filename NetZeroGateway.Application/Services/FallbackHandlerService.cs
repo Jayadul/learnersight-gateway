@@ -63,7 +63,8 @@ public class FallbackHandlerService(
             var cfg = JsonSerializer.Deserialize<Dictionary<string, string>>(
                 enc.Decrypt(fallbackConfig.ConfigJson)) ?? [];
 
-            var sender = senderFactory.GetSender(policy.FallbackChannel);
+            var sender = senderFactory.GetSender(
+                policy.FallbackChannel, fallbackJob.MediaUrl is not null);
             await sender.SendAsync(fallbackJob, cfg);
             await jobRepo.SaveChangesAsync();
 

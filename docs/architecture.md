@@ -43,8 +43,13 @@ with layer-specific conventions — those load automatically when you edit files
 - **SMS and Voice**: ONE job per tag, recipients comma-joined (one batched provider call).
 - **WhatsApp (text & media)**: one job PER recipient.
 - Dashboard "Channel Breakdown" counts **jobs** (provider calls), not per-recipient
-  deliveries. 2 recipients × all-tags message = SMS 2, WP_Text 4 (2 from wp + 2 from
-  smswp), WP_Media 2, Voice 1.
+  deliveries. 2 recipients × all-tags message = SMS 2, WP 6 (2 from `wp` + 2 from
+  `smswp` + 2 from `wpmedia`), Voice 1.
+- WhatsApp text and media are **one channel** (`ChannelType.WP`). A job is a media send
+  when it carries a `MediaUrl`; `IChannelSenderFactory` keys on ChannelType **plus** that
+  flag to pick `WhatsAppTextSender` or `WhatsAppMediaSender`. Both remain separate
+  strategies — only how they are selected changed. See
+  [adr/0006](adr/0006-unify-whatsapp-channel-type.md).
 
 ## Channel tags
 

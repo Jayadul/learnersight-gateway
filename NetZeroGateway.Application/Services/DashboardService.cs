@@ -22,8 +22,7 @@ public class DashboardService(
 
         var jobsToday = allJobs.Where(j => j.CreatedAt >= todayStart).ToList();
         var smsSent = jobsToday.Count(j => j.ChannelType == ChannelType.SMS && j.Status == JobStatus.Sent);
-        var wpSent = jobsToday.Count(j => (j.ChannelType == ChannelType.WP_Text ||
-                                                  j.ChannelType == ChannelType.WP_Media) && j.Status == JobStatus.Sent);
+        var wpSent = jobsToday.Count(j => j.ChannelType == ChannelType.WP && j.Status == JobStatus.Sent);
         var voiceSent = jobsToday.Count(j => j.ChannelType == ChannelType.Voice && j.Status == JobStatus.Sent);
         var failed = jobsToday.Count(j => j.Status == JobStatus.Failed);
         var total = jobsToday.Count;

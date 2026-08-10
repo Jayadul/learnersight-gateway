@@ -34,12 +34,12 @@ public partial class TemplateParserService : ITemplateParserService
                     break;
 
                 case "wp":
-                    jobs.Add(new ParsedChannelJob { ChannelType = ChannelType.WP_Text, Message = content });
+                    jobs.Add(new ParsedChannelJob { ChannelType = ChannelType.WP, Message = content });
                     break;
 
                 case "smswp":
                     jobs.Add(new ParsedChannelJob { ChannelType = ChannelType.SMS, Message = content });
-                    jobs.Add(new ParsedChannelJob { ChannelType = ChannelType.WP_Text, Message = content });
+                    jobs.Add(new ParsedChannelJob { ChannelType = ChannelType.WP, Message = content });
                     break;
 
                 case "wpmedia":
@@ -52,7 +52,7 @@ public partial class TemplateParserService : ITemplateParserService
                             var mediaUrl = content[(sep + 2)..].Trim();
                             jobs.Add(new ParsedChannelJob
                             {
-                                ChannelType = ChannelType.WP_Media,
+                                ChannelType = ChannelType.WP,
                                 Message = msg,
                                 MediaUrl = mediaUrl
                             });
@@ -61,7 +61,7 @@ public partial class TemplateParserService : ITemplateParserService
                         {
                             jobs.Add(new ParsedChannelJob
                             {
-                                ChannelType = ChannelType.WP_Media,
+                                ChannelType = ChannelType.WP,
                                 Message = content
                             });
                         }

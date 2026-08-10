@@ -84,7 +84,8 @@ public class ChannelDispatchService(
         ParsedChannelJob job, Dictionary<string, string> cfg,
         List<string> numbers)
     {
-        var sender = senderFactory.GetSender(job.ChannelType);
+        // WhatsApp text and media share ChannelType.WP — the MediaUrl picks the sender.
+        var sender = senderFactory.GetSender(job.ChannelType, job.MediaUrl is not null);
         foreach (var number in numbers)
         {
             var dispatchJob = await CreateJobAsync(requestId, configId, job, number);
