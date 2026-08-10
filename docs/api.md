@@ -18,6 +18,26 @@ Responses (REVE-compatible):
 - Accepted: `{"Status":"0","Text":"ACCEPTD","Message_ID":"<guid>"}`
 - Rejected: `{"Status":"101","Text":"REJECTD"}` (bad/missing credentials or server error)
 
+### Channel selection
+
+Each channel config has a **`labelSlug`** (lowercase alphanumeric, unique per channel
+type). A tag may name one explicitly:
+
+| Form | Resolves to |
+|---|---|
+| `[sms::text]` | the **default** SMS channel |
+| `[sms_label:revemain::text]` | the **active** SMS channel whose slug is `revemain` |
+| `[wp_label:slug::text]` / `[call_label:slug::id]` | same, for WhatsApp and Voice |
+| `[sms_label:a-wp_label:b::text]` | one named channel per leg |
+
+Only **active** channels are addressable by slug, and an unknown or inactive slug is
+**rejected rather than falling back to the default** — a typo must never bill a channel
+the sender did not name. Slugs exclude hyphens because the combined form splits on
+`-wp_label:`.
+
+Gateway `apikey`/`secretkey` are validated against the **default SMS channel** only;
+credentials on non-default channels do not authenticate callers.
+
 Live simulator + shareable integration guide: admin UI → Administration → Gateway
 Simulator (SuperAdmin only). Postman collection: `postman/`.
 
@@ -49,7 +69,7 @@ Simulator (SuperAdmin only). Postman collection: `postman/`.
 | DispatchLog | `/api/dispatch-logs` | paged delivery jobs |
 | ApiLog | `/api/api-logs` | gateway request audit (secrets masked) |
 | ManualSend | `/api/manual-send` | admin-initiated sends (creds from active configs) |
-| ChannelConfig | `/api/channel-configs` | CRUD + `/activate`; active config cannot be deleted; reads mask secret fields as `***` — on `PUT`, a config field sent as `***` or omitted keeps its stored value, so saving back a masked read never overwrites credentials |
+| ChannelConfig | `/api/channel-configs` | CRUD + `PATCH /{id}/activate`, `/deactivate`, `/set-default`. Several configs per type may be active; exactly one is the **default**. The default cannot be deactivated or deleted — promote another first. Reads mask secret fields as `***` — on `PUT`, a config field sent as `***` or omitted keeps its stored value, so saving back a masked read never overwrites credentials |
 | FallbackPolicy | `/api/fallback-policies` | CRUD + `PATCH /{id}/toggle-active` |
 | AdminUser | `/api/admin-users` | user CRUD |
 | Backup | `/api/backup/export?from=&to=` | xlsx download for a date range |

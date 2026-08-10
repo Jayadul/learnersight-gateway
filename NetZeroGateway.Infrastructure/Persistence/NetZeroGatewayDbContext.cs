@@ -34,11 +34,16 @@ public class NetZeroGatewayDbContext(DbContextOptions<NetZeroGatewayDbContext> o
             e.Property(x => x.ChannelType).HasConversion<string>().HasMaxLength(50);
             e.Property(x => x.ProviderName).HasMaxLength(100).IsRequired();
             e.Property(x => x.Label).HasMaxLength(200).IsRequired();
+            e.Property(x => x.LabelSlug).HasMaxLength(50).IsRequired();
             e.Property(x => x.ConfigJson).HasColumnType("text").IsRequired();
-            // Unique partial index: one active config per channel type
-            e.HasIndex(x => new { x.ChannelType, x.IsActive })
+            // Unique partial index: exactly one DEFAULT config per channel type. This
+            // replaces the old one-active-per-type index — several configs of a type may
+            // now be active at once, so uniqueness moved to the default flag.
+            e.HasIndex(x => new { x.ChannelType, x.IsDefault })
              .IsUnique()
-             .HasFilter("\"is_active\" = true");
+             .HasFilter("\"is_default\" = true");
+            // Labelled sends resolve a slug within a channel type, so it must be unique there.
+            e.HasIndex(x => new { x.ChannelType, x.LabelSlug }).IsUnique();
         });
 
         mb.Entity<MessageRequest>(e =>

@@ -33,11 +33,28 @@ public class ChannelDispatchService(
 
         foreach (var job in jobs)
         {
-            var config = await configRepo.GetActiveByChannelTypeAsync(job.ChannelType);
+            // A labelled tag names a specific active channel; anything else uses the
+            // type's default.
+            var config = job.ChannelLabelSlug is { } slug
+                ? await configRepo.GetActiveBySlugAsync(job.ChannelType, slug)
+                : await configRepo.GetDefaultByChannelTypeAsync(job.ChannelType);
+
             if (config is null)
             {
-                logger.LogWarning(
-                    "[DISPATCH] No active config for {Channel} — skipping", job.ChannelType);
+                if (job.ChannelLabelSlug is { } missing)
+                {
+                    // Fail loudly rather than silently falling back to the default: a
+                    // typo'd slug must never bill a channel the sender did not name.
+                    logger.LogWarning(
+                        "[DISPATCH] No active {Channel} channel with label '{Slug}' — skipping. "
+                        + "The label must match an active channel's slug exactly.",
+                        job.ChannelType, missing);
+                }
+                else
+                {
+                    logger.LogWarning(
+                        "[DISPATCH] No default config for {Channel} — skipping", job.ChannelType);
+                }
                 continue;
             }
 
@@ -136,7 +153,11 @@ public class ChannelDispatchService(
         var sentCount = primaryJobs.Count(j => j.Status == JobStatus.Sent);
         var failedCount = primaryJobs.Count(j => j.Status == JobStatus.Failed);
 
-        request.OverallStatus = failedCount == 0 ? MessageStatus.Success
+        // No jobs at all means nothing could be dispatched — every channel tag failed to
+        // resolve. Without this it scores as Success (failedCount == 0), so a typo'd
+        // channel label would look like a delivered message.
+        request.OverallStatus = primaryJobs.Count == 0 ? MessageStatus.Failed
+                              : failedCount == 0 ? MessageStatus.Success
                               : sentCount == 0 ? MessageStatus.Failed
                               : MessageStatus.PartialSuccess;
         msgRepo.Update(request);

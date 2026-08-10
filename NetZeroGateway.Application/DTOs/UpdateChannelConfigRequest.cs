@@ -3,5 +3,7 @@ public class UpdateChannelConfigRequest
 {
     public string ProviderName { get; set; } = string.Empty;
     public string Label { get; set; } = string.Empty;
+    /// <summary>Optional; derived from Label when omitted. Lowercase alphanumeric only.</summary>
+    public string? LabelSlug { get; set; }
     public string ConfigJson { get; set; } = string.Empty;
 }

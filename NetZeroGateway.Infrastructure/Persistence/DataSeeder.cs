@@ -113,6 +113,26 @@ public static class DataSeeder
         _ => Enum.Parse<ChannelType>(name)
     };
 
+    /// <summary>
+    /// Lowercase alphanumeric slug derived from a label, made unique within a channel
+    /// type by a numeric suffix. Hyphens are stripped: the combined tag form splits on
+    /// "-wp_label:", so a hyphen inside a slug would make it ambiguous to parse.
+    /// </summary>
+    private static string UniqueSlug(string label, IEnumerable<string> taken)
+    {
+        var baseSlug = new string(label.ToLowerInvariant().Where(char.IsLetterOrDigit).ToArray());
+        if (baseSlug.Length == 0) baseSlug = "channel";
+
+        var used = taken.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (!used.Contains(baseSlug)) return baseSlug;
+
+        for (var n = 2; ; n++)
+        {
+            var candidate = $"{baseSlug}{n}";
+            if (!used.Contains(candidate)) return candidate;
+        }
+    }
+
     // ── Channel Configs ───────────────────────────────────────────────────
     private static async Task SeedChannelConfigsAsync(
         NetZeroGatewayDbContext db,
@@ -135,22 +155,27 @@ public static class DataSeeder
 
             if (existing is null)
             {
-                // Only one config per type may be active (unique partial index). A config
-                // file still listing WP_Text and WP_Media collapses both to WP, so the
-                // second one must come in deactivated instead of breaking the insert.
-                var activeExists = await db.ChannelConfigs
-                    .AnyAsync(c => c.ChannelType == channelType && c.IsActive);
+                // Includes entries added earlier in this same pass: they are not persisted
+                // until SaveChanges, so a DB-only query would hand out duplicate slugs.
+                var siblings = (await db.ChannelConfigs
+                        .Where(c => c.ChannelType == channelType).ToListAsync())
+                    .Concat(db.ChannelConfigs.Local.Where(c => c.ChannelType == channelType))
+                    .ToList();
 
                 db.ChannelConfigs.Add(new ChannelConfig
                 {
                     ChannelType = channelType,
                     ProviderName = item.ProviderName,
                     Label = item.Label,
-                    IsActive = !activeExists,
+                    LabelSlug = UniqueSlug(item.Label, siblings.Select(c => c.LabelSlug)),
+                    IsActive = true,
+                    // First config of a type becomes its default; later ones are added
+                    // active but non-default so they never silently steal live traffic.
+                    IsDefault = !siblings.Any(c => c.IsDefault),
                     ConfigJson = enc.Encrypt(plainJson)
                 });
-                logger.LogInformation("[SEED] ChannelConfig ADD: {Type} / {Label} (active={Active})",
-                    channelType, item.Label, !activeExists);
+                logger.LogInformation("[SEED] ChannelConfig ADD: {Type} / {Label}",
+                    channelType, item.Label);
             }
             else
             {

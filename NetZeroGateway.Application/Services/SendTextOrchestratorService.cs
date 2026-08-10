@@ -85,7 +85,7 @@ public class SendTextOrchestratorService(
             return false;
         }
 
-        var config = await configRepo.GetActiveByChannelTypeAsync(ChannelType.SMS);
+        var config = await configRepo.GetDefaultByChannelTypeAsync(ChannelType.SMS);
         if (config is null)
         {
             logger.LogWarning("[GATEWAY_AUTH] Rejected — no active SMS config to validate against");

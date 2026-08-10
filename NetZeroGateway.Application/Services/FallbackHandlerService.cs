@@ -32,7 +32,7 @@ public class FallbackHandlerService(
             var policy = policies.FirstOrDefault(p => p.TriggerChannel == job.ChannelType);
             if (policy is null) continue;
 
-            var fallbackConfig = await configRepo.GetActiveByChannelTypeAsync(policy.FallbackChannel);
+            var fallbackConfig = await configRepo.GetDefaultByChannelTypeAsync(policy.FallbackChannel);
             if (fallbackConfig is null)
             {
                 logger.LogWarning(

@@ -53,7 +53,9 @@ with layer-specific conventions — those load automatically when you edit files
 
 ## Channel tags
 
-`[sms::text]` `[wp::text]` `[smswp::text]` `[wpmedia::text||url]` `[call::campaignId]`
+`[sms::text]` `[wp::text]` `[smswp::text]` `[wpmedia::text||url]`
+`[sms_label:slug::text]` `[wp_label:slug::text]` `[call_label:slug::id]`
+`[sms_label:a-wp_label:b::text]` `[call::campaignId]`
 — no tag means the whole content goes as plain SMS. Full contract: [api.md](api.md).
 
 ## Cross-cutting
@@ -64,6 +66,10 @@ with layer-specific conventions — those load automatically when you edit files
   stored bodies) → routing/CORS/auth.
 - **Errors**: GlobalExceptionMiddleware returns ProblemDetails (`title`/`detail`) for
   admin routes, REVE-format `{Status,Text}` for the gateway path.
+- **Channel resolution**: several configs per type may be **active**; exactly one is the
+  **default** (unique partial index on `(channel_type, is_default)`). Unlabelled tags use
+  the default; `_label:slug` tags resolve to an active config by `label_slug` and fail
+  loudly when no match exists. The gateway authenticates against the default SMS config.
 - **Secrets**: channel provider credentials AES-encrypted in `channel_configs.config_json`
   (`IEncryptionService`); rotation via admin UI applies instantly.
 - **Logging**: Serilog → Seq (compose service, port 18082).

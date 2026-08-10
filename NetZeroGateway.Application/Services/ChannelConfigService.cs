@@ -26,14 +26,22 @@ public class ChannelConfigService(
 
     public async Task<ChannelConfigDto> CreateAsync(CreateChannelConfigRequest req)
     {
+        var siblings = await repo.GetAllByChannelTypeAsync(req.ChannelType);
         var entity = new ChannelConfig
         {
             ChannelType = req.ChannelType,
             ProviderName = req.ProviderName,
             Label = req.Label,
+            LabelSlug = await ResolveSlugAsync(req.ChannelType, req.LabelSlug, req.Label, null),
             ConfigJson = enc.Encrypt(req.ConfigJson),
-            IsActive = false
+            IsActive = false,
+            // The first config of a type becomes its default; otherwise the operator
+            // promotes one explicitly, so creating a channel never silently reroutes
+            // live traffic away from the current default.
+            IsDefault = siblings.Count == 0
         };
+        if (entity.IsDefault) entity.IsActive = true;
+
         await repo.AddAsync(entity);
         await repo.SaveChangesAsync();
         return ToDto(entity);
@@ -45,6 +53,8 @@ public class ChannelConfigService(
             ?? throw new NotFoundException($"ChannelConfig {id} not found.");
         entity.ProviderName = req.ProviderName;
         entity.Label = req.Label;
+        entity.LabelSlug = await ResolveSlugAsync(
+            entity.ChannelType, req.LabelSlug, req.Label, entity.Id);
         entity.ConfigJson = enc.Encrypt(MergeConfigJson(entity.ConfigJson, req.ConfigJson));
         repo.Update(entity);
         await repo.SaveChangesAsync();
@@ -94,19 +104,72 @@ public class ChannelConfigService(
     {
         var entity = await repo.GetByIdAsync(id)
             ?? throw new NotFoundException($"ChannelConfig {id} not found.");
-        if (entity.IsActive)
+        // Guards the default, not merely the active flag: several configs of a type may
+        // be active now, and those are legitimately deletable. Removing the default would
+        // leave untagged sends of that type with nowhere to go.
+        if (entity.IsDefault)
             throw new InvalidOperationException(
-                "This channel is currently active. Activate another configuration first, then delete this one.");
+                "This channel is the default for its type. Make another channel the default first, then delete this one.");
         repo.Delete(entity);
         await repo.SaveChangesAsync();
     }
 
-    public async Task ActivateAsync(Guid id)
+    /// <summary>Toggles availability. Independent of which config is the default.</summary>
+    public async Task SetActiveAsync(Guid id, bool isActive)
     {
         var entity = await repo.GetByIdAsync(id)
             ?? throw new NotFoundException($"ChannelConfig {id} not found.");
-        await repo.ActivateConfigAsync(id, entity.ChannelType);
+
+        if (!isActive && entity.IsDefault)
+            throw new InvalidOperationException(
+                "The default channel cannot be deactivated. Make another channel the default first.");
+
+        entity.IsActive = isActive;
+        repo.Update(entity);
+        await repo.SaveChangesAsync();
     }
+
+    public async Task SetDefaultAsync(Guid id)
+    {
+        var entity = await repo.GetByIdAsync(id)
+            ?? throw new NotFoundException($"ChannelConfig {id} not found.");
+        await repo.SetDefaultAsync(id, entity.ChannelType);
+    }
+
+    /// <summary>
+    /// Settles a config's slug: uses the supplied one when given, otherwise derives it
+    /// from the label. Slugs must be unique per channel type, so collisions get a numeric
+    /// suffix rather than failing the save.
+    /// </summary>
+    private async Task<string> ResolveSlugAsync(
+        ChannelType type, string? requested, string label, Guid? excludeId)
+    {
+        var candidate = Slugify(string.IsNullOrWhiteSpace(requested) ? label : requested);
+        if (candidate.Length == 0)
+            throw new InvalidOperationException(
+                "A channel label must contain at least one letter or digit so a tag slug can be derived from it.");
+
+        var taken = (await repo.GetAllByChannelTypeAsync(type))
+            .Where(c => c.Id != excludeId)
+            .Select(c => c.LabelSlug)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        if (!taken.Contains(candidate)) return candidate;
+
+        for (var n = 2; ; n++)
+        {
+            var next = $"{candidate}{n}";
+            if (!taken.Contains(next)) return next;
+        }
+    }
+
+    /// <summary>
+    /// Lowercase alphanumeric only. Hyphens are stripped rather than preserved because
+    /// the combined tag form splits on "-wp_label:" — a hyphen inside a slug would make
+    /// that ambiguous.
+    /// </summary>
+    private static string Slugify(string value) =>
+        new(value.ToLowerInvariant().Where(char.IsLetterOrDigit).ToArray());
 
     public async Task<string> GetDecryptedConfigJsonAsync(Guid id)
     {
@@ -134,7 +197,9 @@ public class ChannelConfigService(
             ChannelType = c.ChannelType,
             ProviderName = c.ProviderName,
             Label = c.Label,
+            LabelSlug = c.LabelSlug,
             IsActive = c.IsActive,
+            IsDefault = c.IsDefault,
             ConfigFields = masked,
             CreatedAt = c.CreatedAt,
             UpdatedAt = c.UpdatedAt

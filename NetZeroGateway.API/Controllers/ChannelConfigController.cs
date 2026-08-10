@@ -31,7 +31,22 @@ public class ChannelConfigController(IChannelConfigService service) : Controller
     [HttpPatch("{id:guid}/activate")]
     public async Task<IActionResult> Activate(Guid id)
     {
-        await service.ActivateAsync(id);
+        await service.SetActiveAsync(id, true);
+        return NoContent();
+    }
+
+    [HttpPatch("{id:guid}/deactivate")]
+    public async Task<IActionResult> Deactivate(Guid id)
+    {
+        await service.SetActiveAsync(id, false);
+        return NoContent();
+    }
+
+    /// <summary>Promotes this config to be its type's default, demoting the previous one.</summary>
+    [HttpPatch("{id:guid}/set-default")]
+    public async Task<IActionResult> SetDefault(Guid id)
+    {
+        await service.SetDefaultAsync(id);
         return NoContent();
     }
 

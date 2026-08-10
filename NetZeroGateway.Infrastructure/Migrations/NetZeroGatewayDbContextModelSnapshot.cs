@@ -169,11 +169,21 @@ namespace NetZeroGateway.Infrastructure.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
 
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_default");
+
                     b.Property<string>("Label")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("label");
+
+                    b.Property<string>("LabelSlug")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("label_slug");
 
                     b.Property<string>("ProviderName")
                         .IsRequired()
@@ -188,10 +198,14 @@ namespace NetZeroGateway.Infrastructure.Migrations
                     b.HasKey("Id")
                         .HasName("pk_channel_configs");
 
-                    b.HasIndex("ChannelType", "IsActive")
+                    b.HasIndex("ChannelType", "IsDefault")
                         .IsUnique()
-                        .HasDatabaseName("ix_channel_configs_channel_type_is_active")
-                        .HasFilter("\"is_active\" = true");
+                        .HasDatabaseName("ix_channel_configs_channel_type_is_default")
+                        .HasFilter("\"is_default\" = true");
+
+                    b.HasIndex("ChannelType", "LabelSlug")
+                        .IsUnique()
+                        .HasDatabaseName("ix_channel_configs_channel_type_label_slug");
 
                     b.ToTable("channel_configs", (string)null);
                 });
