@@ -23,6 +23,16 @@ public class ChannelConfig : BaseEntity
     /// SMS config.
     /// </summary>
     public bool IsDefault { get; set; }
+    /// <summary>
+    /// Seconds to wait before handing a job on this channel to the provider, applied to
+    /// every attempt including fallback dispatches. Used to pace WhatsApp sends against
+    /// provider rate limits. 0 disables it.
+    /// <para>
+    /// This does not govern the HTTP client's own retries — those are Polly's, configured
+    /// by <c>HttpClients:Retry:DelaySeconds</c>.
+    /// </para>
+    /// </summary>
+    public int DelaySeconds { get; set; }
     /// <summary>AES-256 encrypted JSON string.</summary>
     public string ConfigJson { get; set; } = string.Empty;
 }

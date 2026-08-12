@@ -165,6 +165,10 @@ namespace NetZeroGateway.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<int>("DelaySeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("delay_seconds");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");

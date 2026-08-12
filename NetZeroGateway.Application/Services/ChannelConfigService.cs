@@ -33,6 +33,7 @@ public class ChannelConfigService(
             ProviderName = req.ProviderName,
             Label = req.Label,
             LabelSlug = await ResolveSlugAsync(req.ChannelType, req.LabelSlug, req.Label, null),
+            DelaySeconds = ValidateDelay(req.DelaySeconds),
             ConfigJson = enc.Encrypt(req.ConfigJson),
             IsActive = false,
             // The first config of a type becomes its default; otherwise the operator
@@ -55,6 +56,7 @@ public class ChannelConfigService(
         entity.Label = req.Label;
         entity.LabelSlug = await ResolveSlugAsync(
             entity.ChannelType, req.LabelSlug, req.Label, entity.Id);
+        entity.DelaySeconds = ValidateDelay(req.DelaySeconds);
         entity.ConfigJson = enc.Encrypt(MergeConfigJson(entity.ConfigJson, req.ConfigJson));
         repo.Update(entity);
         await repo.SaveChangesAsync();
@@ -137,6 +139,20 @@ public class ChannelConfigService(
     }
 
     /// <summary>
+    /// Bounded so a mistyped value cannot stall dispatch. The delay applies to every
+    /// attempt, so a large recipient list multiplies it — 300s per send is already far
+    /// beyond any sane pacing need.
+    /// </summary>
+    private static int ValidateDelay(int seconds)
+    {
+        const int max = 300;
+        if (seconds < 0 || seconds > max)
+            throw new InvalidOperationException(
+                $"Send delay must be between 0 and {max} seconds.");
+        return seconds;
+    }
+
+    /// <summary>
     /// Settles a config's slug: uses the supplied one when given, otherwise derives it
     /// from the label. Slugs must be unique per channel type, so collisions get a numeric
     /// suffix rather than failing the save.
@@ -200,6 +216,7 @@ public class ChannelConfigService(
             LabelSlug = c.LabelSlug,
             IsActive = c.IsActive,
             IsDefault = c.IsDefault,
+            DelaySeconds = c.DelaySeconds,
             ConfigFields = masked,
             CreatedAt = c.CreatedAt,
             UpdatedAt = c.UpdatedAt

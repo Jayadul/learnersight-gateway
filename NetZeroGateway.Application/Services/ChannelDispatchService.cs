@@ -70,7 +70,8 @@ public class ChannelDispatchService(
                     await DispatchVoiceAsync(messageRequestId, config.Id, job, cfg, numbers);
                     break;
                 default:
-                    await DispatchPerNumberAsync(messageRequestId, config.Id, job, cfg, numbers);
+                    await DispatchPerNumberAsync(
+                        messageRequestId, config.Id, job, cfg, numbers, config.DelaySeconds);
                     break;
             }
         }
@@ -99,16 +100,33 @@ public class ChannelDispatchService(
     private async Task DispatchPerNumberAsync(
         Guid requestId, Guid configId,
         ParsedChannelJob job, Dictionary<string, string> cfg,
-        List<string> numbers)
+        List<string> numbers, int delaySeconds)
     {
         // WhatsApp text and media share ChannelType.WP — the MediaUrl picks the sender.
         var sender = senderFactory.GetSender(job.ChannelType, job.MediaUrl is not null);
         foreach (var number in numbers)
         {
             var dispatchJob = await CreateJobAsync(requestId, configId, job, number);
+            await PaceAsync(delaySeconds, job.ChannelType);
             await sender.SendAsync(dispatchJob, cfg);
             await jobRepo.SaveChangesAsync();
         }
+    }
+
+    /// <summary>
+    /// Waits the channel's configured pacing delay before a send. Applied to every
+    /// attempt on that channel, so a long recipient list is spaced out end to end.
+    /// Does not affect the HTTP client's own retries — those are Polly's, configured by
+    /// HttpClients:Retry:DelaySeconds.
+    /// </summary>
+    private async Task PaceAsync(int delaySeconds, ChannelType channel)
+    {
+        if (delaySeconds <= 0) return;
+        // Information, not Debug: pacing visibly changes how long a dispatch takes, so
+        // an operator wondering why a batch is slow needs to see it in the normal logs.
+        logger.LogInformation(
+            "[DISPATCH] Pacing {Channel} send by {Delay}s", channel, delaySeconds);
+        await Task.Delay(TimeSpan.FromSeconds(delaySeconds));
     }
 
     // ── Voice — one call, full array ──────────────────────────────────────

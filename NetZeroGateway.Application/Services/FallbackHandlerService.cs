@@ -65,6 +65,18 @@ public class FallbackHandlerService(
 
             var sender = senderFactory.GetSender(
                 policy.FallbackChannel, fallbackJob.MediaUrl is not null);
+
+            // The pacing delay applies to every attempt on a channel, so a fallback
+            // dispatch waits too — otherwise a burst of failures would bypass the very
+            // rate limiting the delay exists to respect.
+            if (fallbackConfig.DelaySeconds > 0)
+            {
+                logger.LogInformation(
+                    "[FALLBACK] Pacing {Channel} send by {Delay}s",
+                    policy.FallbackChannel, fallbackConfig.DelaySeconds);
+                await Task.Delay(TimeSpan.FromSeconds(fallbackConfig.DelaySeconds));
+            }
+
             await sender.SendAsync(fallbackJob, cfg);
             await jobRepo.SaveChangesAsync();
 
