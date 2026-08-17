@@ -102,6 +102,16 @@ public class NetZeroGatewayDbContext(DbContextOptions<NetZeroGatewayDbContext> o
             e.Property(x => x.TriggerChannel).HasConversion<string>().HasMaxLength(50);
             e.Property(x => x.FallbackChannel).HasConversion<string>().HasMaxLength(50);
             e.Property(x => x.Description).HasMaxLength(500);
+            // Restrict, not Cascade: deleting a channel must not silently delete the
+            // fallback rules that depend on it — the operator should see the conflict.
+            e.HasOne(x => x.TriggerChannelConfig)
+             .WithMany()
+             .HasForeignKey(x => x.TriggerChannelConfigId)
+             .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.FallbackChannelConfig)
+             .WithMany()
+             .HasForeignKey(x => x.FallbackChannelConfigId)
+             .OnDelete(DeleteBehavior.Restrict);
         });
 
         mb.Entity<ApiLog>(e =>

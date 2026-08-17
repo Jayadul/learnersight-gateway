@@ -69,8 +69,8 @@ Simulator (SuperAdmin only). Postman collection: `postman/`.
 | DispatchLog | `/api/dispatch-logs` | paged delivery jobs |
 | ApiLog | `/api/api-logs` | gateway request audit (secrets masked) |
 | ManualSend | `/api/manual-send` | admin-initiated sends (creds from active configs) |
-| ChannelConfig | `/api/channel-configs` | CRUD + `PATCH /{id}/activate`, `/deactivate`, `/set-default`. Several configs per type may be active; exactly one is the **default**. The default cannot be deactivated or deleted — promote another first. Reads mask secret fields as `***` — on `PUT`, a config field sent as `***` or omitted keeps its stored value, so saving back a masked read never overwrites credentials |
-| FallbackPolicy | `/api/fallback-policies` | CRUD + `PATCH /{id}/toggle-active` |
+| ChannelConfig | `/api/channel-configs` | CRUD + `PATCH /{id}/activate`, `/deactivate`, `/set-default`. Several configs per type may be active; exactly one is the **default**. The default cannot be deactivated or deleted — promote another first; a channel named by a fallback rule cannot be deleted until that rule is changed. Reads mask secret fields as `***` — on `PUT`, a config field sent as `***` or omitted keeps its stored value, so saving back a masked read never overwrites credentials |
+| FallbackPolicy | `/api/fallback-policies` | CRUD + `PATCH /{id}/toggle-active`. Each side carries a channel **type** and an optional `triggerChannelConfigId` / `fallbackChannelConfigId` naming one channel (null = any/default of that type). Same-type rules must name **both** channels and they must differ; differing types are rejected unless `allowCrossChannel` is true. Reads also return `triggerChannelLabel` / `fallbackChannelLabel` |
 | AdminUser | `/api/admin-users` | user CRUD |
 | Backup | `/api/backup/export?from=&to=` | xlsx download for a date range |
 | Media | `/api/media` | Media Library: multipart upload (`file`, `customName?`, `expiryDays=90`), paged list `?search=&page=&pageSize=` (Active rows only — soft-deleted rows are audit history), detail, `DELETE /{id}` (removes file, keeps row as Deleted) |

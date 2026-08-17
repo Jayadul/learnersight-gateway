@@ -36,7 +36,7 @@ with layer-specific conventions — those load automatically when you edit files
 2. Dispatch (async): `ChannelDispatchService` resolves the channel sender strategy
    (`IChannelSenderFactory`) and calls the provider.
 3. On failure: `FallbackHandlerService` checks `FallbackPolicy` rules and retries on
-   the fallback channel.
+   the fallback channel — see [Fallback](#fallback) for which policy applies.
 
 ### Job-creation semantics (frequent confusion — read carefully)
 
@@ -50,6 +50,31 @@ with layer-specific conventions — those load automatically when you edit files
   flag to pick `WhatsAppTextSender` or `WhatsAppMediaSender`. Both remain separate
   strategies — only how they are selected changed. See
   [adr/0006](adr/0006-unify-whatsapp-channel-type.md).
+
+## Fallback
+
+A `FallbackPolicy` names a trigger channel and a fallback channel, each as a
+**type** plus an **optional specific channel** (`trigger_channel_config_id` /
+`fallback_channel_config_id`). Null on either side means "any channel of this type"
+on the trigger side and "this type's default channel" on the fallback side — the
+behaviour that existed before the columns were added.
+
+Fallback stays **within a channel type** by default: WhatsApp retries on another
+WhatsApp channel, SMS on another SMS, Voice on another Voice. Crossing types changes
+both the delivery format and the per-message cost, so it requires
+`allow_cross_channel = true` on the policy; the admin UI raises a warning dialog
+before the flag can be turned on.
+
+`FallbackHandlerService` skips a policy — and logs the reason at Warning — when:
+
+- it crosses types without `allow_cross_channel` (enforced again at dispatch time,
+  so a row edited directly in the database cannot bypass the rule),
+- its fallback resolves to the same channel that just failed,
+- its fallback channel is inactive, or
+- no config resolves for the fallback type at all.
+
+The pacing delay of the fallback channel applies to the retry too, so a burst of
+failures cannot outrun the rate limit the delay exists to respect.
 
 ## Channel tags
 

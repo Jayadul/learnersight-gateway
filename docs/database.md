@@ -19,7 +19,7 @@ Load this when: writing SQL, adding migrations, changing entities, or inspecting
 | `dispatch_jobs` | Per-job provider calls (filter col: `created_at`) |
 | `api_logs` | Gateway request audit, secrets masked (filter col: `requested_at`) |
 | `channel_configs` | Provider credentials, AES-encrypted `config_json`. Many active per type; exactly one `is_default` (unique partial index). `label_slug` is unique per type and addresses a channel from a message tag |
-| `fallback_policies` | Trigger→fallback channel rules (`is_global`, `is_active`) |
+| `fallback_policies` | Trigger→fallback channel rules (`is_global`, `is_active`). Each side is a channel **type** plus an optional `*_channel_config_id` FK naming one channel (null = any/default of that type). `allow_cross_channel` must be true for a rule whose two types differ |
 | `admin_users` | Dashboard users, BCrypt password hashes |
 | `media_files` | Media Library metadata; unique `stored_file_name`, status Active/Deleted |
 | `hangfire.*` | Hangfire background-job bookkeeping (own schema, created on startup) |

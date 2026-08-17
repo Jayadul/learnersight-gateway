@@ -9,6 +9,7 @@ namespace NetZeroGateway.Application.Services;
 
 public class ChannelConfigService(
     IChannelConfigRepository repo,
+    IFallbackPolicyRepository policyRepo,
     IEncryptionService enc
 ) : IChannelConfigService
 {
@@ -112,6 +113,15 @@ public class ChannelConfigService(
         if (entity.IsDefault)
             throw new InvalidOperationException(
                 "This channel is the default for its type. Make another channel the default first, then delete this one.");
+
+        // The fallback FKs are Restrict, so the database would refuse this with a raw
+        // constraint violation. Name the rules instead so the admin knows what to edit.
+        var referencing = await policyRepo.GetNamesReferencingChannelAsync(id);
+        if (referencing.Count > 0)
+            throw new InvalidOperationException(
+                $"This channel is used by fallback rule(s): {string.Join(", ", referencing)}. "
+                + "Update or remove them first, then delete this channel.");
+
         repo.Delete(entity);
         await repo.SaveChangesAsync();
     }

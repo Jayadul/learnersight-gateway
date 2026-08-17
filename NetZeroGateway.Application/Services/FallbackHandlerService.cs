@@ -29,10 +29,49 @@ public class FallbackHandlerService(
 
         foreach (var job in failedPrimary)
         {
-            var policy = policies.FirstOrDefault(p => p.TriggerChannel == job.ChannelType);
+            // A policy scoped to one channel only covers failures on that channel;
+            // an unscoped policy still covers every channel of its type.
+            var policy = policies.FirstOrDefault(p =>
+                p.TriggerChannel == job.ChannelType
+                && (p.TriggerChannelConfigId is null
+                    || p.TriggerChannelConfigId == job.ChannelConfigId));
             if (policy is null) continue;
 
-            var fallbackConfig = await configRepo.GetDefaultByChannelTypeAsync(policy.FallbackChannel);
+            // Enforced here as well as at save time: a policy created before the rule
+            // existed, or edited directly in the database, must not quietly cross types.
+            if (policy.TriggerChannel != policy.FallbackChannel && !policy.AllowCrossChannel)
+            {
+                logger.LogWarning(
+                    "[FALLBACK] Policy '{Name}' skipped — it crosses {Trigger} to {Fallback} "
+                    + "without cross-channel fallback enabled.",
+                    policy.Name, policy.TriggerChannel, policy.FallbackChannel);
+                continue;
+            }
+
+            // A named fallback channel must be used as named; only an unnamed one falls
+            // through to the type's default.
+            var fallbackConfig = policy.FallbackChannelConfigId is { } targetId
+                ? await configRepo.GetByIdAsync(targetId)
+                : await configRepo.GetDefaultByChannelTypeAsync(policy.FallbackChannel);
+
+            // Retrying on the channel that just failed would be pointless at best.
+            if (fallbackConfig is not null && fallbackConfig.Id == job.ChannelConfigId)
+            {
+                logger.LogWarning(
+                    "[FALLBACK] Policy '{Name}' skipped — its fallback resolves to the same "
+                    + "channel that just failed ({ConfigId}).",
+                    policy.Name, job.ChannelConfigId);
+                continue;
+            }
+
+            if (fallbackConfig is not null && !fallbackConfig.IsActive)
+            {
+                logger.LogWarning(
+                    "[FALLBACK] Policy '{Name}' skipped — its fallback channel '{Label}' is inactive.",
+                    policy.Name, fallbackConfig.Label);
+                continue;
+            }
+
             if (fallbackConfig is null)
             {
                 logger.LogWarning(

@@ -321,6 +321,10 @@ namespace NetZeroGateway.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<bool>("AllowCrossChannel")
+                        .HasColumnType("boolean")
+                        .HasColumnName("allow_cross_channel");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -335,6 +339,10 @@ namespace NetZeroGateway.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
                         .HasColumnName("fallback_channel");
+
+                    b.Property<Guid?>("FallbackChannelConfigId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("fallback_channel_config_id");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")
@@ -356,12 +364,22 @@ namespace NetZeroGateway.Infrastructure.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("trigger_channel");
 
+                    b.Property<Guid?>("TriggerChannelConfigId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("trigger_channel_config_id");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
                     b.HasKey("Id")
                         .HasName("pk_fallback_policies");
+
+                    b.HasIndex("FallbackChannelConfigId")
+                        .HasDatabaseName("ix_fallback_policies_fallback_channel_config_id");
+
+                    b.HasIndex("TriggerChannelConfigId")
+                        .HasDatabaseName("ix_fallback_policies_trigger_channel_config_id");
 
                     b.ToTable("fallback_policies", (string)null);
                 });
@@ -543,6 +561,25 @@ namespace NetZeroGateway.Infrastructure.Migrations
                     b.Navigation("ChannelConfig");
 
                     b.Navigation("MessageRequest");
+                });
+
+            modelBuilder.Entity("NetZeroGateway.Domain.Entities.FallbackPolicy", b =>
+                {
+                    b.HasOne("NetZeroGateway.Domain.Entities.ChannelConfig", "FallbackChannelConfig")
+                        .WithMany()
+                        .HasForeignKey("FallbackChannelConfigId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_fallback_policies_channel_configs_fallback_channel_config_id");
+
+                    b.HasOne("NetZeroGateway.Domain.Entities.ChannelConfig", "TriggerChannelConfig")
+                        .WithMany()
+                        .HasForeignKey("TriggerChannelConfigId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_fallback_policies_channel_configs_trigger_channel_config_id");
+
+                    b.Navigation("FallbackChannelConfig");
+
+                    b.Navigation("TriggerChannelConfig");
                 });
 
             modelBuilder.Entity("NetZeroGateway.Domain.Entities.MessageRequest", b =>
