@@ -5,7 +5,8 @@ Load this when: planning R2 work or starting any R2 feature.
 ## Recommended task workflow: feature-by-feature in small milestone batches
 
 The team lead plans a **milestone of 3–6 features** (one short planning session, one
-document); Claude executes **one feature at a time**, each in its own session/branch.
+document); the milestone is then implemented **one feature at a time**, each in its own
+branch.
 
 Why this hybrid beats the alternatives:
 
