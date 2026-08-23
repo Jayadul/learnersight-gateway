@@ -18,6 +18,12 @@ Responses (REVE-compatible):
 - Accepted: `{"Status":"0","Text":"ACCEPTD","Message_ID":"<guid>"}`
 - Rejected: `{"Status":"101","Text":"REJECTD"}` (bad/missing credentials or server error)
 
+**Fallback does not apply to a multi-tagged send.** If `messageContent` produces more
+than one delivery — two tags, `[smswp::..]`, or the combined `[sms_label:a-wp_label:b::..]`
+form — the request is marked multi-channel and no fallback message is generated for any
+of its jobs, so a send never costs more than the sender asked for. The skip is logged at
+Warning and shown on the message detail page.
+
 ### Channel selection
 
 Each channel config has a **`labelSlug`** (lowercase alphanumeric, unique per channel
@@ -65,7 +71,7 @@ Simulator (SuperAdmin only). Postman collection: `postman/`.
 |---|---|---|
 | Auth | `/api/auth` | login / refresh |
 | Dashboard | `/api/dashboard` | summary, timeline, breakdown, failure reasons |
-| MessageRequest | `/api/message-requests` | paged logs + detail with job tree |
+| MessageRequest | `/api/message-requests` | paged logs + detail with job tree. `isMultiChannel` marks a request whose tags asked for more than one delivery — fallback is skipped for it |
 | DispatchLog | `/api/dispatch-logs` | paged delivery jobs |
 | ApiLog | `/api/api-logs` | gateway request audit (secrets masked) |
 | ManualSend | `/api/manual-send` | admin-initiated sends (creds from active configs) |

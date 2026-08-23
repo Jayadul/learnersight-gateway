@@ -36,6 +36,8 @@ public class ManualSendService(
             ToUser = request.ToNumbers,
             RawMessageContent = request.Message,
             ParsedChannels = [request.ChannelType.ToString()],
+            // The admin panel sends on exactly one channel, so fallback stays available.
+            IsMultiChannel = false,
             OverallStatus = MessageStatus.Pending,
             ReceivedAt = DateTimeOffset.UtcNow,
             Source = MessageSource.AdminPanel

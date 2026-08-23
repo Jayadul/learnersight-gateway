@@ -9,6 +9,7 @@ namespace NetZeroGateway.Application.Services;
 
 public class FallbackHandlerService(
     IDispatchJobRepository jobRepo,
+    IMessageRequestRepository msgRepo,
     IFallbackPolicyRepository policyRepo,
     IChannelConfigRepository configRepo,
     IEncryptionService enc,
@@ -19,13 +20,28 @@ public class FallbackHandlerService(
     public async Task HandleAsync(Guid messageRequestId)
     {
         var jobs = await jobRepo.GetByMessageRequestIdAsync(messageRequestId);
-        var policies = await policyRepo.GetActiveGlobalPoliciesAsync();
 
         var failedPrimary = jobs
             .Where(j => j.Status == JobStatus.Failed && !j.IsFallback)
             .ToList();
 
         if (failedPrimary.Count == 0) return;
+
+        // The sender already asked for more than one delivery, so a fallback send would be
+        // a third message they never requested and did not budget for. Skip every job on
+        // the request, not just the failed one, and say so loudly — a silent no-op here
+        // looks identical to a missing policy when someone reads the logs later.
+        var msgRequest = await msgRepo.GetByIdAsync(messageRequestId);
+        if (msgRequest?.IsMultiChannel == true)
+        {
+            logger.LogWarning(
+                "[FALLBACK] Skipped — message explicitly tagged multiple channels. "
+                + "RequestId={Id} FailedJobs={Count}",
+                messageRequestId, failedPrimary.Count);
+            return;
+        }
+
+        var policies = await policyRepo.GetActiveGlobalPoliciesAsync();
 
         foreach (var job in failedPrimary)
         {

@@ -35,8 +35,9 @@ with layer-specific conventions — those load automatically when you edit files
      **queuing, not delivery**.
 2. Dispatch (async): `ChannelDispatchService` resolves the channel sender strategy
    (`IChannelSenderFactory`) and calls the provider.
-3. On failure: `FallbackHandlerService` checks `FallbackPolicy` rules and retries on
-   the fallback channel — see [Fallback](#fallback) for which policy applies.
+3. On failure: `FallbackHandlerService` retries on the fallback channel — unless the
+   request was tagged for more than one channel, in which case fallback is skipped
+   entirely. See [Fallback](#fallback) for which policy applies and when.
 
 ### Job-creation semantics (frequent confusion — read carefully)
 
@@ -64,6 +65,15 @@ WhatsApp channel, SMS on another SMS, Voice on another Voice. Crossing types cha
 both the delivery format and the per-message cost, so it requires
 `allow_cross_channel = true` on the policy; the admin UI raises a warning dialog
 before the flag can be turned on.
+
+Fallback only applies to a message that asked for **one** delivery. If the sender's
+tags produced more than one `DispatchJob` — `[sms::x][wp::y]`, `[smswp::x]`, the
+combined `[sms_label:a-wp_label:b::x]` form, or even two SMS tags — the redundancy was
+already paid for, so adding a fallback send would be a third message nobody asked for.
+The count is frozen at parse time in `message_requests.is_multi_channel`; counting
+sibling jobs at fallback time would give a different answer after a retry or a cleanup.
+When the flag is set, **every** job on the request is skipped and the reason is logged
+at Warning, so it never looks like a missing policy.
 
 `FallbackHandlerService` skips a policy — and logs the reason at Warning — when:
 

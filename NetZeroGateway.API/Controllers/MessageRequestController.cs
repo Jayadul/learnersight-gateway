@@ -32,6 +32,7 @@ public class MessageRequestController(IMessageRequestRepository repo) : Controll
                 OverallStatus = m.OverallStatus,
                 ReceivedAt = m.ReceivedAt,
                 Source = m.Source,
+                IsMultiChannel = m.IsMultiChannel,
                 CreatedAt = m.CreatedAt
             }).ToList(),
             TotalCount = total,
@@ -54,6 +55,7 @@ public class MessageRequestController(IMessageRequestRepository repo) : Controll
             OverallStatus = m.OverallStatus,
             ReceivedAt = m.ReceivedAt,
             Source = m.Source,
+            IsMultiChannel = m.IsMultiChannel,
             CreatedAt = m.CreatedAt,
             Jobs = m.Jobs.Select(j => new DispatchJobDto
             {

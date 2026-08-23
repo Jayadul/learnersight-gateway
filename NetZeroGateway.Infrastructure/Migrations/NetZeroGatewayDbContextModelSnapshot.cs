@@ -494,6 +494,10 @@ namespace NetZeroGateway.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<bool>("IsMultiChannel")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_multi_channel");
+
                     b.Property<string>("OverallStatus")
                         .IsRequired()
                         .HasMaxLength(50)

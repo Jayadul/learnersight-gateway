@@ -34,6 +34,10 @@ public class SendTextOrchestratorService(
             ToUser = request.ToUser,
             RawMessageContent = request.MessageContent,
             ParsedChannels = jobs.Select(j => j.ChannelType.ToString()).Distinct().ToList(),
+            // More than one parsed job means the sender asked for the extra delivery
+            // themselves, so fallback must not add a third. This counts jobs, not distinct
+            // types: [smswp::..] and two SMS tags are both redundancy the sender paid for.
+            IsMultiChannel = jobs.Count > 1,
             OverallStatus = MessageStatus.Pending,
             ReceivedAt = DateTimeOffset.UtcNow,
             Source = MessageSource.Api

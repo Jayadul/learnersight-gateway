@@ -12,6 +12,13 @@ public class MessageRequest : BaseEntity
     public DateTimeOffset ReceivedAt { get; set; } = DateTimeOffset.UtcNow;
     public MessageSource Source { get; set; }
 
+    /// <summary>
+    /// True when the sender's tags asked for more than one delivery, so fallback must
+    /// not add another. Set once at parse time — counting sibling jobs later would give
+    /// a different answer after a retry or a cleanup.
+    /// </summary>
+    public bool IsMultiChannel { get; set; }
+
     // Navigation
     public ICollection<DispatchJob> Jobs { get; set; } = new List<DispatchJob>();
 }
