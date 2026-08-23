@@ -26,7 +26,18 @@ public class SendTextOrchestratorService(
             return SendTextResponse.Rejected();
         }
 
-        var jobs = parser.Parse(request.MessageContent);
+        var parsed = parser.Parse(request.MessageContent);
+        if (!parsed.IsValid)
+        {
+            // Rejecting beats accepting: an unknown tag produces no job, so accepting the
+            // request would report success for a message that never went anywhere. The
+            // reason travels back to the caller and into api_logs with the response body.
+            logger.LogWarning(
+                "[GATEWAY] Rejected — {Reason} ToUser={ToUser}", parsed.Error, request.ToUser);
+            return SendTextResponse.Rejected(parsed.Error);
+        }
+
+        var jobs = parsed.Jobs;
 
         var msgRequest = new MessageRequest
         {

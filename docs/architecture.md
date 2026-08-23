@@ -88,10 +88,25 @@ failures cannot outrun the rate limit the delay exists to respect.
 
 ## Channel tags
 
-`[sms::text]` `[wp::text]` `[smswp::text]` `[wpmedia::text||url]`
-`[sms_label:slug::text]` `[wp_label:slug::text]` `[call_label:slug::id]`
-`[sms_label:a-wp_label:b::text]` `[call::campaignId]`
-— no tag means the whole content goes as plain SMS. Full contract: [api.md](api.md).
+`[sms::text]` `[wp::text]` `[wp::text||url]` `[sms-wp::text]`
+`[call::campaignId]` `[call::campaignId||lotNumber]`
+
+Any tag may name one channel instead of using its type's default:
+`[sms_label:slug::text]` `[wp_label:slug::text]` `[call_label:slug::campaignId]`. Each leg
+of the combined tag takes its own label independently, so `[sms_label:a-wp::text]` and
+`[sms-wp_label:b::text]` are both valid — the unlabelled leg falls to its type's default.
+
+`||` is the one delimiter across tags: it splits a media URL from its caption and a lot
+number from its campaign id. A `call` tag without a lot leaves the lot to the channel
+config; a supplied lot overrides it for that message only and is not stored on the
+dispatch job.
+
+WhatsApp has no separate media tag and no separate media channel — the presence of
+`||url` is what selects the media sender. No tag at all means the whole content goes as
+plain SMS. An unrecognised tag **rejects the whole request** with `101 REJECTD` and a
+reason naming the tag, rather than being silently dropped: a skipped tag produces no job
+and no error, which reads as a successful send that delivered nothing. Full contract:
+[api.md](api.md).
 
 ## Cross-cutting
 

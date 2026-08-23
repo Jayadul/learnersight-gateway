@@ -11,4 +11,10 @@ public class ParsedChannelJob
     /// this type to use. Null means "the type's default channel".
     /// </summary>
     public string? ChannelLabelSlug { get; set; }
+    /// <summary>
+    /// Per-message voice lot from <c>[call::campaignId||lotNumber]</c>. Overlaid onto the
+    /// channel config at dispatch time rather than stored on the DispatchJob, so it is
+    /// deliberately not persisted; null means "use the channel's configured lot".
+    /// </summary>
+    public string? LotNumber { get; set; }
 }
