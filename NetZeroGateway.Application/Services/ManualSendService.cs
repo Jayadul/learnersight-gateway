@@ -23,16 +23,21 @@ public class ManualSendService(
         {
             new()
             {
-                ChannelType = request.ChannelType,
-                Message     = request.Message,
-                MediaUrl    = request.MediaUrl
-                // CampaignId/CallerID come from the channel config, not user input
+                ChannelType      = request.ChannelType,
+                Message          = request.Message,
+                MediaUrl         = Blank(request.MediaUrl),
+                // Blank means "not overridden", so an empty box never clears a configured
+                // value — dispatch only overlays what is actually set.
+                ChannelLabelSlug = Blank(request.ChannelLabelSlug),
+                CallerId         = Blank(request.CallerId),
+                CampaignId       = Blank(request.CampaignId),
+                LotNumber        = Blank(request.LotNumber)
             }
         };
 
         var msgRequest = new MessageRequest
         {
-            CallerID = "",
+            CallerID = request.CallerId ?? "",
             ToUser = request.ToNumbers,
             RawMessageContent = request.Message,
             ParsedChannels = [request.ChannelType.ToString()],
@@ -76,4 +81,7 @@ public class ManualSendService(
             TotalNumbers = numbers.Count
         };
     }
+
+    private static string? Blank(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

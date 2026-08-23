@@ -97,16 +97,18 @@ internal sealed class FakeDispatchJobRepository : IDispatchJobRepository
 /// GetWithJobsAsync returns null on purpose: ChannelDispatchService treats that as
 /// "nothing to summarise" and returns early, keeping these tests focused on dispatch.
 /// </summary>
-internal sealed class FakeMessageRequestRepository : IMessageRequestRepository
+internal sealed class FakeMessageRequestRepository(MessageRequest? byId = null) : IMessageRequestRepository
 {
     public Task<MessageRequest?> GetWithJobsAsync(Guid id) => Task.FromResult<MessageRequest?>(null);
     public Task<int> SaveChangesAsync() => Task.FromResult(0);
+
+    /// <summary>The request the fallback handler reads its multi-channel flag from.</summary>
+    public Task<MessageRequest?> GetByIdAsync(Guid id) => Task.FromResult(byId);
 
     public Task<(List<MessageRequest> Items, int Total)> GetPagedAsync(
         int page, int size, DateTimeOffset? from, DateTimeOffset? to,
         string? toUser, MessageStatus? status, MessageSource? source)
         => Unused.Fail<Task<(List<MessageRequest>, int)>>();
-    public Task<MessageRequest?> GetByIdAsync(Guid id) => Unused.Fail<Task<MessageRequest?>>();
     public Task<List<MessageRequest>> GetAllAsync() => Unused.Fail<Task<List<MessageRequest>>>();
     public Task<List<MessageRequest>> FindAsync(Expression<Func<MessageRequest, bool>> p) => Unused.Fail<Task<List<MessageRequest>>>();
     public Task AddAsync(MessageRequest entity) => Unused.Fail<Task>();
@@ -117,4 +119,49 @@ internal sealed class FakeMessageRequestRepository : IMessageRequestRepository
 internal sealed class NoOpFallbackHandler : IFallbackHandlerService
 {
     public Task HandleAsync(Guid messageRequestId) => Task.CompletedTask;
+}
+
+internal sealed class FakeFallbackPolicyRepository(params FallbackPolicy[] policies)
+    : IFallbackPolicyRepository
+{
+    public Task<List<FallbackPolicy>> GetActiveGlobalPoliciesAsync()
+        => Task.FromResult(policies.Where(p => p.IsActive && p.IsGlobal).ToList());
+
+    public Task<FallbackPolicy?> GetActiveByTriggerChannelAsync(ChannelType triggerChannel)
+        => Unused.Fail<Task<FallbackPolicy?>>();
+    public Task<List<string>> GetNamesReferencingChannelAsync(Guid channelConfigId)
+        => Unused.Fail<Task<List<string>>>();
+    public Task<FallbackPolicy?> GetByIdAsync(Guid id) => Unused.Fail<Task<FallbackPolicy?>>();
+    public Task<List<FallbackPolicy>> GetAllAsync() => Unused.Fail<Task<List<FallbackPolicy>>>();
+    public Task<List<FallbackPolicy>> FindAsync(Expression<Func<FallbackPolicy, bool>> p) => Unused.Fail<Task<List<FallbackPolicy>>>();
+    public Task AddAsync(FallbackPolicy entity) => Unused.Fail<Task>();
+    public void Update(FallbackPolicy entity) => Unused.Fail<bool>();
+    public void Delete(FallbackPolicy entity) => Unused.Fail<bool>();
+    public Task<int> SaveChangesAsync() => Task.FromResult(0);
+}
+
+/// <summary>Returns the jobs a request already has, and records anything added.</summary>
+internal sealed class FakeJobRepositoryWithExisting(List<DispatchJob> existing) : IDispatchJobRepository
+{
+    public List<DispatchJob> Added { get; } = [];
+
+    public Task<List<DispatchJob>> GetByMessageRequestIdAsync(Guid id) => Task.FromResult(existing);
+
+    public Task AddAsync(DispatchJob entity)
+    {
+        Added.Add(entity);
+        return Task.CompletedTask;
+    }
+
+    public Task<int> SaveChangesAsync() => Task.FromResult(0);
+
+    public Task<(List<DispatchJob> Items, int Total)> GetPagedAsync(
+        int page, int size, DateTimeOffset? from, DateTimeOffset? to,
+        ChannelType? channelType, JobStatus? status, string? toNumber)
+        => Unused.Fail<Task<(List<DispatchJob>, int)>>();
+    public Task<DispatchJob?> GetByIdAsync(Guid id) => Unused.Fail<Task<DispatchJob?>>();
+    public Task<List<DispatchJob>> GetAllAsync() => Unused.Fail<Task<List<DispatchJob>>>();
+    public Task<List<DispatchJob>> FindAsync(Expression<Func<DispatchJob, bool>> p) => Unused.Fail<Task<List<DispatchJob>>>();
+    public void Update(DispatchJob entity) { }
+    public void Delete(DispatchJob entity) => Unused.Fail<bool>();
 }

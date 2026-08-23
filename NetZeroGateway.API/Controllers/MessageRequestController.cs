@@ -61,6 +61,7 @@ public class MessageRequestController(IMessageRequestRepository repo) : Controll
             {
                 Id = j.Id,
                 ChannelType = j.ChannelType,
+                ChannelLabel = j.ChannelConfig?.Label,
                 ToNumber = j.ToNumber,
                 MessageContent = j.MessageContent,
                 Status = j.Status,
@@ -69,6 +70,7 @@ public class MessageRequestController(IMessageRequestRepository repo) : Controll
                 FailureReason = j.FailureReason,
                 SentAt = j.SentAt,
                 IsFallback = j.IsFallback,
+                CampaignId = j.CampaignId,
                 FallbackFromJobId = j.FallbackFromJobId,
                 CreatedAt = j.CreatedAt
             }).ToList()

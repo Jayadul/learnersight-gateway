@@ -91,6 +91,11 @@ public class ChannelDispatchService(
         var dispatchJob = await CreateJobAsync(
             requestId, configId, job, string.Join(",", numbers));
 
+        // A sender id supplied per message overrides the channel's configured one. cfg is
+        // deserialized per job in DispatchAsync, so this cannot leak into another job.
+        if (!string.IsNullOrWhiteSpace(job.CallerId))
+            cfg["callerID"] = job.CallerId;
+
         var sender = senderFactory.GetSender(ChannelType.SMS);
         await sender.SendAsync(dispatchJob, cfg);
         await jobRepo.SaveChangesAsync();

@@ -28,6 +28,7 @@ public class DispatchLogController(IDispatchJobRepository repo) : ControllerBase
             {
                 Id = j.Id,
                 ChannelType = j.ChannelType,
+                ChannelLabel = j.ChannelConfig?.Label,
                 ToNumber = j.ToNumber,
                 MessageContent = j.MessageContent,
                 Status = j.Status,
@@ -36,6 +37,7 @@ public class DispatchLogController(IDispatchJobRepository repo) : ControllerBase
                 FailureReason = j.FailureReason,
                 SentAt = j.SentAt,
                 IsFallback = j.IsFallback,
+                CampaignId = j.CampaignId,
                 FallbackFromJobId = j.FallbackFromJobId,
                 CreatedAt = j.CreatedAt
             }).ToList(),

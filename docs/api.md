@@ -72,9 +72,9 @@ Simulator (SuperAdmin only). Postman collection: `postman/`.
 | Auth | `/api/auth` | login / refresh |
 | Dashboard | `/api/dashboard` | summary, timeline, breakdown, failure reasons |
 | MessageRequest | `/api/message-requests` | paged logs + detail with job tree. `isMultiChannel` marks a request whose tags asked for more than one delivery — fallback is skipped for it |
-| DispatchLog | `/api/dispatch-logs` | paged delivery jobs |
+| DispatchLog | `/api/dispatch-logs` | paged delivery jobs. Each job carries `channelLabel` — the name of the channel that actually sent it, since several gateways of a type may be active — and `campaignId` on voice jobs |
 | ApiLog | `/api/api-logs` | gateway request audit (secrets masked) |
-| ManualSend | `/api/manual-send` | admin-initiated sends (creds from active configs) |
+| ManualSend | `/api/manual-send` | admin-initiated sends. Credentials come from the channel config; every override is optional and a blank one keeps the configured value — `channelLabelSlug` (which gateway; default when omitted), `callerId` (SMS), `campaignId` and `lotNumber` (Voice), `mediaUrl` (WhatsApp — its presence is what makes the send a media send) |
 | ChannelConfig | `/api/channel-configs` | CRUD + `PATCH /{id}/activate`, `/deactivate`, `/set-default`. Several configs per type may be active; exactly one is the **default**. The default cannot be deactivated or deleted — promote another first; a channel named by a fallback rule cannot be deleted until that rule is changed. Reads mask secret fields as `***` — on `PUT`, a config field sent as `***` or omitted keeps its stored value, so saving back a masked read never overwrites credentials |
 | FallbackPolicy | `/api/fallback-policies` | CRUD + `PATCH /{id}/toggle-active`. Each side carries a channel **type** and an optional `triggerChannelConfigId` / `fallbackChannelConfigId` naming one channel (null = any/default of that type). Same-type rules must name **both** channels and they must differ; differing types are rejected unless `allowCrossChannel` is true. Reads also return `triggerChannelLabel` / `fallbackChannelLabel` |
 | AdminUser | `/api/admin-users` | user CRUD |
