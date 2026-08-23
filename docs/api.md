@@ -17,10 +17,12 @@ Load this when: changing endpoints, integrating a client, or debugging request/r
 Responses (REVE-compatible):
 - Accepted: `{"Status":"0","Text":"ACCEPTD","Message_ID":"<guid>"}`
 - Rejected: `{"Status":"101","Text":"REJECTD"}` (bad/missing credentials or server error)
+- Rejected with a fixable reason: `{"Status":"101","Text":"REJECTD","Reason":"Unknown
+  channel tag 'smswp'. It is now [sms-wp::text]."}` — `Reason` is omitted when there is
+  nothing for the caller to act on, so the REVE shape is unchanged for every other case.
 
 **Fallback does not apply to a multi-tagged send.** If `messageContent` produces more
-than one delivery — two tags, `[smswp::..]`, or the combined `[sms_label:a-wp_label:b::..]`
-form — the request is marked multi-channel and no fallback message is generated for any
+than one delivery — two tags, or any `[sms-wp::..]` form — the request is marked multi-channel and no fallback message is generated for any
 of its jobs, so a send never costs more than the sender asked for. The skip is logged at
 Warning and shown on the message detail page.
 
@@ -35,11 +37,17 @@ type). A tag may name one explicitly:
 | `[sms_label:revemain::text]` | the **active** SMS channel whose slug is `revemain` |
 | `[wp_label:slug::text]` / `[call_label:slug::id]` | same, for WhatsApp and Voice |
 | `[sms_label:a-wp_label:b::text]` | one named channel per leg |
+| `[sms_label:a-wp::text]` / `[sms-wp_label:b::text]` | one leg named, the other on its type's default |
 
 Only **active** channels are addressable by slug, and an unknown or inactive slug is
 **rejected rather than falling back to the default** — a typo must never bill a channel
-the sender did not name. Slugs exclude hyphens because the combined form splits on
-`-wp_label:`.
+the sender did not name. Slugs exclude hyphens because the combined form splits on `-wp`,
+which is also why either leg can be labelled independently.
+
+An unrecognised tag — including the retired `smswp` and `wpmedia` — **rejects the whole
+request** with a `Reason` naming it and its replacement. It is never dropped: a skipped
+tag produces no job and no error, so the caller would read a success for a message that
+was never sent.
 
 Gateway `apikey`/`secretkey` are validated against the **default SMS channel** only;
 credentials on non-default channels do not authenticate callers.

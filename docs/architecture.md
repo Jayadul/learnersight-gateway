@@ -44,8 +44,9 @@ with layer-specific conventions — those load automatically when you edit files
 - **SMS and Voice**: ONE job per tag, recipients comma-joined (one batched provider call).
 - **WhatsApp (text & media)**: one job PER recipient.
 - Dashboard "Channel Breakdown" counts **jobs** (provider calls), not per-recipient
-  deliveries. 2 recipients × all-tags message = SMS 2, WP 6 (2 from `wp` + 2 from
-  `smswp` + 2 from `wpmedia`), Voice 1.
+  deliveries. 2 recipients × a message tagged `[sms::][wp::][wp::||url][sms-wp::][call::]`
+  = SMS 2 (one job per tag, numbers comma-joined), WP 6 (2 each from `wp`, the media `wp`
+  and the WhatsApp leg of `sms-wp`), Voice 1.
 - WhatsApp text and media are **one channel** (`ChannelType.WP`). A job is a media send
   when it carries a `MediaUrl`; `IChannelSenderFactory` keys on ChannelType **plus** that
   flag to pick `WhatsAppTextSender` or `WhatsAppMediaSender`. Both remain separate
@@ -67,8 +68,8 @@ both the delivery format and the per-message cost, so it requires
 before the flag can be turned on.
 
 Fallback only applies to a message that asked for **one** delivery. If the sender's
-tags produced more than one `DispatchJob` — `[sms::x][wp::y]`, `[smswp::x]`, the
-combined `[sms_label:a-wp_label:b::x]` form, or even two SMS tags — the redundancy was
+tags produced more than one `DispatchJob` — `[sms::x][wp::y]`, any `[sms-wp::x]` form,
+or even two SMS tags — the redundancy was
 already paid for, so adding a fallback send would be a third message nobody asked for.
 The count is frozen at parse time in `message_requests.is_multi_channel`; counting
 sibling jobs at fallback time would give a different answer after a retry or a cleanup.
