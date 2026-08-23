@@ -36,7 +36,14 @@ Load this when: writing SQL, adding migrations, changing entities, or inspecting
 ## Seed data (fresh database)
 
 2 users (`admin`/`Admin@123` SuperAdmin, `operator`/`Operator@123` Admin),
-4 channel configs (one per channel), 2 fallback policies.
+channel configs from `Seed:ChannelConfigs`, fallback policies from `Seed:FallbackPolicies`.
+
+**The seed creates; it never re-asserts.** An existing channel config has only its
+credentials and provider name refreshed, and an existing fallback policy is left
+untouched — so switching a rule off, or renaming a channel, survives a restart. The
+flip side: **deleting** a seeded row does not stick. The seeder re-creates it on the next
+startup unless the entry is removed from `appsettings*.json` first.
+
 Fresh start: `docker compose down`, `docker volume rm netzero-gateway_pgdata` (keep
 `seqdata`), `docker compose up -d --build`.
 

@@ -261,23 +261,14 @@ public static class DataSeeder
             }
             else
             {
-                var changed = false;
-
-                if (existing.TriggerChannel != triggerChannel) { existing.TriggerChannel = triggerChannel; changed = true; }
-                if (existing.FallbackChannel != fallbackChannel) { existing.FallbackChannel = fallbackChannel; changed = true; }
-                if (existing.IsActive != item.IsActive) { existing.IsActive = item.IsActive; changed = true; }
-                if (existing.IsGlobal != item.IsGlobal) { existing.IsGlobal = item.IsGlobal; changed = true; }
-                if (existing.Description != item.Description) { existing.Description = item.Description; changed = true; }
-
-                if (changed)
-                {
-                    db.FallbackPolicies.Update(existing);
-                    logger.LogInformation("[SEED] FallbackPolicy UPDATE: {Name}", item.Name);
-                }
-                else
-                {
-                    logger.LogDebug("[SEED] FallbackPolicy SKIP (no change): {Name}", item.Name);
-                }
+                // An existing policy is left exactly as it is. The seed decides what a
+                // fresh database starts with; after that the rule belongs to whoever
+                // administers it. Re-applying the seeded values here meant switching a
+                // rule off in the admin panel lasted only until the next restart — and
+                // for a cross-channel rule, that silently resumed paying twice per send.
+                logger.LogDebug(
+                    "[SEED] FallbackPolicy SKIP (already exists, admin owns it): {Name}",
+                    item.Name);
             }
         }
 
