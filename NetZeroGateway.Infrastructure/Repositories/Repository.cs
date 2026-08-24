@@ -12,9 +12,10 @@ public class Repository<T>(NetZeroGatewayDbContext db) : IRepository<T>
     protected readonly DbSet<T> _set = db.Set<T>();
     protected readonly NetZeroGatewayDbContext _db = db;
 
-    public Task<T?> GetByIdAsync(Guid id)
+    // virtual so a repository can eager-load navigations it needs (see FallbackPolicyRepository)
+    public virtual Task<T?> GetByIdAsync(Guid id)
         => _set.FirstOrDefaultAsync(e => e.Id == id);
-    public Task<List<T>> GetAllAsync()
+    public virtual Task<List<T>> GetAllAsync()
         => _set.ToListAsync();
     public Task<List<T>> FindAsync(Expression<Func<T, bool>> predicate)
         => _set.Where(predicate).ToListAsync();

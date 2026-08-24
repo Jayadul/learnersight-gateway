@@ -22,8 +22,7 @@ public class DashboardService(
 
         var jobsToday = allJobs.Where(j => j.CreatedAt >= todayStart).ToList();
         var smsSent = jobsToday.Count(j => j.ChannelType == ChannelType.SMS && j.Status == JobStatus.Sent);
-        var wpSent = jobsToday.Count(j => (j.ChannelType == ChannelType.WP_Text ||
-                                                  j.ChannelType == ChannelType.WP_Media) && j.Status == JobStatus.Sent);
+        var wpSent = jobsToday.Count(j => j.ChannelType == ChannelType.WP && j.Status == JobStatus.Sent);
         var voiceSent = jobsToday.Count(j => j.ChannelType == ChannelType.Voice && j.Status == JobStatus.Sent);
         var failed = jobsToday.Count(j => j.Status == JobStatus.Failed);
         var total = jobsToday.Count;
@@ -69,14 +68,27 @@ public class DashboardService(
 
     public async Task<List<FailureReasonDto>> GetTopFailureReasonsAsync(int top = 5)
     {
-        var failedJobs = await jobRepo.FindAsync(
-            j => j.Status == JobStatus.Failed && j.FailureReason != null);
+        var failedJobs = await jobRepo.GetFailedWithChannelAsync();
 
         return failedJobs
             .GroupBy(j => j.FailureReason!)
             .OrderByDescending(g => g.Count())
             .Take(top)
-            .Select(g => new FailureReasonDto { Reason = g.Key, Count = g.Count() })
+            .Select(g => new FailureReasonDto
+            {
+                Reason = g.Key,
+                Count = g.Count(),
+                ByChannel = g
+                    .GroupBy(j => (Type: j.ChannelType, Label: j.ChannelConfig?.Label))
+                    .OrderByDescending(c => c.Count())
+                    .Select(c => new ChannelFailureCountDto
+                    {
+                        ChannelType = c.Key.Type.ToString(),
+                        ChannelLabel = c.Key.Label,
+                        Count = c.Count()
+                    })
+                    .ToList()
+            })
             .ToList();
     }
 }

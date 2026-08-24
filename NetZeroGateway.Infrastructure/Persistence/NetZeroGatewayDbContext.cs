@@ -34,11 +34,16 @@ public class NetZeroGatewayDbContext(DbContextOptions<NetZeroGatewayDbContext> o
             e.Property(x => x.ChannelType).HasConversion<string>().HasMaxLength(50);
             e.Property(x => x.ProviderName).HasMaxLength(100).IsRequired();
             e.Property(x => x.Label).HasMaxLength(200).IsRequired();
+            e.Property(x => x.LabelSlug).HasMaxLength(50).IsRequired();
             e.Property(x => x.ConfigJson).HasColumnType("text").IsRequired();
-            // Unique partial index: one active config per channel type
-            e.HasIndex(x => new { x.ChannelType, x.IsActive })
+            // Unique partial index: exactly one DEFAULT config per channel type. This
+            // replaces the old one-active-per-type index — several configs of a type may
+            // now be active at once, so uniqueness moved to the default flag.
+            e.HasIndex(x => new { x.ChannelType, x.IsDefault })
              .IsUnique()
-             .HasFilter("\"is_active\" = true");
+             .HasFilter("\"is_default\" = true");
+            // Labelled sends resolve a slug within a channel type, so it must be unique there.
+            e.HasIndex(x => new { x.ChannelType, x.LabelSlug }).IsUnique();
         });
 
         mb.Entity<MessageRequest>(e =>
@@ -97,6 +102,16 @@ public class NetZeroGatewayDbContext(DbContextOptions<NetZeroGatewayDbContext> o
             e.Property(x => x.TriggerChannel).HasConversion<string>().HasMaxLength(50);
             e.Property(x => x.FallbackChannel).HasConversion<string>().HasMaxLength(50);
             e.Property(x => x.Description).HasMaxLength(500);
+            // Restrict, not Cascade: deleting a channel must not silently delete the
+            // fallback rules that depend on it — the operator should see the conflict.
+            e.HasOne(x => x.TriggerChannelConfig)
+             .WithMany()
+             .HasForeignKey(x => x.TriggerChannelConfigId)
+             .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.FallbackChannelConfig)
+             .WithMany()
+             .HasForeignKey(x => x.FallbackChannelConfigId)
+             .OnDelete(DeleteBehavior.Restrict);
         });
 
         mb.Entity<ApiLog>(e =>
@@ -106,6 +121,8 @@ public class NetZeroGatewayDbContext(DbContextOptions<NetZeroGatewayDbContext> o
             e.Property(x => x.RawBody).HasColumnType("text").IsRequired();
             e.Property(x => x.ResponseBody).HasColumnType("text").IsRequired();
             e.Property(x => x.CallerIp).HasMaxLength(50).IsRequired();
+            // Three channel names at most, so a short bounded column rather than text.
+            e.Property(x => x.RequestedChannels).HasMaxLength(100);
             e.HasIndex(x => x.RequestedAt);
             e.HasIndex(x => x.ResponseStatus);
         });

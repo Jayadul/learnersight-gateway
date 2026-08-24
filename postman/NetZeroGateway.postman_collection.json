@@ -188,7 +188,7 @@
               "urlencoded": [
                 { "key": "callerID", "value": "123", "type": "text" },
                 { "key": "toUser", "value": "8801748848039", "type": "text" },
-                { "key": "messageContent", "value": "[sms::Your OTP is 123456. It expires in 10 minutes.]  [wp::Hello John, your appointment is confirmed for tomorrow at 3:00 PM.]  [smswp::Book direct and save on every reservation. Visit https://hotel.example.com]  [wpmedia::Please review the attached invoice.||https://example.com/files/invoice.pdf]  [call::due-bill-api]", "type": "text" }
+                { "key": "messageContent", "value": "[sms::Your OTP is 123456. It expires in 10 minutes.]  [wp::Hello John, your appointment is confirmed for tomorrow at 3:00 PM.]  [sms-wp::Book direct and save on every reservation. Visit https://hotel.example.com]  [wp::Please review the attached invoice.||https://example.com/files/invoice.pdf]  [call::due-bill-api||lot-42]", "type": "text" }
               ]
             },
             "url": {
@@ -291,7 +291,7 @@
               "urlencoded": [
                 { "key": "callerID", "value": "123", "type": "text" },
                 { "key": "toUser", "value": "8801748848039", "type": "text" },
-                { "key": "messageContent", "value": "[wpmedia::Please review the attached invoice.||https://example.com/files/invoice.pdf]", "type": "text" }
+                { "key": "messageContent", "value": "[wp::Please review the attached invoice.||https://example.com/files/invoice.pdf]", "type": "text" }
               ]
             },
             "url": {
@@ -337,7 +337,7 @@
               "urlencoded": [
                 { "key": "callerID", "value": "123", "type": "text" },
                 { "key": "toUser", "value": "8801748848039", "type": "text" },
-                { "key": "messageContent", "value": "[smswp::Sent to both SMS and WhatsApp channels]", "type": "text" }
+                { "key": "messageContent", "value": "[sms-wp::Sent to both SMS and WhatsApp channels]", "type": "text" }
               ]
             },
             "url": {

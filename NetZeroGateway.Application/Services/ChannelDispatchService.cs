@@ -33,11 +33,28 @@ public class ChannelDispatchService(
 
         foreach (var job in jobs)
         {
-            var config = await configRepo.GetActiveByChannelTypeAsync(job.ChannelType);
+            // A labelled tag names a specific active channel; anything else uses the
+            // type's default.
+            var config = job.ChannelLabelSlug is { } slug
+                ? await configRepo.GetActiveBySlugAsync(job.ChannelType, slug)
+                : await configRepo.GetDefaultByChannelTypeAsync(job.ChannelType);
+
             if (config is null)
             {
-                logger.LogWarning(
-                    "[DISPATCH] No active config for {Channel} — skipping", job.ChannelType);
+                if (job.ChannelLabelSlug is { } missing)
+                {
+                    // Fail loudly rather than silently falling back to the default: a
+                    // typo'd slug must never bill a channel the sender did not name.
+                    logger.LogWarning(
+                        "[DISPATCH] No active {Channel} channel with label '{Slug}' — skipping. "
+                        + "The label must match an active channel's slug exactly.",
+                        job.ChannelType, missing);
+                }
+                else
+                {
+                    logger.LogWarning(
+                        "[DISPATCH] No default config for {Channel} — skipping", job.ChannelType);
+                }
                 continue;
             }
 
@@ -53,7 +70,8 @@ public class ChannelDispatchService(
                     await DispatchVoiceAsync(messageRequestId, config.Id, job, cfg, numbers);
                     break;
                 default:
-                    await DispatchPerNumberAsync(messageRequestId, config.Id, job, cfg, numbers);
+                    await DispatchPerNumberAsync(
+                        messageRequestId, config.Id, job, cfg, numbers, config.DelaySeconds);
                     break;
             }
         }
@@ -73,6 +91,11 @@ public class ChannelDispatchService(
         var dispatchJob = await CreateJobAsync(
             requestId, configId, job, string.Join(",", numbers));
 
+        // A sender id supplied per message overrides the channel's configured one. cfg is
+        // deserialized per job in DispatchAsync, so this cannot leak into another job.
+        if (!string.IsNullOrWhiteSpace(job.CallerId))
+            cfg["callerID"] = job.CallerId;
+
         var sender = senderFactory.GetSender(ChannelType.SMS);
         await sender.SendAsync(dispatchJob, cfg);
         await jobRepo.SaveChangesAsync();
@@ -82,15 +105,33 @@ public class ChannelDispatchService(
     private async Task DispatchPerNumberAsync(
         Guid requestId, Guid configId,
         ParsedChannelJob job, Dictionary<string, string> cfg,
-        List<string> numbers)
+        List<string> numbers, int delaySeconds)
     {
-        var sender = senderFactory.GetSender(job.ChannelType);
+        // WhatsApp text and media share ChannelType.WP — the MediaUrl picks the sender.
+        var sender = senderFactory.GetSender(job.ChannelType, job.MediaUrl is not null);
         foreach (var number in numbers)
         {
             var dispatchJob = await CreateJobAsync(requestId, configId, job, number);
+            await PaceAsync(delaySeconds, job.ChannelType);
             await sender.SendAsync(dispatchJob, cfg);
             await jobRepo.SaveChangesAsync();
         }
+    }
+
+    /// <summary>
+    /// Waits the channel's configured pacing delay before a send. Applied to every
+    /// attempt on that channel, so a long recipient list is spaced out end to end.
+    /// Does not affect the HTTP client's own retries — those are Polly's, configured by
+    /// HttpClients:Retry:DelaySeconds.
+    /// </summary>
+    private async Task PaceAsync(int delaySeconds, ChannelType channel)
+    {
+        if (delaySeconds <= 0) return;
+        // Information, not Debug: pacing visibly changes how long a dispatch takes, so
+        // an operator wondering why a batch is slow needs to see it in the normal logs.
+        logger.LogInformation(
+            "[DISPATCH] Pacing {Channel} send by {Delay}s", channel, delaySeconds);
+        await Task.Delay(TimeSpan.FromSeconds(delaySeconds));
     }
 
     // ── Voice — one call, full array ──────────────────────────────────────
@@ -101,6 +142,12 @@ public class ChannelDispatchService(
     {
         var dispatchJob = await CreateJobAsync(
             requestId, configId, job, string.Join(",", numbers));
+
+        // A lot number supplied per message ([call::campaignId||lotNumber]) overrides the
+        // channel's configured default. cfg is deserialized per job in DispatchAsync, so
+        // this overlay cannot leak into another job's dispatch.
+        if (!string.IsNullOrWhiteSpace(job.LotNumber))
+            cfg["lotNumber"] = job.LotNumber;
 
         var sender = senderFactory.GetSender(ChannelType.Voice);
         await sender.SendAsync(dispatchJob, cfg);
@@ -135,7 +182,18 @@ public class ChannelDispatchService(
         var sentCount = primaryJobs.Count(j => j.Status == JobStatus.Sent);
         var failedCount = primaryJobs.Count(j => j.Status == JobStatus.Failed);
 
-        request.OverallStatus = failedCount == 0 ? MessageStatus.Success
+        // Every primary attempt failed but a retry got through, so the message did arrive
+        // — just not by the route the sender asked for. Reporting that as Failed hid a
+        // delivered message; reporting it as Success hid that a channel is broken.
+        var rescuedByFallback = sentCount == 0
+            && request.Jobs.Any(j => j.IsFallback && j.Status == JobStatus.Sent);
+
+        // No jobs at all means nothing could be dispatched — every channel tag failed to
+        // resolve. Without this it scores as Success (failedCount == 0), so a typo'd
+        // channel label would look like a delivered message.
+        request.OverallStatus = primaryJobs.Count == 0 ? MessageStatus.Failed
+                              : failedCount == 0 ? MessageStatus.Success
+                              : rescuedByFallback ? MessageStatus.Fallback
                               : sentCount == 0 ? MessageStatus.Failed
                               : MessageStatus.PartialSuccess;
         msgRepo.Update(request);

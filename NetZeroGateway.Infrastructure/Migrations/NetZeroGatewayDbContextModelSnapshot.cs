@@ -113,6 +113,11 @@ namespace NetZeroGateway.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("requested_at");
 
+                    b.Property<string>("RequestedChannels")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("requested_channels");
+
                     b.Property<string>("ResponseBody")
                         .IsRequired()
                         .HasColumnType("text")
@@ -165,15 +170,29 @@ namespace NetZeroGateway.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<int>("DelaySeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("delay_seconds");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_default");
 
                     b.Property<string>("Label")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("label");
+
+                    b.Property<string>("LabelSlug")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("label_slug");
 
                     b.Property<string>("ProviderName")
                         .IsRequired()
@@ -188,10 +207,14 @@ namespace NetZeroGateway.Infrastructure.Migrations
                     b.HasKey("Id")
                         .HasName("pk_channel_configs");
 
-                    b.HasIndex("ChannelType", "IsActive")
+                    b.HasIndex("ChannelType", "IsDefault")
                         .IsUnique()
-                        .HasDatabaseName("ix_channel_configs_channel_type_is_active")
-                        .HasFilter("\"is_active\" = true");
+                        .HasDatabaseName("ix_channel_configs_channel_type_is_default")
+                        .HasFilter("\"is_default\" = true");
+
+                    b.HasIndex("ChannelType", "LabelSlug")
+                        .IsUnique()
+                        .HasDatabaseName("ix_channel_configs_channel_type_label_slug");
 
                     b.ToTable("channel_configs", (string)null);
                 });
@@ -303,6 +326,10 @@ namespace NetZeroGateway.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<bool>("AllowCrossChannel")
+                        .HasColumnType("boolean")
+                        .HasColumnName("allow_cross_channel");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -317,6 +344,10 @@ namespace NetZeroGateway.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
                         .HasColumnName("fallback_channel");
+
+                    b.Property<Guid?>("FallbackChannelConfigId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("fallback_channel_config_id");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")
@@ -338,12 +369,22 @@ namespace NetZeroGateway.Infrastructure.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("trigger_channel");
 
+                    b.Property<Guid?>("TriggerChannelConfigId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("trigger_channel_config_id");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
                     b.HasKey("Id")
                         .HasName("pk_fallback_policies");
+
+                    b.HasIndex("FallbackChannelConfigId")
+                        .HasDatabaseName("ix_fallback_policies_fallback_channel_config_id");
+
+                    b.HasIndex("TriggerChannelConfigId")
+                        .HasDatabaseName("ix_fallback_policies_trigger_channel_config_id");
 
                     b.ToTable("fallback_policies", (string)null);
                 });
@@ -458,6 +499,10 @@ namespace NetZeroGateway.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<bool>("IsMultiChannel")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_multi_channel");
+
                     b.Property<string>("OverallStatus")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -525,6 +570,25 @@ namespace NetZeroGateway.Infrastructure.Migrations
                     b.Navigation("ChannelConfig");
 
                     b.Navigation("MessageRequest");
+                });
+
+            modelBuilder.Entity("NetZeroGateway.Domain.Entities.FallbackPolicy", b =>
+                {
+                    b.HasOne("NetZeroGateway.Domain.Entities.ChannelConfig", "FallbackChannelConfig")
+                        .WithMany()
+                        .HasForeignKey("FallbackChannelConfigId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_fallback_policies_channel_configs_fallback_channel_config_id");
+
+                    b.HasOne("NetZeroGateway.Domain.Entities.ChannelConfig", "TriggerChannelConfig")
+                        .WithMany()
+                        .HasForeignKey("TriggerChannelConfigId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_fallback_policies_channel_configs_trigger_channel_config_id");
+
+                    b.Navigation("FallbackChannelConfig");
+
+                    b.Navigation("TriggerChannelConfig");
                 });
 
             modelBuilder.Entity("NetZeroGateway.Domain.Entities.MessageRequest", b =>

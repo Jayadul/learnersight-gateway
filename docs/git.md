@@ -17,8 +17,8 @@ knowledge into this repo's `docs/`.
 
 - Release 1.0.0 was developed directly on `main`. From Release 2 onward use feature
   branches + PRs (see releases/release-2-plan.md); never force-push `main`.
-- Commit messages: one imperative summary line; end body with
-  `Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>` when Claude authored it.
+- Commit messages: one imperative summary line, then a body explaining why. No
+  attribution trailers — history reads team-authored.
 - Cross-repo features (API + UI): commit backend first, then frontend, with matching
   wording so history lines up.
 - Never commit: `.vscode/`, `node_modules/`, build output, un-encrypted secrets.

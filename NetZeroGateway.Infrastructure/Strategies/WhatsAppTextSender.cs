@@ -12,7 +12,8 @@ public class WhatsAppTextSender(
     ILogger<WhatsAppTextSender> logger
 ) : IChannelSender
 {
-    public ChannelType ChannelType => ChannelType.WP_Text;
+    public ChannelType ChannelType => ChannelType.WP;
+    public bool HandlesMedia => false;
 
     public async Task SendAsync(
         DispatchJob job, Dictionary<string, string> cfg, CancellationToken ct = default)

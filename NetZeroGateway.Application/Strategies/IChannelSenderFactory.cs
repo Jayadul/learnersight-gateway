@@ -8,5 +8,10 @@ namespace NetZeroGateway.Application.Strategies;
 /// </summary>
 public interface IChannelSenderFactory
 {
-    IChannelSender GetSender(ChannelType channelType);
+    /// <summary>
+    /// Resolves the sender for a channel. <paramref name="hasMedia"/> disambiguates
+    /// WhatsApp text from WhatsApp media, which share a single ChannelType; channels
+    /// with one sender ignore it.
+    /// </summary>
+    IChannelSender GetSender(ChannelType channelType, bool hasMedia = false);
 }

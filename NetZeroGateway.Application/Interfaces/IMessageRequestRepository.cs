@@ -9,5 +9,6 @@ public interface IMessageRequestRepository : IRepository<MessageRequest>
     Task<(List<MessageRequest> Items, int Total)> GetPagedAsync(
         int page, int size,
         DateTimeOffset? from, DateTimeOffset? to,
-        string? toUser, MessageStatus? status, MessageSource? source);
+        string? toUser, MessageStatus? status, MessageSource? source,
+        Guid? channelConfigId);
 }

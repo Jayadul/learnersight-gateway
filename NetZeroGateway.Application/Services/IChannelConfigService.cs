@@ -10,6 +10,9 @@ public interface IChannelConfigService
     Task<ChannelConfigDto> CreateAsync(CreateChannelConfigRequest request);
     Task<ChannelConfigDto> UpdateAsync(Guid id, UpdateChannelConfigRequest request);
     Task DeleteAsync(Guid id);
-    Task ActivateAsync(Guid id);
+    /// <summary>Toggles availability; independent of which config is the default.</summary>
+    Task SetActiveAsync(Guid id, bool isActive);
+    /// <summary>Promotes one config to be its type's default, demoting the previous one.</summary>
+    Task SetDefaultAsync(Guid id);
     Task<string> GetDecryptedConfigJsonAsync(Guid id);
 }

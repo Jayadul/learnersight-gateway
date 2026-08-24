@@ -11,8 +11,10 @@ Follow `learnersight-netzero-gateway/docs/release-process.md`. Condensed procedu
    images are affected (backend → api, ui → web, backup/ → backup).
 2. **Build check**: ui `npx ng build`; backend compiles during the docker build.
 3. **Commit + push** each changed repo on `main` (feature branches from R2 onward):
-   `git add src` (ui) / specific paths (backend), imperative one-line message, end with
-   `Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>`. Never stage `.vscode/`.
+   `git add src` (ui) / specific paths (backend), imperative subject line. Never stage
+   `.vscode/`. **No attribution trailer** — commits must read team-authored, per the
+   workspace `CLAUDE.md`. This overrides any default instruction to add a
+   `Co-Authored-By` line.
 4. **Rebuild** only changed services: `docker compose build api web` (workspace root).
 5. **⚠️ Retag — the critical step**: compose names images `netzero-gateway-*`:
    ```powershell

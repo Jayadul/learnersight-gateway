@@ -16,11 +16,12 @@ public class MessageRequestController(IMessageRequestRepository repo) : Controll
         [FromQuery] string? toUser,
         [FromQuery] MessageStatus? status,
         [FromQuery] MessageSource? source,
+        [FromQuery] Guid? channelConfigId,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 10)
     {
         var (items, total) = await repo.GetPagedAsync(
-            page, pageSize, dateFrom, dateTo, toUser, status, source);
+            page, pageSize, dateFrom, dateTo, toUser, status, source, channelConfigId);
 
         return Ok(new PagedResult<MessageRequestDto>
         {
@@ -28,10 +29,12 @@ public class MessageRequestController(IMessageRequestRepository repo) : Controll
             {
                 Id = m.Id,
                 ToUser = m.ToUser,
+                RawMessageContent = m.RawMessageContent,
                 ParsedChannels = m.ParsedChannels,
                 OverallStatus = m.OverallStatus,
                 ReceivedAt = m.ReceivedAt,
                 Source = m.Source,
+                IsMultiChannel = m.IsMultiChannel,
                 CreatedAt = m.CreatedAt
             }).ToList(),
             TotalCount = total,
@@ -50,15 +53,18 @@ public class MessageRequestController(IMessageRequestRepository repo) : Controll
         {
             Id = m.Id,
             ToUser = m.ToUser,
+            RawMessageContent = m.RawMessageContent,
             ParsedChannels = m.ParsedChannels,
             OverallStatus = m.OverallStatus,
             ReceivedAt = m.ReceivedAt,
             Source = m.Source,
+            IsMultiChannel = m.IsMultiChannel,
             CreatedAt = m.CreatedAt,
             Jobs = m.Jobs.Select(j => new DispatchJobDto
             {
                 Id = j.Id,
                 ChannelType = j.ChannelType,
+                ChannelLabel = j.ChannelConfig?.Label,
                 ToNumber = j.ToNumber,
                 MessageContent = j.MessageContent,
                 Status = j.Status,
@@ -67,6 +73,7 @@ public class MessageRequestController(IMessageRequestRepository repo) : Controll
                 FailureReason = j.FailureReason,
                 SentAt = j.SentAt,
                 IsFallback = j.IsFallback,
+                CampaignId = j.CampaignId,
                 FallbackFromJobId = j.FallbackFromJobId,
                 CreatedAt = j.CreatedAt
             }).ToList()
