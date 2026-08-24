@@ -4,6 +4,8 @@ public class MessageRequestDto
 {
     public Guid Id { get; set; }
     public string ToUser { get; set; } = string.Empty;
+    /// <summary>The message as submitted, tags and all. Truncated for display by the UI.</summary>
+    public string RawMessageContent { get; set; } = string.Empty;
     public List<string> ParsedChannels { get; set; } = [];
     public MessageStatus OverallStatus { get; set; }
     public DateTimeOffset ReceivedAt { get; set; }

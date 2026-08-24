@@ -182,11 +182,18 @@ public class ChannelDispatchService(
         var sentCount = primaryJobs.Count(j => j.Status == JobStatus.Sent);
         var failedCount = primaryJobs.Count(j => j.Status == JobStatus.Failed);
 
+        // Every primary attempt failed but a retry got through, so the message did arrive
+        // — just not by the route the sender asked for. Reporting that as Failed hid a
+        // delivered message; reporting it as Success hid that a channel is broken.
+        var rescuedByFallback = sentCount == 0
+            && request.Jobs.Any(j => j.IsFallback && j.Status == JobStatus.Sent);
+
         // No jobs at all means nothing could be dispatched — every channel tag failed to
         // resolve. Without this it scores as Success (failedCount == 0), so a typo'd
         // channel label would look like a delivered message.
         request.OverallStatus = primaryJobs.Count == 0 ? MessageStatus.Failed
                               : failedCount == 0 ? MessageStatus.Success
+                              : rescuedByFallback ? MessageStatus.Fallback
                               : sentCount == 0 ? MessageStatus.Failed
                               : MessageStatus.PartialSuccess;
         msgRepo.Update(request);

@@ -20,7 +20,8 @@ public class MessageRequestRepository(NetZeroGatewayDbContext db)
     public async Task<(List<MessageRequest> Items, int Total)> GetPagedAsync(
         int page, int size,
         DateTimeOffset? from, DateTimeOffset? to,
-        string? toUser, MessageStatus? status, MessageSource? source)
+        string? toUser, MessageStatus? status, MessageSource? source,
+        Guid? channelConfigId)
     {
         var q = _set.AsQueryable();
         if (from is not null) q = q.Where(m => m.ReceivedAt >= from);
@@ -29,6 +30,11 @@ public class MessageRequestRepository(NetZeroGatewayDbContext db)
             q = q.Where(m => m.ToUser.Contains(toUser));
         if (status is not null) q = q.Where(m => m.OverallStatus == status);
         if (source is not null) q = q.Where(m => m.Source == source);
+        // Filtering on the deliveries, not on the request: the request records channel
+        // types, which no longer identify a gateway now that several may be active per
+        // type. A fallback delivery counts — the message did go out through that gateway.
+        if (channelConfigId is not null)
+            q = q.Where(m => m.Jobs.Any(j => j.ChannelConfigId == channelConfigId));
 
         var total = await q.CountAsync();
         var items = await q.OrderByDescending(m => m.ReceivedAt)

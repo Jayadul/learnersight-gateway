@@ -16,6 +16,7 @@ Load this when: writing SQL, adding migrations, changing entities, or inspecting
 | Table | Purpose |
 |---|---|
 | `message_requests` | One row per gateway/manual request (filter col: `received_at`). `is_multi_channel` is set once at parse time when the tags produced more than one job; fallback skips those requests |
+| `api_logs` | One row per gateway request. `requested_channels` snapshots the channel types the tags asked for — a snapshot, not an FK, so the row stays readable after a channel is renamed or deleted |
 | `dispatch_jobs` | Per-job provider calls (filter col: `created_at`) |
 | `api_logs` | Gateway request audit, secrets masked (filter col: `requested_at`) |
 | `channel_configs` | Provider credentials, AES-encrypted `config_json`. Many active per type; exactly one `is_default` (unique partial index). `label_slug` is unique per type and addresses a channel from a message tag |

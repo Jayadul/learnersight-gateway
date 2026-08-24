@@ -121,6 +121,8 @@ public class NetZeroGatewayDbContext(DbContextOptions<NetZeroGatewayDbContext> o
             e.Property(x => x.RawBody).HasColumnType("text").IsRequired();
             e.Property(x => x.ResponseBody).HasColumnType("text").IsRequired();
             e.Property(x => x.CallerIp).HasMaxLength(50).IsRequired();
+            // Three channel names at most, so a short bounded column rather than text.
+            e.Property(x => x.RequestedChannels).HasMaxLength(100);
             e.HasIndex(x => x.RequestedAt);
             e.HasIndex(x => x.ResponseStatus);
         });

@@ -113,6 +113,11 @@ namespace NetZeroGateway.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("requested_at");
 
+                    b.Property<string>("RequestedChannels")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("requested_channels");
+
                     b.Property<string>("ResponseBody")
                         .IsRequired()
                         .HasColumnType("text")

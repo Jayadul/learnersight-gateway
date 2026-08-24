@@ -82,6 +82,7 @@ internal sealed class FakeDispatchJobRepository : IDispatchJobRepository
     public Task<int> SaveChangesAsync() => Task.FromResult(0);
 
     public Task<List<DispatchJob>> GetByMessageRequestIdAsync(Guid id) => Unused.Fail<Task<List<DispatchJob>>>();
+    public Task<List<DispatchJob>> GetFailedWithChannelAsync() => Unused.Fail<Task<List<DispatchJob>>>();
     public Task<(List<DispatchJob> Items, int Total)> GetPagedAsync(
         int page, int size, DateTimeOffset? from, DateTimeOffset? to,
         ChannelType? channelType, JobStatus? status, string? toNumber)
@@ -107,7 +108,8 @@ internal sealed class FakeMessageRequestRepository(MessageRequest? byId = null) 
 
     public Task<(List<MessageRequest> Items, int Total)> GetPagedAsync(
         int page, int size, DateTimeOffset? from, DateTimeOffset? to,
-        string? toUser, MessageStatus? status, MessageSource? source)
+        string? toUser, MessageStatus? status, MessageSource? source,
+        Guid? channelConfigId)
         => Unused.Fail<Task<(List<MessageRequest>, int)>>();
     public Task<List<MessageRequest>> GetAllAsync() => Unused.Fail<Task<List<MessageRequest>>>();
     public Task<List<MessageRequest>> FindAsync(Expression<Func<MessageRequest, bool>> p) => Unused.Fail<Task<List<MessageRequest>>>();
@@ -146,6 +148,7 @@ internal sealed class FakeJobRepositoryWithExisting(List<DispatchJob> existing) 
     public List<DispatchJob> Added { get; } = [];
 
     public Task<List<DispatchJob>> GetByMessageRequestIdAsync(Guid id) => Task.FromResult(existing);
+    public Task<List<DispatchJob>> GetFailedWithChannelAsync() => Unused.Fail<Task<List<DispatchJob>>>();
 
     public Task AddAsync(DispatchJob entity)
     {

@@ -58,7 +58,9 @@ Simulator (SuperAdmin only). Postman collection: `postman/`.
 ## Admin API (`/api/*`, JWT Bearer)
 
 - Wire format: **enums as integers** (ChannelType SMS=0, WP=1, Voice=3 — **2 is retired**,
-  see below; MessageStatus Pending=0, PartialSuccess=1, Success=2, Failed=3; JobStatus
+  see below; MessageStatus Pending=0, PartialSuccess=1, Success=2, Failed=3, **Fallback=4**
+  — every primary delivery failed but a retry got through, so the message arrived by a
+  route the sender did not ask for; JobStatus
   Pending=0, Sent=1, Failed=2; AdminRole SuperAdmin=0, Admin=1; MediaStatus Active=0,
   Deleted=1).
 - **ChannelType 2 (`WP_Media`) no longer exists.** WhatsApp text and media were unified
@@ -78,10 +80,10 @@ Simulator (SuperAdmin only). Postman collection: `postman/`.
 | Controller | Route | Purpose |
 |---|---|---|
 | Auth | `/api/auth` | login / refresh |
-| Dashboard | `/api/dashboard` | summary, timeline, breakdown, failure reasons |
-| MessageRequest | `/api/message-requests` | paged logs + detail with job tree. `isMultiChannel` marks a request whose tags asked for more than one delivery — fallback is skipped for it |
+| Dashboard | `/api/dashboard` | summary, timeline, breakdown, failure reasons. Each failure reason carries `byChannel` — the same failures split by channel type and gateway, so a one-provider outage is distinguishable from a general problem |
+| MessageRequest | `/api/message-requests` | paged logs + detail with job tree. `isMultiChannel` marks a request whose tags asked for more than one delivery — fallback is skipped for it. `?channelConfigId=` filters on the **gateway** that delivered (matching the jobs, since a request records only channel types) |
 | DispatchLog | `/api/dispatch-logs` | paged delivery jobs. Each job carries `channelLabel` — the name of the channel that actually sent it, since several gateways of a type may be active — and `campaignId` on voice jobs |
-| ApiLog | `/api/api-logs` | gateway request audit (secrets masked) |
+| ApiLog | `/api/api-logs` | gateway request audit (secrets masked). `requestedChannels` snapshots the channel types the tags asked for ("SMS, WhatsApp") and `?channel=` filters on it; `messageRequestId` links to the deliveries the request produced |
 | ManualSend | `/api/manual-send` | admin-initiated sends. Credentials come from the channel config; every override is optional and a blank one keeps the configured value — `channelLabelSlug` (which gateway; default when omitted), `callerId` (SMS), `campaignId` and `lotNumber` (Voice), `mediaUrl` (WhatsApp — its presence is what makes the send a media send) |
 | ChannelConfig | `/api/channel-configs` | CRUD + `PATCH /{id}/activate`, `/deactivate`, `/set-default`. Several configs per type may be active; exactly one is the **default**. The default cannot be deactivated or deleted — promote another first; a channel named by a fallback rule cannot be deleted until that rule is changed. Reads mask secret fields as `***` — on `PUT`, a config field sent as `***` or omitted keeps its stored value, so saving back a masked read never overwrites credentials |
 | FallbackPolicy | `/api/fallback-policies` | CRUD + `PATCH /{id}/toggle-active`. Each side carries a channel **type** and an optional `triggerChannelConfigId` / `fallbackChannelConfigId` naming one channel (null = any/default of that type). Same-type rules must name **both** channels and they must differ; differing types are rejected unless `allowCrossChannel` is true. Reads also return `triggerChannelLabel` / `fallbackChannelLabel` |

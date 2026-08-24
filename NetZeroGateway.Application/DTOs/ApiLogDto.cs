@@ -10,4 +10,6 @@ public class ApiLogDto
     public long DurationMs { get; set; }
     public DateTimeOffset RequestedAt { get; set; }
     public Guid? MessageRequestId { get; set; }
+    /// <summary>Channel types the request asked for, e.g. "SMS, WhatsApp". Null when it was rejected before parsing.</summary>
+    public string? RequestedChannels { get; set; }
 }

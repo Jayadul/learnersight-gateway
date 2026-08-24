@@ -16,11 +16,12 @@ public class MessageRequestController(IMessageRequestRepository repo) : Controll
         [FromQuery] string? toUser,
         [FromQuery] MessageStatus? status,
         [FromQuery] MessageSource? source,
+        [FromQuery] Guid? channelConfigId,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 10)
     {
         var (items, total) = await repo.GetPagedAsync(
-            page, pageSize, dateFrom, dateTo, toUser, status, source);
+            page, pageSize, dateFrom, dateTo, toUser, status, source, channelConfigId);
 
         return Ok(new PagedResult<MessageRequestDto>
         {
@@ -28,6 +29,7 @@ public class MessageRequestController(IMessageRequestRepository repo) : Controll
             {
                 Id = m.Id,
                 ToUser = m.ToUser,
+                RawMessageContent = m.RawMessageContent,
                 ParsedChannels = m.ParsedChannels,
                 OverallStatus = m.OverallStatus,
                 ReceivedAt = m.ReceivedAt,
@@ -51,6 +53,7 @@ public class MessageRequestController(IMessageRequestRepository repo) : Controll
         {
             Id = m.Id,
             ToUser = m.ToUser,
+            RawMessageContent = m.RawMessageContent,
             ParsedChannels = m.ParsedChannels,
             OverallStatus = m.OverallStatus,
             ReceivedAt = m.ReceivedAt,

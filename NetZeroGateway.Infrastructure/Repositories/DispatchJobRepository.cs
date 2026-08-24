@@ -16,6 +16,11 @@ public class DispatchJobRepository(NetZeroGatewayDbContext db)
                .Where(j => j.MessageRequestId == id)
                .ToListAsync();
 
+    public Task<List<DispatchJob>> GetFailedWithChannelAsync()
+        => _set.Include(j => j.ChannelConfig)
+               .Where(j => j.Status == JobStatus.Failed && j.FailureReason != null)
+               .ToListAsync();
+
     public async Task<(List<DispatchJob> Items, int Total)> GetPagedAsync(
         int page, int size,
         DateTimeOffset? from, DateTimeOffset? to,
