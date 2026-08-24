@@ -39,6 +39,13 @@ Load this when: writing SQL, adding migrations, changing entities, or inspecting
 2 users (`admin`/`Admin@123` SuperAdmin, `operator`/`Operator@123` Admin),
 channel configs from `Seed:ChannelConfigs`, fallback policies from `Seed:FallbackPolicies`.
 
+A seed entry names its channel type as `SMS`, `WP` or `Voice`. The friendly names the
+admin UI shows (`WhatsApp`, `Voice Call`) are accepted too, and an unrecognised one logs
+an error and skips that entry — seeding runs at boot, so a typo used to stop the whole
+gateway starting. A seeded fallback rule crossing channel types needs
+`AllowCrossChannel: true`, or it is skipped rather than created in a state where it can
+never fire.
+
 **The seed creates; it never re-asserts.** An existing channel config has only its
 credentials and provider name refreshed, and an existing fallback policy is left
 untouched — so switching a rule off, or renaming a channel, survives a restart. The

@@ -103,15 +103,26 @@ public static class DataSeeder
     }
 
     /// <summary>
-    /// Parses a seeded channel-type name, tolerating the pre-unification
-    /// <c>WP_Text</c>/<c>WP_Media</c> names. Without this an un-updated appsettings would
-    /// throw here and stop the app from starting, since seeding runs at boot.
+    /// Parses a seeded channel-type name, returning null for anything unrecognised.
+    /// Seeding runs at boot, so throwing here would stop the whole gateway starting over
+    /// a typo in a config file — the caller logs the bad entry and skips it instead.
+    /// Accepts the pre-unification WP_Text/WP_Media names, and the friendly names the
+    /// admin UI displays: someone editing this file reads "WhatsApp" on screen, not "WP".
     /// </summary>
-    private static ChannelType ParseChannelType(string name) => name switch
+    private static ChannelType? ParseChannelType(string name)
     {
-        "WP_Text" or "WP_Media" => ChannelType.WP,
-        _ => Enum.Parse<ChannelType>(name)
-    };
+        var trimmed = name?.Trim() ?? "";
+
+        return trimmed.ToLowerInvariant() switch
+        {
+            "wp" or "wp_text" or "wp_media" or "whatsapp" => ChannelType.WP,
+            "sms" => ChannelType.SMS,
+            "voice" or "voice call" or "call" => ChannelType.Voice,
+            _ => Enum.TryParse<ChannelType>(trimmed, ignoreCase: true, out var parsed)
+                ? parsed
+                : null
+        };
+    }
 
     /// <summary>
     /// Lowercase alphanumeric slug derived from a label, made unique within a channel
@@ -145,7 +156,15 @@ public static class DataSeeder
 
         foreach (var item in items)
         {
-            var channelType = ParseChannelType(item.ChannelType);
+            if (ParseChannelType(item.ChannelType) is not { } channelType)
+            {
+                logger.LogError(
+                    "[SEED] ChannelConfig SKIP: '{Label}' names channel type '{Type}', which "
+                    + "does not exist. Use SMS, WP or Voice. The channel was not created.",
+                    item.Label, item.ChannelType);
+                continue;
+            }
+
             var plainJson = JsonSerializer.Serialize(item.Config,
                 new JsonSerializerOptions { WriteIndented = false });
 
@@ -230,8 +249,28 @@ public static class DataSeeder
 
         foreach (var item in items)
         {
-            var triggerChannel = ParseChannelType(item.TriggerChannel);
-            var fallbackChannel = ParseChannelType(item.FallbackChannel);
+            if (ParseChannelType(item.TriggerChannel) is not { } triggerChannel
+                || ParseChannelType(item.FallbackChannel) is not { } fallbackChannel)
+            {
+                logger.LogError(
+                    "[SEED] FallbackPolicy SKIP: '{Name}' names channel type '{Trigger}' or "
+                    + "'{Fallback}', which does not exist. Use SMS, WP or Voice.",
+                    item.Name, item.TriggerChannel, item.FallbackChannel);
+                continue;
+            }
+
+            // Crossing types needs the opt-in, and the seeder used not to carry it — so a
+            // seeded cross-type rule was created looking active and then skipped at every
+            // dispatch, which reads as a broken rule rather than a disabled one.
+            if (triggerChannel != fallbackChannel && !item.AllowCrossChannel)
+            {
+                logger.LogWarning(
+                    "[SEED] FallbackPolicy SKIP: '{Name}' retries {Trigger} on {Fallback}, which "
+                    + "crosses channel types. Set AllowCrossChannel to seed it — crossing types "
+                    + "changes both the delivery format and the cost of the message.",
+                    item.Name, triggerChannel, fallbackChannel);
+                continue;
+            }
 
             // A WP_Text -> WP_Media policy collapses to WP -> WP, which would make a
             // channel fall back to itself. Skip rather than seed a nonsensical rule.
@@ -253,6 +292,7 @@ public static class DataSeeder
                     Name = item.Name,
                     TriggerChannel = triggerChannel,
                     FallbackChannel = fallbackChannel,
+                    AllowCrossChannel = item.AllowCrossChannel,
                     IsActive = item.IsActive,
                     IsGlobal = item.IsGlobal,
                     Description = item.Description
@@ -321,5 +361,7 @@ file sealed class SeedFallbackPolicy
     public string FallbackChannel { get; set; } = "";
     public bool IsActive { get; set; }
     public bool IsGlobal { get; set; }
+    /// <summary>Required for a rule whose two sides are different channel types.</summary>
+    public bool AllowCrossChannel { get; set; }
     public string? Description { get; set; }
 }
