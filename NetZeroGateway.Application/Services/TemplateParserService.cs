@@ -8,8 +8,8 @@ public partial class TemplateParserService : ITemplateParserService
 {
     /// <summary>
     /// Matches <c>[descriptor::content]</c>. The descriptor is captured loosely and
-    /// interpreted by <see cref="ParseDescriptor"/> — a single regex covering plain tags,
-    /// labelled tags and the combined form would be unreadable and hard to extend.
+    /// interpreted by <see cref="ParseDescriptor"/> — a single regex covering both the
+    /// single and the combined form would be unreadable and hard to extend.
     /// </summary>
     [GeneratedRegex(@"\[([A-Za-z0-9_:-]+)::(.*?)\]", RegexOptions.Singleline)]
     private static partial Regex TagPattern();
@@ -19,12 +19,14 @@ public partial class TemplateParserService : ITemplateParserService
     private static partial Regex SlugPattern();
 
     /// <summary>
-    /// Joins the two legs of a combined send. Slugs cannot contain a hyphen, so this
-    /// sequence can only occur at the join — which is what lets either leg be labelled
-    /// independently: <c>sms-wp</c>, <c>sms_label:a-wp</c>, <c>sms-wp_label:b</c>,
-    /// <c>sms_label:a-wp_label:b</c>.
+    /// Joins the two legs of a combined send. The keyword is part of the separator on
+    /// purpose: <c>sms:</c> and <c>wp:</c> are reserved and cannot appear inside a slug,
+    /// so this sequence can only ever occur at the join.
     /// </summary>
-    private const string CombinedSeparator = "-wp";
+    private const string CombinedSeparator = "-wp:";
+
+    /// <summary>Separates a channel type from its label, as in <c>sms:revemain</c>.</summary>
+    private const char LabelSeparator = ':';
 
     /// <summary>Splits a media URL from its caption, and a lot number from its campaign id.</summary>
     private const string ValueSeparator = "||";
@@ -35,7 +37,8 @@ public partial class TemplateParserService : ITemplateParserService
 
         if (matches.Count == 0)
         {
-            // No tags — backward compat: single SMS with full content
+            // An untagged message is a plain SMS through the default SMS channel. This is
+            // the only way to reach a default: every tag has to name its channel.
             return ParsedTemplate.Ok(
                 [new ParsedChannelJob { ChannelType = ChannelType.SMS, Message = messageContent }]);
         }
@@ -65,10 +68,11 @@ public partial class TemplateParserService : ITemplateParserService
         if (sep >= 0)
         {
             var sms = SingleJob(descriptor[..sep], content);
+            // Step past the hyphen only — the "wp:" belongs to the right-hand leg.
             var wp = SingleJob(descriptor[(sep + 1)..], content);
 
-            // Either leg may carry its own label or none at all, but the legs must be one
-            // SMS and one WhatsApp — anything else is a malformed descriptor, not a send.
+            // The legs must be one SMS and one WhatsApp. Anything else — two WhatsApp
+            // legs, a voice leg — is a malformed descriptor rather than a send.
             if (sms is null || wp is null
                 || sms.ChannelType != ChannelType.SMS || wp.ChannelType != ChannelType.WP)
             {
@@ -90,13 +94,18 @@ public partial class TemplateParserService : ITemplateParserService
     }
 
     /// <summary>
-    /// Maps one descriptor segment to a job. Returns null for anything unrecognised —
-    /// including a malformed slug — so the caller can reject the request by name.
+    /// Maps one <c>type:label</c> segment to a job. Returns null for anything
+    /// unrecognised — an unknown type, a malformed slug, or a missing label — so the
+    /// caller can reject the whole request by name.
     /// </summary>
     private static ParsedChannelJob? SingleJob(string segment, string content)
     {
         var (name, slug) = SplitLabel(segment);
-        if (slug is not null && !SlugPattern().IsMatch(slug)) return null;
+
+        // The label is not optional. Without it a tag would silently resolve to whichever
+        // channel happens to be the default, which is exactly the ambiguity that having
+        // several active channels per type introduced.
+        if (slug is null || !SlugPattern().IsMatch(slug)) return null;
 
         return name switch
         {
@@ -117,7 +126,7 @@ public partial class TemplateParserService : ITemplateParserService
         };
     }
 
-    private static ParsedChannelJob BuildWhatsApp(string content, string? slug)
+    private static ParsedChannelJob BuildWhatsApp(string content, string slug)
     {
         var (message, mediaUrl) = SplitValue(content);
 
@@ -130,10 +139,10 @@ public partial class TemplateParserService : ITemplateParserService
         };
     }
 
-    private static ParsedChannelJob BuildVoice(string content, string? slug)
+    private static ParsedChannelJob BuildVoice(string content, string slug)
     {
-        // [call::campaignId] or [call::campaignId||lotNumber]. A bare campaign id keeps
-        // working and leaves the lot to the channel config.
+        // [call:slug::campaignId] or [call:slug::campaignId||lotNumber]. A bare campaign
+        // id is valid and leaves the lot number to the channel config.
         var (campaignId, lotNumber) = SplitValue(content);
 
         return new ParsedChannelJob
@@ -156,31 +165,58 @@ public partial class TemplateParserService : ITemplateParserService
         return (content[..i].Trim(), string.IsNullOrWhiteSpace(tail) ? null : tail);
     }
 
-    /// <summary>Splits <c>sms_label:revemain</c> into ("sms", "revemain").</summary>
+    /// <summary>
+    /// Splits <c>sms:revemain</c> into ("sms", "revemain"). The slug is null when the
+    /// segment carries no label at all, which is no longer a valid tag.
+    /// </summary>
     private static (string Name, string? Slug) SplitLabel(string segment)
     {
-        const string marker = "_label:";
-        var i = segment.IndexOf(marker, StringComparison.Ordinal);
+        var i = segment.IndexOf(LabelSeparator);
         return i < 0
             ? (segment, null)
-            : (segment[..i], segment[(i + marker.Length)..]);
+            : (segment[..i], segment[(i + 1)..]);
     }
 
     /// <summary>
-    /// Names the offending tag and its replacement. The retired spellings get a specific
-    /// hint because an integrator hitting them is mid-migration, not guessing.
+    /// Names the offending tag and the form that replaces it. Release 2.1 removed the
+    /// whole previous grammar, so an integrator hitting this is mid-migration rather than
+    /// guessing — a specific hint is worth more than a list of everything valid.
     /// </summary>
     private static string Reject(string descriptor)
     {
-        var hint = SplitLabel(descriptor).Name switch
+        var (name, slug) = SplitLabel(descriptor);
+
+        var hint = descriptor switch
         {
-            "smswp" => "It is now [sms-wp::text].",
-            "wpmedia" => "WhatsApp media is the same tag as WhatsApp text: [wp::text||url].",
-            _ => "Supported tags are [sms::text], [wp::text], [wp::text||url], "
-                 + "[sms-wp::text] and [call::campaignId||lotNumber]. Any of them may name a "
-                 + "channel, for example [sms_label:revemain::text].",
+            // A voice tag carries a campaign id, not message text.
+            "call" => "The channel label is now required: [call:yourlabel::your-campaign-id].",
+
+            "sms" or "wp" =>
+                $"The channel label is now required: [{descriptor}:yourlabel::your message].",
+
+            "smswp" or "sms-wp" =>
+                "Combined sends now label each leg: [sms:yourlabel-wp:yourlabel::text].",
+
+            "wpmedia" =>
+                "WhatsApp media uses the WhatsApp tag with a URL: "
+                + "[wp:yourlabel::caption||https://example.com/file.pdf].",
+
+            _ when descriptor.Contains("_label:", StringComparison.Ordinal) =>
+                "The label form changed — write [sms:revemain::text], not "
+                + "[sms_label:revemain::text].",
+
+            _ when slug is not null && !SlugPattern().IsMatch(slug) =>
+                $"'{slug}' is not a valid channel label. Labels are lowercase letters and "
+                + "digits only, matching a channel's slug in the admin panel exactly.",
+
+            _ when slug is not null =>
+                $"'{name}' is not a channel type. Use sms, wp or call.",
+
+            _ => "Every tag must name its channel type and label.",
         };
 
-        return $"Unknown channel tag '{descriptor}'. {hint}";
+        return $"Unknown channel tag '{descriptor}'. {hint} "
+             + "Valid tags are [sms:label::text], [wp:label::text], [wp:label::text||url], "
+             + "[sms:label-wp:label::text] and [call:label::campaignId||lotNumber].";
     }
 }

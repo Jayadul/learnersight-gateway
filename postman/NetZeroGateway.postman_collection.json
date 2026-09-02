@@ -188,7 +188,7 @@
               "urlencoded": [
                 { "key": "callerID", "value": "123", "type": "text" },
                 { "key": "toUser", "value": "8801748848039", "type": "text" },
-                { "key": "messageContent", "value": "[sms::Your OTP is 123456. It expires in 10 minutes.]  [wp::Hello John, your appointment is confirmed for tomorrow at 3:00 PM.]  [sms-wp::Book direct and save on every reservation. Visit https://hotel.example.com]  [wp::Please review the attached invoice.||https://example.com/files/invoice.pdf]  [call::due-bill-api||lot-42]", "type": "text" }
+                { "key": "messageContent", "value": "[sms:revemain::Your OTP is 123456. It expires in 10 minutes.]  [wp:waprimary::Hello John, your appointment is confirmed for tomorrow at 3:00 PM.]  [sms:revemain-wp:waprimary::Book direct and save on every reservation. Visit https://hotel.example.com]  [wp:waprimary::Please review the attached invoice.||https://example.com/files/invoice.pdf]  [call:voicemain::due-bill-api||lot-42]", "type": "text" }
               ]
             },
             "url": {
@@ -228,7 +228,7 @@
               "urlencoded": [
                 { "key": "callerID", "value": "123", "type": "text" },
                 { "key": "toUser", "value": "8801748848039", "type": "text" },
-                { "key": "messageContent", "value": "[sms::Hello from NetZeroGateway test]", "type": "text" }
+                { "key": "messageContent", "value": "[sms:revemain::Hello from NetZeroGateway test]", "type": "text" }
               ]
             },
             "url": {
@@ -268,7 +268,7 @@
               "urlencoded": [
                 { "key": "callerID", "value": "123", "type": "text" },
                 { "key": "toUser", "value": "8801748848039", "type": "text" },
-                { "key": "messageContent", "value": "[wp::Hello via WhatsApp from NetZeroGateway]", "type": "text" }
+                { "key": "messageContent", "value": "[wp:waprimary::Hello via WhatsApp from NetZeroGateway]", "type": "text" }
               ]
             },
             "url": {
@@ -291,7 +291,7 @@
               "urlencoded": [
                 { "key": "callerID", "value": "123", "type": "text" },
                 { "key": "toUser", "value": "8801748848039", "type": "text" },
-                { "key": "messageContent", "value": "[wp::Please review the attached invoice.||https://example.com/files/invoice.pdf]", "type": "text" }
+                { "key": "messageContent", "value": "[wp:waprimary::Please review the attached invoice.||https://example.com/files/invoice.pdf]", "type": "text" }
               ]
             },
             "url": {
@@ -314,7 +314,7 @@
               "urlencoded": [
                 { "key": "callerID", "value": "123", "type": "text" },
                 { "key": "toUser", "value": "8801748848039", "type": "text" },
-                { "key": "messageContent", "value": "[call::due-bill-api]", "type": "text" }
+                { "key": "messageContent", "value": "[call:voicemain::due-bill-api]", "type": "text" }
               ]
             },
             "url": {
@@ -337,7 +337,7 @@
               "urlencoded": [
                 { "key": "callerID", "value": "123", "type": "text" },
                 { "key": "toUser", "value": "8801748848039", "type": "text" },
-                { "key": "messageContent", "value": "[sms-wp::Sent to both SMS and WhatsApp channels]", "type": "text" }
+                { "key": "messageContent", "value": "[sms:revemain-wp:waprimary::Sent to both SMS and WhatsApp channels]", "type": "text" }
               ]
             },
             "url": {
