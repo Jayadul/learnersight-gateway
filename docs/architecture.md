@@ -28,11 +28,16 @@ with layer-specific conventions — those load automatically when you edit files
 ## Message flow (the core path)
 
 1. `POST /sendtext` → `SendTextOrchestratorService`
-   - Validates `apikey`/`secretkey`/`callerID` against the **active SMS ChannelConfig**
-     (AES-decrypted ConfigJson, constant-time comparison). Invalid → `101 REJECTD`.
-   - Parses channel tags from `messageContent`, creates one `MessageRequest` +
-     `DispatchJob`s, returns `0 ACCEPTD` with `Message_ID`. Response confirms
-     **queuing, not delivery**.
+   - Validates `apikey`/`secretkey` against the single **`gateway_credentials`** row
+     (AES-decrypted, constant-time comparison), and requires `callerID` to be present.
+     Invalid → `101 REJECTD`. Independent of any channel since 2.1 — see
+     [adr/0007](adr/0007-decouple-gateway-auth-from-channel-config.md).
+   - Parses channel tags from `messageContent`, then checks every label resolves to an
+     **active** channel. An unknown or inactive label rejects the request here, before
+     anything is queued — dispatch runs after the caller has already been told `ACCEPTD`,
+     so a typo caught there would only ever be a warning in Seq.
+   - Creates one `MessageRequest` + `DispatchJob`s, returns `0 ACCEPTD` with
+     `Message_ID`. Response confirms **queuing, not delivery**.
 2. Dispatch (async): `ChannelDispatchService` resolves the channel sender strategy
    (`IChannelSenderFactory`) and calls the provider.
 3. On failure: `FallbackHandlerService` retries on the fallback channel — unless the
@@ -44,9 +49,10 @@ with layer-specific conventions — those load automatically when you edit files
 - **SMS and Voice**: ONE job per tag, recipients comma-joined (one batched provider call).
 - **WhatsApp (text & media)**: one job PER recipient.
 - Dashboard "Channel Breakdown" counts **jobs** (provider calls), not per-recipient
-  deliveries. 2 recipients × a message tagged `[sms::][wp::][wp::||url][sms-wp::][call::]`
-  = SMS 2 (one job per tag, numbers comma-joined), WP 6 (2 each from `wp`, the media `wp`
-  and the WhatsApp leg of `sms-wp`), Voice 1.
+  deliveries. 2 recipients × a message tagged
+  `[sms:a::][wp:b::][wp:b::||url][sms:a-wp:b::][call:c::]` = SMS 2 (one job per tag,
+  numbers comma-joined), WP 6 (2 each from `wp`, the media `wp` and the WhatsApp leg of
+  the combined tag), Voice 1.
 - WhatsApp text and media are **one channel** (`ChannelType.WP`). A job is a media send
   when it carries a `MediaUrl`; `IChannelSenderFactory` keys on ChannelType **plus** that
   flag to pick `WhatsAppTextSender` or `WhatsAppMediaSender`. Both remain separate
@@ -68,8 +74,8 @@ both the delivery format and the per-message cost, so it requires
 before the flag can be turned on.
 
 Fallback only applies to a message that asked for **one** delivery. If the sender's
-tags produced more than one `DispatchJob` — `[sms::x][wp::y]`, any `[sms-wp::x]` form,
-or even two SMS tags — the redundancy was
+tags produced more than one `DispatchJob` — `[sms:a::x][wp:b::y]`, any combined
+`[sms:a-wp:b::x]` tag, or even two SMS tags — the redundancy was
 already paid for, so adding a fallback send would be a third message nobody asked for.
 The count is frozen at parse time in `message_requests.is_multi_channel`; counting
 sibling jobs at fallback time would give a different answer after a retry or a cleanup.
@@ -89,40 +95,64 @@ failures cannot outrun the rate limit the delay exists to respect.
 
 ## Channel tags
 
-`[sms::text]` `[wp::text]` `[wp::text||url]` `[sms-wp::text]`
-`[call::campaignId]` `[call::campaignId||lotNumber]`
+Every tag is `[type:label::content]` — the type keyword picks the channel, the label
+picks which gateway of that type carries it:
 
-Any tag may name one channel instead of using its type's default:
-`[sms_label:slug::text]` `[wp_label:slug::text]` `[call_label:slug::campaignId]`. Each leg
-of the combined tag takes its own label independently, so `[sms_label:a-wp::text]` and
-`[sms-wp_label:b::text]` are both valid — the unlabelled leg falls to its type's default.
+`[sms:revemain::text]` `[wp:waprimary::text]` `[wp:waprimary::text||url]`
+`[sms:revemain-wp:waprimary::text]` `[call:voicemain::campaignId]`
+`[call:voicemain::campaignId||lotNumber]`
+
+**The label is mandatory.** Release 2.1 removed the bare `[sms::…]` / `[wp::…]` /
+`[call::…]` forms and every `_label:` spelling. Sending **no tag at all** is the only way
+to reach a default channel: the whole body then goes as plain SMS on the default SMS
+channel. With several channels active per type, an unlabelled tag could only mean
+"whichever is default today", which is exactly the ambiguity worth removing from a
+contract third parties build against.
+
+Because the type keyword always precedes the label, channel type is read from the tag
+rather than inferred from the label — so `label_slug` only has to be unique **within** a
+channel type, and no global-uniqueness constraint is needed.
+
+The combined form pairs `sms:` and `wp:` only; `call:` never combines. Parsing splits on
+the literal `-wp:`, unambiguous because `sms`/`wp`/`call` are reserved keywords and a slug
+is lowercase alphanumeric — no hyphen, no colon.
 
 `||` is the one delimiter across tags: it splits a media URL from its caption and a lot
 number from its campaign id. A `call` tag without a lot leaves the lot to the channel
 config; a supplied lot overrides it for that message only and is not stored on the
-dispatch job.
+dispatch job. On a combined tag the URL goes to the WhatsApp leg — the SMS leg keeps the
+raw body, since dropping the URL there would remove the only copy the recipient could act
+on.
 
 WhatsApp has no separate media tag and no separate media channel — the presence of
-`||url` is what selects the media sender. No tag at all means the whole content goes as
-plain SMS. An unrecognised tag **rejects the whole request** with `101 REJECTD` and a
-reason naming the tag, rather than being silently dropped: a skipped tag produces no job
-and no error, which reads as a successful send that delivered nothing. Full contract:
-[api.md](api.md).
+`||url` is what selects the media sender. An unrecognised tag, an unknown label, or a
+label naming an inactive channel **rejects the whole request** with `101 REJECTD` and a
+`Reason` naming the problem, rather than being silently dropped: a skipped tag produces
+no job and no error, which reads as a successful send that delivered nothing. Rejection
+reasons name the replacement for each removed 2.0 form, since a caller hitting one is
+mid-migration. Full contract: [api.md](api.md).
 
 ## Cross-cutting
 
 - **Auth policies**: convention-driven from `NetZeroGateway.API/authorization.json` —
-  never `[Authorize]` attributes. ChannelConfig, FallbackPolicy, AdminUser require SuperAdmin.
+  never `[Authorize]` attributes. ChannelConfig, FallbackPolicy, AdminUser and
+  GatewayCredential require SuperAdmin. `/health` is anonymous.
 - **Middleware order**: GlobalException → ApiLogging (masks `apikey`/`secretkey` in
   stored bodies) → routing/CORS/auth.
 - **Errors**: GlobalExceptionMiddleware returns ProblemDetails (`title`/`detail`) for
   admin routes, REVE-format `{Status,Text}` for the gateway path.
 - **Channel resolution**: several configs per type may be **active**; exactly one is the
-  **default** (unique partial index on `(channel_type, is_default)`). Unlabelled tags use
-  the default; `_label:slug` tags resolve to an active config by `label_slug` and fail
-  loudly when no match exists. The gateway authenticates against the default SMS config.
-- **Secrets**: channel provider credentials AES-encrypted in `channel_configs.config_json`
-  (`IEncryptionService`); rotation via admin UI applies instantly.
+  **default** (unique partial index on `(channel_type, is_default)`). Every tag names its
+  channel by `label_slug` and resolves against **active** configs only, failing loudly
+  when no match exists; the default is reached only by sending no tag at all. Gateway
+  authentication is separate from all of this — it reads `gateway_credentials`.
+- **Secrets**: channel provider credentials AES-encrypted in `channel_configs.config_json`,
+  and the gateway's own keys in `gateway_credentials.api_key_encrypted` /
+  `secret_key_encrypted` (`IEncryptionService` for both); rotation via admin UI applies
+  instantly. Channel-config reads mask secrets as `***`; the gateway credentials are read
+  back decrypted for SuperAdmin, since the pair has to be handed to an integrator and
+  nothing else can read the column. Writes treat an omitted, blank or `***` field as
+  "leave it alone" so a partial save never blanks a credential.
 - **Logging**: Serilog → Seq (compose service, port 18082).
 - **Time**: UTC storage/processing everywhere; Dhaka (UTC+6) for display and job
   schedules — see [conventions.md](conventions.md).

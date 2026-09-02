@@ -33,6 +33,7 @@ public static class DataSeeder
         await SeedAdminUsersAsync(db, config, logger);
         await SeedChannelConfigsAsync(db, enc, config, logger);
         await SeedFallbackPoliciesAsync(db, config, logger);
+        await SeedGatewayCredentialsAsync(db, enc, config, logger);
 
         logger.LogInformation("[SEED] Seed check complete");
     }
@@ -315,6 +316,55 @@ public static class DataSeeder
         await db.SaveChangesAsync();
     }
 
+    // ── Gateway Credentials ───────────────────────────────────────────────
+
+    /// <summary>
+    /// Create-only. Unlike a channel config, these keys are handed to third parties and
+    /// then rotated in the admin panel; re-asserting them from config on every restart
+    /// would silently roll a rotation back and lock every integrator out until someone
+    /// noticed. The seed decides what a fresh database starts with and nothing more.
+    /// </summary>
+    private static async Task SeedGatewayCredentialsAsync(
+        NetZeroGatewayDbContext db,
+        IEncryptionService enc,
+        IConfiguration config,
+        ILogger logger)
+    {
+        if (await db.GatewayCredentials.AnyAsync())
+        {
+            logger.LogDebug("[SEED] GatewayCredential SKIP (already exists, admin owns it)");
+            return;
+        }
+
+        var seed = config.GetSection("Seed:GatewayCredentials").Get<SeedGatewayCredential>();
+
+        if (seed is null
+            || string.IsNullOrWhiteSpace(seed.Username)
+            || string.IsNullOrWhiteSpace(seed.ApiKey)
+            || string.IsNullOrWhiteSpace(seed.SecretKey))
+        {
+            // Not fatal, but the gateway rejects every /sendtext call until someone fixes
+            // it, so this is an error rather than a note.
+            logger.LogError(
+                "[SEED] GatewayCredential SKIP: Seed:GatewayCredentials is missing Username, "
+                + "ApiKey or SecretKey. /sendtext will reject every request until credentials "
+                + "exist. Add the section to appsettings and restart.");
+            return;
+        }
+
+        db.GatewayCredentials.Add(new GatewayCredential
+        {
+            Username = seed.Username.Trim(),
+            ApiKeyEncrypted = enc.Encrypt(seed.ApiKey.Trim()),
+            SecretKeyEncrypted = enc.Encrypt(seed.SecretKey.Trim())
+        });
+
+        // The keys themselves are never logged.
+        logger.LogInformation("[SEED] GatewayCredential ADD: {Username}", seed.Username);
+
+        await db.SaveChangesAsync();
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────
 
     /// <summary>
@@ -352,6 +402,13 @@ file sealed class SeedChannelConfig
     public string ProviderName { get; set; } = "";
     public string Label { get; set; } = "";
     public Dictionary<string, string> Config { get; set; } = [];
+}
+
+file sealed class SeedGatewayCredential
+{
+    public string Username { get; set; } = "";
+    public string ApiKey { get; set; } = "";
+    public string SecretKey { get; set; } = "";
 }
 
 file sealed class SeedFallbackPolicy

@@ -42,6 +42,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IApiLogRepository, ApiLogRepository>();
         services.AddScoped<IFallbackPolicyRepository, FallbackPolicyRepository>();
         services.AddScoped<IMediaFileRepository, MediaFileRepository>();
+        services.AddScoped<IGatewayCredentialRepository, GatewayCredentialRepository>();
 
         // Media file storage (local disk / Docker volume)
         services.AddScoped<IMediaStorageService, LocalMediaStorageService>();
@@ -112,6 +113,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IApiLogService, ApiLogService>();
         services.AddScoped<IAdminUserService, AdminUserService>();
         services.AddScoped<IMediaLibraryService, MediaLibraryService>();
+        services.AddScoped<IGatewayCredentialService, GatewayCredentialService>();
         return services;
     }
 

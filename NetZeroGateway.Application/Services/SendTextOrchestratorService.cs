@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using NetZeroGateway.Application.DTOs;
@@ -14,6 +13,7 @@ public class SendTextOrchestratorService(
     ITemplateParserService parser,
     IMessageRequestRepository msgRepo,
     IChannelConfigRepository configRepo,
+    IGatewayCredentialRepository credentialRepo,
     IEncryptionService enc,
     IServiceScopeFactory scopeFactory,
     ILogger<SendTextOrchestratorService> logger
@@ -39,6 +39,13 @@ public class SendTextOrchestratorService(
 
         var jobs = parsed.Jobs;
 
+        if (await UnresolvableLabelAsync(jobs) is { } labelError)
+        {
+            logger.LogWarning(
+                "[GATEWAY] Rejected — {Reason} ToUser={ToUser}", labelError, request.ToUser);
+            return SendTextResponse.Rejected(labelError);
+        }
+
         var msgRequest = new MessageRequest
         {
             CallerID = request.CallerID ?? string.Empty,
@@ -47,7 +54,7 @@ public class SendTextOrchestratorService(
             ParsedChannels = jobs.Select(j => j.ChannelType.ToString()).Distinct().ToList(),
             // More than one parsed job means the sender asked for the extra delivery
             // themselves, so fallback must not add a third. This counts jobs, not distinct
-            // types: [smswp::..] and two SMS tags are both redundancy the sender paid for.
+            // types: a combined tag and two SMS tags are both redundancy the sender paid for.
             IsMultiChannel = jobs.Count > 1,
             OverallStatus = MessageStatus.Pending,
             ReceivedAt = DateTimeOffset.UtcNow,
@@ -86,9 +93,36 @@ public class SendTextOrchestratorService(
     }
 
     /// <summary>
-    /// Third-party callers must supply apikey/secretkey/callerID. Keys are validated
-    /// against the active SMS channel config, so rotating them in the admin panel
-    /// immediately applies here too.
+    /// Checks every label names an active channel, and returns the reason for the first
+    /// that does not. Dispatch happens after the caller has been told 202, so a label
+    /// that cannot resolve has to be caught here — otherwise the only trace of a typo'd
+    /// slug is a warning in Seq, long after the sender was told the message was accepted.
+    /// </summary>
+    private async Task<string?> UnresolvableLabelAsync(List<ParsedChannelJob> jobs)
+    {
+        foreach (var job in jobs)
+        {
+            // Only tagged sends carry a label; an untagged message uses the default SMS
+            // channel and has nothing to resolve.
+            if (job.ChannelLabelSlug is not { } slug) continue;
+
+            if (await configRepo.GetActiveBySlugAsync(job.ChannelType, slug) is null)
+                return $"No active {job.ChannelType} channel is labelled '{slug}'. "
+                     + "The label must match an active channel's slug in the admin panel exactly.";
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Third-party callers must supply apikey/secretkey/callerID. The keys are validated
+    /// against the gateway's own credentials, so rotating them in the admin panel applies
+    /// here immediately.
+    /// <para>
+    /// Until Release 2.1 these were read off the default SMS channel config. That made
+    /// gateway access a side effect of whichever SMS provider happened to be the default
+    /// — see docs/adr/0007-decouple-gateway-auth-from-channel-config.md.
+    /// </para>
     /// </summary>
     private async Task<bool> IsAuthorizedAsync(SendTextRequest request)
     {
@@ -100,20 +134,33 @@ public class SendTextOrchestratorService(
             return false;
         }
 
-        var config = await configRepo.GetDefaultByChannelTypeAsync(ChannelType.SMS);
-        if (config is null)
+        var credential = await credentialRepo.GetCurrentAsync();
+        if (credential is null)
         {
-            logger.LogWarning("[GATEWAY_AUTH] Rejected — no active SMS config to validate against");
+            logger.LogError(
+                "[GATEWAY_AUTH] Rejected — no gateway credentials exist. Seed them via "
+                + "Seed:GatewayCredentials, or set them under Settings in the admin panel.");
             return false;
         }
 
-        var cfg = JsonSerializer.Deserialize<Dictionary<string, string>>(
-            enc.Decrypt(config.ConfigJson)) ?? [];
+        string expectedKey, expectedSecret;
+        try
+        {
+            expectedKey = enc.Decrypt(credential.ApiKeyEncrypted);
+            expectedSecret = enc.Decrypt(credential.SecretKeyEncrypted);
+        }
+        catch (Exception ex)
+        {
+            // Almost always a changed encryption key: the stored ciphertext predates it.
+            // Rejecting is right, but the cause is not the caller's, so say so.
+            logger.LogError(ex,
+                "[GATEWAY_AUTH] Rejected — stored gateway credentials could not be decrypted. "
+                + "Re-enter them under Settings in the admin panel.");
+            return false;
+        }
 
-        var apiKeyOk = cfg.TryGetValue("apikey", out var expectedKey)
-                       && FixedTimeEquals(request.ApiKey, expectedKey);
-        var secretOk = cfg.TryGetValue("secretkey", out var expectedSecret)
-                       && FixedTimeEquals(request.SecretKey, expectedSecret);
+        var apiKeyOk = FixedTimeEquals(request.ApiKey, expectedKey);
+        var secretOk = FixedTimeEquals(request.SecretKey, expectedSecret);
 
         if (!apiKeyOk || !secretOk)
         {

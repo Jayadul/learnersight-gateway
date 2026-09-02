@@ -22,6 +22,7 @@ Load this when: writing SQL, adding migrations, changing entities, or inspecting
 | `channel_configs` | Provider credentials, AES-encrypted `config_json`. Many active per type; exactly one `is_default` (unique partial index). `label_slug` is unique per type and addresses a channel from a message tag |
 | `fallback_policies` | Trigger→fallback channel rules (`is_global`, `is_active`). Each side is a channel **type** plus an optional `*_channel_config_id` FK naming one channel (null = any/default of that type). `allow_cross_channel` must be true for a rule whose two types differ |
 | `admin_users` | Dashboard users, BCrypt password hashes |
+| `gateway_credentials` | The one credential set `/sendtext` accepts. `api_key_encrypted` / `secret_key_encrypted` are AES ciphertext; `username` is admin-side only and is never sent by callers. Single row — decoupled from `channel_configs` in 2.1 (adr/0007) |
 | `media_files` | Media Library metadata; unique `stored_file_name`, status Active/Deleted |
 | `hangfire.*` | Hangfire background-job bookkeeping (own schema, created on startup) |
 | `__ef_migrations_history` | EF bookkeeping (excluded from backups) |
@@ -37,7 +38,12 @@ Load this when: writing SQL, adding migrations, changing entities, or inspecting
 ## Seed data (fresh database)
 
 2 users (`admin`/`Admin@123` SuperAdmin, `operator`/`Operator@123` Admin),
-channel configs from `Seed:ChannelConfigs`, fallback policies from `Seed:FallbackPolicies`.
+channel configs from `Seed:ChannelConfigs`, fallback policies from `Seed:FallbackPolicies`,
+and the gateway credentials from `Seed:GatewayCredentials` (an object, not a list:
+`Username`, `ApiKey`, `SecretKey`).
+
+Without `Seed:GatewayCredentials` the row is not created and `/sendtext` rejects every
+request — the seeder logs that at Error and carries on rather than failing the boot.
 
 A seed entry names its channel type as `SMS`, `WP` or `Voice`. The friendly names the
 admin UI shows (`WhatsApp`, `Voice Call`) are accepted too, and an unrecognised one logs
@@ -49,6 +55,9 @@ never fire.
 **The seed creates; it never re-asserts.** An existing channel config has only its
 credentials and provider name refreshed, and an existing fallback policy is left
 untouched — so switching a rule off, or renaming a channel, survives a restart. The
+gateway credentials are create-only in the strictest sense: once a row exists the seeder
+does not touch it at all, so a key rotated in the admin panel is never rolled back to the
+config value on the next restart. The
 flip side: **deleting** a seeded row does not stick. The seeder re-creates it on the next
 startup unless the entry is removed from `appsettings*.json` first.
 
