@@ -8,8 +8,8 @@ Load this when: building/pushing images, running the stack, debugging containers
 |---|---|---|---|
 | db | postgres:16-alpine | 15432 | volume `pgdata` |
 | seq | datalust/seq | 18082 | log viewer, volume `seqdata` |
-| api | built from this repo | 18081 | migrations+seed on startup; volume `mediadata:/app/media` for Media Library files |
-| web | built from `../learnersight-netzero-gateway-ui` | 18080 | nginx serves SPA, proxies `/api/`, `/sendtext` and `/media/` |
+| api | built from this repo | 18081 | migrations+seed on startup, then `HEALTHCHECK` on `/health`; volume `mediadata:/app/media` for Media Library files |
+| web | built from `../learnersight-netzero-gateway-ui` | 18080 | nginx serves SPA, proxies `/api/`, `/sendtext` and `/media/`. Waits for `api: condition: service_healthy` |
 | backup | built from `../backup` | — | nightly exports, writes next to compose file |
 
 ```powershell
@@ -53,6 +53,16 @@ contains production appsettings; see releases/1.0.0.md → Known limitations.
 
 `deploy/` folder (workspace root) = pull-based compose + non-technical README.
 Client only needs Docker Desktop → `docker compose pull` → `docker compose up -d`.
+
+`web` waits on the API's healthcheck, not merely on its container starting. Without that
+gate the login page is served while the API is still migrating and nginx answers `/api/*`
+with 502, which the sign-in screen used to report as a failed sign-in — see
+[releases/2.1.0.md](releases/2.1.0.md). Keep the `condition: service_healthy` form when
+editing either compose file; the short `depends_on: [api]` list form does not wait.
+
+Startup on a fresh database takes as long as migrations plus seeding; `docker compose ps`
+shows `api` as `starting` until then, and the healthcheck allows 90s before it counts
+failures.
 
 ## Backups
 
