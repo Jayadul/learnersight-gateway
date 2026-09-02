@@ -13,6 +13,7 @@ public class NetZeroGatewayDbContext(DbContextOptions<NetZeroGatewayDbContext> o
     public DbSet<FallbackPolicy> FallbackPolicies => Set<FallbackPolicy>();
     public DbSet<ApiLog> ApiLogs => Set<ApiLog>();
     public DbSet<MediaFile> MediaFiles => Set<MediaFile>();
+    public DbSet<GatewayCredential> GatewayCredentials => Set<GatewayCredential>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -125,6 +126,16 @@ public class NetZeroGatewayDbContext(DbContextOptions<NetZeroGatewayDbContext> o
             e.Property(x => x.RequestedChannels).HasMaxLength(100);
             e.HasIndex(x => x.RequestedAt);
             e.HasIndex(x => x.ResponseStatus);
+        });
+
+        mb.Entity<GatewayCredential>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Username).HasMaxLength(100).IsRequired();
+            // Ciphertext, not the key itself — AES output is longer than what it wraps.
+            e.Property(x => x.ApiKeyEncrypted).HasColumnType("text").IsRequired();
+            e.Property(x => x.SecretKeyEncrypted).HasColumnType("text").IsRequired();
+            e.HasIndex(x => x.Username).IsUnique();
         });
 
         mb.Entity<MediaFile>(e =>

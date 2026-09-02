@@ -16,6 +16,13 @@
       "AdminUser": {
         "Roles": [ "SuperAdmin" ]
       },
+      "GatewayCredential": {
+        "Roles": [ "SuperAdmin" ]
+      },
+      "Health": {
+        "SwaggerGroup": "gateway",
+        "RequireAuth": false
+      },
       "ChannelConfig": {
         "Roles": [ "SuperAdmin" ]
       },

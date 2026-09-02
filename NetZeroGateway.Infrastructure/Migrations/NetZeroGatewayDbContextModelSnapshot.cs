@@ -389,6 +389,47 @@ namespace NetZeroGateway.Infrastructure.Migrations
                     b.ToTable("fallback_policies", (string)null);
                 });
 
+            modelBuilder.Entity("NetZeroGateway.Domain.Entities.GatewayCredential", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ApiKeyEncrypted")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("api_key_encrypted");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("SecretKeyEncrypted")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("secret_key_encrypted");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("Username")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("username");
+
+                    b.HasKey("Id")
+                        .HasName("pk_gateway_credentials");
+
+                    b.HasIndex("Username")
+                        .IsUnique()
+                        .HasDatabaseName("ix_gateway_credentials_username");
+
+                    b.ToTable("gateway_credentials", (string)null);
+                });
+
             modelBuilder.Entity("NetZeroGateway.Domain.Entities.MediaFile", b =>
                 {
                     b.Property<Guid>("Id")
