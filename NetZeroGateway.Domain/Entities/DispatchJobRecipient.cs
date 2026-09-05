@@ -38,6 +38,14 @@ public class DispatchJobRecipient : BaseEntity
 
     public DateTimeOffset? LastCheckedAt { get; set; }
 
+    /// <summary>
+    /// The recipient row this one was created to retry, when it came from a resend.
+    /// A resend never mutates the row that failed: it creates a fresh job and fresh
+    /// rows pointing back here, so the delivery log stays append-only and the original
+    /// failure remains visible after a successful retry.
+    /// </summary>
+    public Guid? ResentFromRecipientId { get; set; }
+
     // Navigation
     public DispatchJob? DispatchJob { get; set; }
 }

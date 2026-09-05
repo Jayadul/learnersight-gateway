@@ -21,4 +21,12 @@ public class DispatchJobDto
     public bool IsFallback { get; set; }
     public Guid? FallbackFromJobId { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
+
+    /// <summary>
+    /// Per-recipient outcomes, populated on the detail view. A drill-down beneath the
+    /// job's own status, never a replacement for it: the job says what the provider
+    /// answered at hand-off, these say what happened to each number afterwards, and the
+    /// two can legitimately disagree.
+    /// </summary>
+    public List<DispatchJobRecipientDto> Recipients { get; set; } = [];
 }

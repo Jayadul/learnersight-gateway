@@ -384,6 +384,10 @@ namespace NetZeroGateway.Infrastructure.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("recipient");
 
+                    b.Property<Guid?>("ResentFromRecipientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("resent_from_recipient_id");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -402,6 +406,9 @@ namespace NetZeroGateway.Infrastructure.Migrations
 
                     b.HasIndex("Recipient")
                         .HasDatabaseName("ix_dispatch_job_recipients_recipient");
+
+                    b.HasIndex("ResentFromRecipientId")
+                        .HasDatabaseName("ix_dispatch_job_recipients_resent_from_recipient_id");
 
                     b.ToTable("dispatch_job_recipients", (string)null);
                 });

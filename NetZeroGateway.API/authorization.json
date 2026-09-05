@@ -28,6 +28,7 @@
       },
       "ChannelBalance": {},
       "StatusSync": {},
+      "Resend": {},
       "FallbackPolicy": {
         "Roles": [ "SuperAdmin" ]
       },

@@ -89,7 +89,8 @@ internal sealed class FakeDispatchJobRepository : IDispatchJobRepository
     public Task<List<DispatchJob>> GetFailedWithChannelAsync() => Unused.Fail<Task<List<DispatchJob>>>();
     public Task<(List<DispatchJob> Items, int Total)> GetPagedAsync(
         int page, int size, DateTimeOffset? from, DateTimeOffset? to,
-        ChannelType? channelType, JobStatus? status, string? toNumber)
+        ChannelType? channelType, JobStatus? status, string? toNumber,
+        DeliveryStatus? deliveryStatus = null)
         => Unused.Fail<Task<(List<DispatchJob>, int)>>();
     public Task<DispatchJob?> GetByIdAsync(Guid id) => Unused.Fail<Task<DispatchJob?>>();
     public Task<List<DispatchJob>> GetAllAsync() => Unused.Fail<Task<List<DispatchJob>>>();
@@ -201,7 +202,8 @@ internal sealed class FakeJobRepositoryWithExisting(List<DispatchJob> existing) 
 
     public Task<(List<DispatchJob> Items, int Total)> GetPagedAsync(
         int page, int size, DateTimeOffset? from, DateTimeOffset? to,
-        ChannelType? channelType, JobStatus? status, string? toNumber)
+        ChannelType? channelType, JobStatus? status, string? toNumber,
+        DeliveryStatus? deliveryStatus = null)
         => Unused.Fail<Task<(List<DispatchJob>, int)>>();
     public Task<DispatchJob?> GetByIdAsync(Guid id) => Unused.Fail<Task<DispatchJob?>>();
     public Task<List<DispatchJob>> GetAllAsync() => Unused.Fail<Task<List<DispatchJob>>>();

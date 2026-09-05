@@ -16,11 +16,12 @@ public class DispatchLogController(IDispatchJobRepository repo) : ControllerBase
         [FromQuery] ChannelType? channelType,
         [FromQuery] JobStatus? status,
         [FromQuery] string? toNumber,
+        [FromQuery] DeliveryStatus? deliveryStatus,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 10)
     {
         var (items, total) = await repo.GetPagedAsync(
-            page, pageSize, dateFrom, dateTo, channelType, status, toNumber);
+            page, pageSize, dateFrom, dateTo, channelType, status, toNumber, deliveryStatus);
 
         return Ok(new PagedResult<DispatchJobDto>
         {

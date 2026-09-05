@@ -15,6 +15,11 @@ public class MessageRequestRepository(NetZeroGatewayDbContext db)
     public Task<MessageRequest?> GetWithJobsAsync(Guid id)
         => _set.Include(m => m.Jobs)
                    .ThenInclude(j => j.ChannelConfig)
+               .Include(m => m.Jobs)
+                   // The detail view breaks each job down per recipient; the list view
+                   // deliberately does not load these, since a batched job can carry
+                   // hundreds of rows nobody is looking at yet.
+                   .ThenInclude(j => j.Recipients)
                .FirstOrDefaultAsync(m => m.Id == id);
 
     public async Task<(List<MessageRequest> Items, int Total)> GetPagedAsync(

@@ -123,6 +123,8 @@ public class NetZeroGatewayDbContext(DbContextOptions<NetZeroGatewayDbContext> o
             e.HasIndex(x => x.ProviderReferenceId);
             e.HasIndex(x => x.Recipient);
             e.HasIndex(x => x.DeliveryStatus);
+            // Finding every retry of one recipient, and the audit trail behind a resend.
+            e.HasIndex(x => x.ResentFromRecipientId);
         });
 
         mb.Entity<FallbackPolicy>(e =>
