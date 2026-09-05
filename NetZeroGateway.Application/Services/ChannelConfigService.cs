@@ -231,7 +231,7 @@ public class ChannelConfigService(
     private static Provider[] ProvidersFor(ChannelType channelType) => channelType switch
     {
         ChannelType.SMS => [Provider.Reve, Provider.GenNet, Provider.Chithi],
-        ChannelType.WP => [Provider.WaTrend, Provider.NetZeroInbox],
+        ChannelType.WP => [Provider.WaTrend, Provider.NetZeroInbox, Provider.NetZeroInboxQr],
         ChannelType.Voice => [Provider.NetZeroVoice],
         _ => []
     };

@@ -80,7 +80,23 @@ registration, which is what made one-provider-per-type structural. See
 
 Only providers with a registered sender are selectable
 (`ChannelConfigService.ProvidersFor`): **SMS** — REVE, GenNet, Chithi; **WhatsApp** —
-WaTrend, NetZero Inbox; **Voice** — NetZero Voice.
+WaTrend, NetZero Inbox (v1), NetZero Inbox (QR); **Voice** — NetZero Voice.
+
+**NetZero Inbox is two providers, not one.** The vendor exposes two unrelated WhatsApp
+APIs on one host, sharing only the token:
+
+| | `NetZeroInbox` (v1) | `NetZeroInboxQr` (QR device) |
+|---|---|---|
+| Request | `POST /api/v1/send-message`, JSON body | `GET /api/qr/rest/send_message`, query string |
+| Scheme | `https` | `http` |
+| Sender | none | `from` — the linked device's number |
+| Recipient | `+8801700000001` | `8801700000001` |
+
+Sending either recipient form to the other API is a wrong number, which is why they are
+separate `Provider` members rather than a mode flag: the format is resolved from the
+provider alone, and a mode would put that decision out of `RecipientFormat`'s reach.
+Neither supports media — both refuse a media send rather than guess a request shape the
+vendor has not documented.
 
 ### Recipient formats differ per provider (R3.1)
 
@@ -90,9 +106,9 @@ rather than per vendor platform:
 
 | Provider | On the wire | Note |
 |---|---|---|
-| REVE, WaTrend, NetZero Voice, **Chithi** | `8801700000001` | the stored form |
+| REVE, WaTrend, NetZero Voice, **Chithi**, **NetZero Inbox QR** | `8801700000001` | the stored form |
 | GenNet | `01700000001` | country code dropped, trunk `0` restored |
-| NetZero Inbox | `+8801700000001` | WhatsApp Cloud API shape |
+| NetZero Inbox (v1) | `+8801700000001` | WhatsApp Cloud API shape |
 
 Chithi shares GenNet's `api_token`, `sid` and API family but **not** its number format
 or request shape — GenNet takes an array of recipients at `/send-sms/bulk`, Chithi one

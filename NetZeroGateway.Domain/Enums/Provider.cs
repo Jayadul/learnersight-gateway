@@ -27,9 +27,24 @@ public enum Provider
     /// <summary>GenNet SMS (isms.gennet.com.bd).</summary>
     GenNet = 3,
 
-    /// <summary>NetZero Inbox WhatsApp (inbox.netzero.com.bd).</summary>
+    /// <summary>
+    /// NetZero Inbox WhatsApp, structured v1 API
+    /// (<c>POST https://inbox.netzero.com.bd/api/v1/send-message</c>).
+    /// </summary>
     NetZeroInbox = 4,
 
     /// <summary>Chithi SMS (sms.chithi.net).</summary>
-    Chithi = 5
+    Chithi = 5,
+
+    /// <summary>
+    /// NetZero Inbox WhatsApp, QR-linked device API
+    /// (<c>GET http://inbox.netzero.com.bd/api/qr/rest/send_message</c>).
+    /// <para>
+    /// A separate member rather than a mode on <see cref="NetZeroInbox"/>: it is a GET
+    /// with query parameters over plain http where v1 is a JSON POST over https, it
+    /// carries a <c>from</c> number that v1 has none of, and it takes the recipient
+    /// without the leading plus that v1 requires. Only the token is shared.
+    /// </para>
+    /// </summary>
+    NetZeroInboxQr = 6
 }

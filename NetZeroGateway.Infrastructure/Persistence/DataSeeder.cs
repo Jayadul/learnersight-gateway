@@ -128,6 +128,7 @@ public static class DataSeeder
             "gennet" => Provider.GenNet,
             "chithi" => Provider.Chithi,
             "netzeroinbox" or "inbox" => Provider.NetZeroInbox,
+            "netzeroinboxqr" or "inboxqr" => Provider.NetZeroInboxQr,
             "netzerovoice" => Provider.NetZeroVoice,
             // Bare "netzero" is ambiguous — it is the voice vendor, the WhatsApp vendor
             // and the product name. Fall through to the channel type rather than guess.

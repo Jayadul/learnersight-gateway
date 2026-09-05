@@ -41,6 +41,18 @@ public class RecipientFormatTests
             RecipientFormat.For(Provider.Chithi, Canonical));
     }
 
+    [Fact]
+    public void The_two_NetZero_Inbox_APIs_disagree_about_the_plus()
+    {
+        // Same vendor, same host, same token — but v1 wants a leading plus and the QR
+        // device API does not. Sending either form to the other API is a wrong number.
+        Assert.Equal("+8801748848039", RecipientFormat.For(Provider.NetZeroInbox, Canonical));
+        Assert.Equal("8801748848039", RecipientFormat.For(Provider.NetZeroInboxQr, Canonical));
+        Assert.NotEqual(
+            RecipientFormat.For(Provider.NetZeroInbox, Canonical),
+            RecipientFormat.For(Provider.NetZeroInboxQr, Canonical));
+    }
+
     [Theory]
     [InlineData("8801748848039", "01748848039")]
     [InlineData("01748848039", "01748848039")]   // already local, left alone

@@ -198,6 +198,78 @@ public class NewProviderSenderTests
         Assert.Contains("does not support media", job.FailureReason);
     }
 
+    // ── NetZero Inbox, QR device API ─────────────────────────────────────────
+
+    private sealed class FakeInboxQrClient : INetZeroInboxQrClient
+    {
+        public string? SentTo { get; private set; }
+        public string? SentFrom { get; private set; }
+        public bool WasCalled { get; private set; }
+
+        public Task<NetZeroInboxQrResponse> SendTextAsync(
+            string token, string from, string to, string message,
+            string? baseUrl = null, CancellationToken ct = default)
+        {
+            WasCalled = true;
+            SentTo = to;
+            SentFrom = from;
+            return Task.FromResult(new NetZeroInboxQrResponse { Id = "QR-1" });
+        }
+    }
+
+    [Fact]
+    public async Task The_QR_API_sends_the_recipient_without_a_plus_unlike_v1()
+    {
+        var client = new FakeInboxQrClient();
+        var sender = new NetZeroInboxQrWhatsAppSender(
+            client, NullLogger<NetZeroInboxQrWhatsAppSender>.Instance);
+        var job = Job("8801748848039");
+
+        await sender.SendAsync(job, QrCfg());
+
+        Assert.Equal("8801748848039", client.SentTo);
+        Assert.Equal("8801942785200", client.SentFrom);
+        Assert.Equal(JobStatus.Sent, job.Status);
+        Assert.Equal("QR-1", job.ProviderMessageId);
+    }
+
+    [Fact]
+    public async Task The_QR_API_refuses_to_send_without_a_configured_sender_number()
+    {
+        // The provider cannot tell which linked WhatsApp session to use, and a blank
+        // from would fail somewhere inside their API with an opaque error.
+        var client = new FakeInboxQrClient();
+        var sender = new NetZeroInboxQrWhatsAppSender(
+            client, NullLogger<NetZeroInboxQrWhatsAppSender>.Instance);
+        var job = Job("8801748848039");
+
+        await sender.SendAsync(job, new Dictionary<string, string> { ["token"] = "t" });
+
+        Assert.False(client.WasCalled);
+        Assert.Equal(JobStatus.Failed, job.Status);
+        Assert.Contains("no sender number", job.FailureReason);
+    }
+
+    [Fact]
+    public async Task The_QR_API_also_refuses_media()
+    {
+        var client = new FakeInboxQrClient();
+        var sender = new NetZeroInboxQrWhatsAppSender(
+            client, NullLogger<NetZeroInboxQrWhatsAppSender>.Instance);
+        var job = Job("8801748848039", mediaUrl: "https://example.com/f.pdf");
+
+        await sender.SendAsync(job, QrCfg());
+
+        Assert.False(client.WasCalled);
+        Assert.Equal(JobStatus.Failed, job.Status);
+        Assert.Contains("does not support media", job.FailureReason);
+    }
+
+    private static Dictionary<string, string> QrCfg() => new()
+    {
+        ["token"] = "t", ["from"] = "8801942785200"
+    };
+
     private static Dictionary<string, string> Cfg() => new()
     {
         ["api_token"] = "t", ["sid"] = "s", ["token"] = "t"

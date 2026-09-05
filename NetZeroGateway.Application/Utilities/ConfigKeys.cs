@@ -30,6 +30,7 @@ public static class ConfigKeys
     public const string GenNetBaseUrl = "Providers:GenNet:BaseUrl";
     public const string ChithiBaseUrl = "Providers:Chithi:BaseUrl";
     public const string NetZeroInboxBaseUrl = "Providers:NetZeroInbox:BaseUrl";
+    public const string NetZeroInboxQrBaseUrl = "Providers:NetZeroInboxQr:BaseUrl";
     public const string WhatsAppBaseUrl = "Providers:WhatsApp:BaseUrl";
     public const string VoiceBaseUrl = "Providers:Voice:BaseUrl";
 
@@ -68,5 +69,6 @@ public static class ConfigKeys
     public const string ChithiSendPath = "Providers:Chithi:SendPath";
     public const string ChithiBalancePath = "Providers:Chithi:BalancePath";
     public const string NetZeroInboxSendPath = "Providers:NetZeroInbox:SendPath";
+    public const string NetZeroInboxQrSendPath = "Providers:NetZeroInboxQr:SendPath";
     public const string ReveBalancePath = "Providers:Sms:BalancePath";
 }

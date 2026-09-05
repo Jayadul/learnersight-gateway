@@ -13,7 +13,8 @@ Load this when: building/pushing images, running the stack, debugging containers
 | backup | built from `../backup` | — | nightly exports, writes next to compose file |
 
 **Provider endpoints (R3.1).** GenNet (`isms.gennet.com.bd`), Chithi (`sms.chithi.net`)
-and NetZero Inbox (`inbox.netzero.com.bd`) have defaults under `Providers:*` in
+and both NetZero Inbox APIs (`inbox.netzero.com.bd` — `https` for v1, `http` for the QR
+device endpoint, which is why they are separate entries) have defaults under `Providers:*` in
 `authorization.json`, but unlike REVE/WaTrend/Voice their channels are seeded with an
 explicit `baseUrl`, since a blank one on a provider without a central default leaves the
 channel nowhere to send. REVE's *balance* uses a separate host (`https://smpp.revesms.com`,

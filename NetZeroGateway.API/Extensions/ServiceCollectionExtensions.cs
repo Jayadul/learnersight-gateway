@@ -118,6 +118,17 @@ public static class ServiceCollectionExtensions
             })
             .AddStandardResilienceHandler(o => Resilience(o, retryCount, retryDelay, waTimeout));
 
+        services
+            .AddHttpClient<INetZeroInboxQrClient, NetZeroInboxQrClient>(c =>
+            {
+                // Plain http, unlike the v1 API on the same host — that is what the
+                // vendor documents for the QR device endpoint.
+                c.BaseAddress = new Uri(
+                    config[ConfigKeys.NetZeroInboxQrBaseUrl] ?? "http://inbox.netzero.com.bd");
+                c.Timeout = TimeSpan.FromSeconds(waTimeout + 20);
+            })
+            .AddStandardResilienceHandler(o => Resilience(o, retryCount, retryDelay, waTimeout));
+
         // REVE's balance sits on a different host and scheme from its send endpoint
         // (https, no port), so it gets its own client rather than reusing the send one.
         services
@@ -143,7 +154,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IChannelSender, VoiceSender>();          // Voice/ NetZeroVoice
         services.AddScoped<IChannelSender, GenNetSmsSender>();      // SMS  / GenNet
         services.AddScoped<IChannelSender, ChithiSmsSender>();      // SMS  / Chithi
-        services.AddScoped<IChannelSender, NetZeroInboxWhatsAppSender>(); // WP / NetZeroInbox
+        services.AddScoped<IChannelSender, NetZeroInboxWhatsAppSender>();   // WP / NetZeroInbox v1
+        services.AddScoped<IChannelSender, NetZeroInboxQrWhatsAppSender>(); // WP / NetZeroInbox QR
         services.AddScoped<IChannelSenderFactory, ChannelSenderFactory>();
 
         return services;
