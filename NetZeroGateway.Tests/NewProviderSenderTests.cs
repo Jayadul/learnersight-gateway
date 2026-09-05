@@ -8,16 +8,27 @@ using NetZeroGateway.Infrastructure.Strategies;
 namespace NetZeroGateway.Tests;
 
 /// <summary>
-/// The three providers added in Release 3. What each sends on the wire is the part worth
-/// pinning: two of them disagree with our stored number format in opposite directions,
-/// and one batches where the other does not — none of which is visible from the job.
+/// The providers added in Release 3. What each sends on the wire is the part worth
+/// pinning: several disagree with our stored number format in different directions, one
+/// batches where another does not, and two share a vendor and a token while agreeing on
+/// almost nothing else — none of which is visible from the job.
 /// </summary>
 public class NewProviderSenderTests
 {
-    private static DispatchJob Job(string toNumber, string? mediaUrl = null) => new()
+    // The channel type is carried on the job so a fixture cannot quietly describe, say,
+    // a WhatsApp send as an SMS one. Senders resolve nothing from it — the factory has
+    // already picked them by then — but a test that reads wrong is a test that misleads
+    // the next person to change one.
+    private static DispatchJob SmsJob(string toNumber) => Job(ChannelType.SMS, toNumber);
+
+    private static DispatchJob WhatsAppJob(string toNumber, string? mediaUrl = null)
+        => Job(ChannelType.WP, toNumber, mediaUrl);
+
+    private static DispatchJob Job(
+        ChannelType channelType, string toNumber, string? mediaUrl = null) => new()
     {
         MessageRequestId = Guid.NewGuid(),
-        ChannelType = ChannelType.SMS,
+        ChannelType = channelType,
         MessageContent = "hello",
         MediaUrl = mediaUrl,
         ToNumber = toNumber
@@ -53,7 +64,7 @@ public class NewProviderSenderTests
     {
         var client = new FakeGenNetClient();
         var sender = new GenNetSmsSender(client, NullLogger<GenNetSmsSender>.Instance);
-        var job = Job("8801748848039,8801969155575");
+        var job = SmsJob("8801748848039,8801969155575");
 
         await sender.SendAsync(job, Cfg());
 
@@ -67,7 +78,7 @@ public class NewProviderSenderTests
     {
         var client = new FakeGenNetClient();
         var sender = new GenNetSmsSender(client, NullLogger<GenNetSmsSender>.Instance);
-        var job = Job("8801748848039");
+        var job = SmsJob("8801748848039");
 
         await sender.SendAsync(job, Cfg());
 
@@ -81,7 +92,7 @@ public class NewProviderSenderTests
     {
         var sender = new GenNetSmsSender(
             new FakeGenNetClient(success: false), NullLogger<GenNetSmsSender>.Instance);
-        var job = Job("8801748848039");
+        var job = SmsJob("8801748848039");
 
         await sender.SendAsync(job, Cfg());
 
@@ -121,7 +132,7 @@ public class NewProviderSenderTests
     {
         var client = new FakeChithiClient(true, true);
         var sender = new ChithiSmsSender(client, NullLogger<ChithiSmsSender>.Instance);
-        var job = Job("8801748848039,8801969155575");
+        var job = SmsJob("8801748848039,8801969155575");
 
         await sender.SendAsync(job, Cfg());
 
@@ -138,7 +149,7 @@ public class NewProviderSenderTests
         // reason carries the count. The recipient rows hold the detail.
         var sender = new ChithiSmsSender(
             new FakeChithiClient(true, false), NullLogger<ChithiSmsSender>.Instance);
-        var job = Job("8801748848039,8801969155575");
+        var job = SmsJob("8801748848039,8801969155575");
 
         await sender.SendAsync(job, Cfg());
 
@@ -172,7 +183,7 @@ public class NewProviderSenderTests
         var client = new FakeInboxClient();
         var sender = new NetZeroInboxWhatsAppSender(
             client, NullLogger<NetZeroInboxWhatsAppSender>.Instance);
-        var job = Job("8801748848039");
+        var job = WhatsAppJob("8801748848039");
 
         await sender.SendAsync(job, Cfg());
 
@@ -189,7 +200,7 @@ public class NewProviderSenderTests
         var client = new FakeInboxClient();
         var sender = new NetZeroInboxWhatsAppSender(
             client, NullLogger<NetZeroInboxWhatsAppSender>.Instance);
-        var job = Job("8801748848039", mediaUrl: "https://example.com/f.pdf");
+        var job = WhatsAppJob("8801748848039", mediaUrl: "https://example.com/f.pdf");
 
         await sender.SendAsync(job, Cfg());
 
@@ -223,7 +234,7 @@ public class NewProviderSenderTests
         var client = new FakeInboxQrClient();
         var sender = new NetZeroInboxQrWhatsAppSender(
             client, NullLogger<NetZeroInboxQrWhatsAppSender>.Instance);
-        var job = Job("8801748848039");
+        var job = WhatsAppJob("8801748848039");
 
         await sender.SendAsync(job, QrCfg());
 
@@ -241,7 +252,7 @@ public class NewProviderSenderTests
         var client = new FakeInboxQrClient();
         var sender = new NetZeroInboxQrWhatsAppSender(
             client, NullLogger<NetZeroInboxQrWhatsAppSender>.Instance);
-        var job = Job("8801748848039");
+        var job = WhatsAppJob("8801748848039");
 
         await sender.SendAsync(job, new Dictionary<string, string> { ["token"] = "t" });
 
@@ -256,7 +267,7 @@ public class NewProviderSenderTests
         var client = new FakeInboxQrClient();
         var sender = new NetZeroInboxQrWhatsAppSender(
             client, NullLogger<NetZeroInboxQrWhatsAppSender>.Instance);
-        var job = Job("8801748848039", mediaUrl: "https://example.com/f.pdf");
+        var job = WhatsAppJob("8801748848039", mediaUrl: "https://example.com/f.pdf");
 
         await sender.SendAsync(job, QrCfg());
 
