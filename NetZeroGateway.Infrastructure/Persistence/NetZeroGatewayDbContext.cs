@@ -14,6 +14,7 @@ public class NetZeroGatewayDbContext(DbContextOptions<NetZeroGatewayDbContext> o
     public DbSet<ApiLog> ApiLogs => Set<ApiLog>();
     public DbSet<MediaFile> MediaFiles => Set<MediaFile>();
     public DbSet<GatewayCredential> GatewayCredentials => Set<GatewayCredential>();
+    public DbSet<DispatchJobRecipient> DispatchJobRecipients => Set<DispatchJobRecipient>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -33,6 +34,7 @@ public class NetZeroGatewayDbContext(DbContextOptions<NetZeroGatewayDbContext> o
         {
             e.HasKey(x => x.Id);
             e.Property(x => x.ChannelType).HasConversion<string>().HasMaxLength(50);
+            e.Property(x => x.Provider).HasConversion<string>().HasMaxLength(50);
             e.Property(x => x.ProviderName).HasMaxLength(100).IsRequired();
             e.Property(x => x.Label).HasMaxLength(200).IsRequired();
             e.Property(x => x.LabelSlug).HasMaxLength(50).IsRequired();
@@ -94,6 +96,28 @@ public class NetZeroGatewayDbContext(DbContextOptions<NetZeroGatewayDbContext> o
             e.HasIndex(x => x.MessageRequestId);
             e.HasIndex(x => x.Status);
             e.HasIndex(x => x.CreatedAt);
+        });
+
+        mb.Entity<DispatchJobRecipient>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Recipient).HasMaxLength(50).IsRequired();
+            e.Property(x => x.ProviderReferenceId).HasMaxLength(500);
+            e.Property(x => x.DeliveryStatus).HasConversion<string>().HasMaxLength(50);
+            e.Property(x => x.RawStatusResponse).HasColumnType("jsonb");
+            // Cascade, unlike the Restrict used elsewhere: these rows are part of the job
+            // rather than a separate record that outlives it, so a deleted job should not
+            // leave orphaned recipients behind.
+            e.HasOne(x => x.DispatchJob)
+             .WithMany(x => x.Recipients)
+             .HasForeignKey(x => x.DispatchJobId)
+             .OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => x.DispatchJobId);
+            // Status sync looks rows up by the id the provider gave back, and the voice
+            // sync — which gets no id — looks them up by number.
+            e.HasIndex(x => x.ProviderReferenceId);
+            e.HasIndex(x => x.Recipient);
+            e.HasIndex(x => x.DeliveryStatus);
         });
 
         mb.Entity<FallbackPolicy>(e =>

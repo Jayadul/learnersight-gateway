@@ -13,6 +13,7 @@ CLAUDE.md non-negotiables.
 | [0005](0005-utc-storage-dhaka-display.md) | UTC storage, Dhaka display |
 | [0006](0006-unify-whatsapp-channel-type.md) | WhatsApp text + media unified into one channel (`WP=1`, 2 retired) |
 | [0007](0007-decouple-gateway-auth-from-channel-config.md) | Gateway `apikey`/`secretkey` moved off the SMS channel into `gateway_credentials` |
+| [0008](0008-multi-provider-channels.md) | Several providers may serve one channel type; sender resolution keys on the provider |
 
 ## Adding one
 

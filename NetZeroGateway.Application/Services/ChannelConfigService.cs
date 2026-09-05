@@ -31,6 +31,7 @@ public class ChannelConfigService(
         var entity = new ChannelConfig
         {
             ChannelType = req.ChannelType,
+            Provider = ValidateProvider(req.ChannelType, req.Provider),
             ProviderName = req.ProviderName,
             Label = req.Label,
             LabelSlug = await ResolveSlugAsync(req.ChannelType, req.LabelSlug, req.Label, null),
@@ -53,6 +54,7 @@ public class ChannelConfigService(
     {
         var entity = await repo.GetByIdAsync(id)
             ?? throw new NotFoundException($"ChannelConfig {id} not found.");
+        entity.Provider = ValidateProvider(entity.ChannelType, req.Provider);
         entity.ProviderName = req.ProviderName;
         entity.Label = req.Label;
         entity.LabelSlug = await ResolveSlugAsync(
@@ -204,6 +206,37 @@ public class ChannelConfigService(
         return enc.Decrypt(entity.ConfigJson);
     }
 
+    /// <summary>
+    /// Rejects a provider that cannot serve this channel type. Saving a Voice channel
+    /// with the WaTrend provider would otherwise persist happily and then throw at
+    /// dispatch, when there is a real message to lose — better to refuse the save.
+    /// </summary>
+    private static Provider ValidateProvider(ChannelType channelType, Provider provider)
+    {
+        var allowed = ProvidersFor(channelType);
+        if (allowed.Contains(provider)) return provider;
+
+        throw new InvalidOperationException(
+            $"Provider '{provider}' does not serve {channelType} channels. "
+            + $"Valid providers for {channelType}: {string.Join(", ", allowed)}.");
+    }
+
+    /// <summary>
+    /// Which vendors an operator may currently select for a channel type. This lists
+    /// providers that have a registered sender, not every member of the enum — GenNet,
+    /// Chithi and NetZeroInbox exist in <see cref="Provider"/> and land in R3.1, and
+    /// allowing one to be saved before its sender exists would create a channel that
+    /// looks configured and throws on the first real message. Add each here as its
+    /// sender is registered. See ADR 0008.
+    /// </summary>
+    private static Provider[] ProvidersFor(ChannelType channelType) => channelType switch
+    {
+        ChannelType.SMS => [Provider.Reve],
+        ChannelType.WP => [Provider.WaTrend],
+        ChannelType.Voice => [Provider.NetZeroVoice],
+        _ => []
+    };
+
     private ChannelConfigDto ToDto(ChannelConfig c)
     {
         var masked = new Dictionary<string, string>();
@@ -221,6 +254,7 @@ public class ChannelConfigService(
         {
             Id = c.Id,
             ChannelType = c.ChannelType,
+            Provider = c.Provider,
             ProviderName = c.ProviderName,
             Label = c.Label,
             LabelSlug = c.LabelSlug,

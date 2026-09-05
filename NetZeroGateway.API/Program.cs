@@ -19,6 +19,14 @@ try
     // ── Load authorization.json into config ────────────────────────────────
     builder.Configuration.AddJsonFile("authorization.json", optional: false, reloadOnChange: true);
 
+    // CreateBuilder has already registered the environment-variable and command-line
+    // sources, and in .NET configuration the last source added wins — so the file above
+    // was silently outranking both. That is why Providers__Voice__BaseUrl could be set in
+    // the container, confirmed with printenv, and still be ignored at dispatch time.
+    // Re-adding them puts the deployment back on top of the file, where it belongs.
+    builder.Configuration.AddEnvironmentVariables();
+    builder.Configuration.AddCommandLine(args);
+
     // ── Serilog from appsettings ───────────────────────────────────────────
     builder.Host.UseSerilog((ctx, services, loggerConfig) =>
         loggerConfig.ReadFrom.Configuration(ctx.Configuration)

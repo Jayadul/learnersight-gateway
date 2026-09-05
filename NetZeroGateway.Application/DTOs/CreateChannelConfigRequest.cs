@@ -3,6 +3,8 @@ namespace NetZeroGateway.Application.DTOs;
 public class CreateChannelConfigRequest
 {
     public ChannelType ChannelType { get; set; }
+    /// <summary>Which vendor serves this channel. Must have a registered sender.</summary>
+    public Provider Provider { get; set; }
     public string ProviderName { get; set; } = string.Empty;
     public string Label { get; set; } = string.Empty;
     /// <summary>Optional; derived from Label when omitted. Lowercase alphanumeric only.</summary>

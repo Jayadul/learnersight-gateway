@@ -45,9 +45,15 @@ Messaging; `/settings/channels` direct URL → Access Denied; ChannelConfig API 
 
 Covered so far: `TemplateParserService` (every 2.1 tag form, the no-tag path, label
 validation, and a rejection test per removed 2.0 form), `FallbackHandlerService`, the
-`ChannelDispatchService` lot-number overlay, and `GatewayCredentialService`'s
-partial-update contract. Test doubles are hand-rolled in `Fakes.cs` — no mocking
-library; members a test does not exercise throw rather than returning null.
+`ChannelDispatchService` lot-number overlay, `GatewayCredentialService`'s partial-update
+contract, `ChannelSenderFactory` resolution, `ProviderEndpoint` base-URL resolution, and
+the `dispatch_job_recipients` rows written at dispatch. Test doubles are hand-rolled in
+`Fakes.cs` — no mocking library; members a test does not exercise throw rather than
+returning null.
+
+The test project references Infrastructure as of R3.0, so sender resolution can be tested
+directly. It decides which vendor a message is billed to, which is not something to cover
+only through the services that happen to call it.
 
 The tag grammar is a published contract, so treat it as a priority test target: any
 change to it needs a test per accepted form **and** per rejected form, since the

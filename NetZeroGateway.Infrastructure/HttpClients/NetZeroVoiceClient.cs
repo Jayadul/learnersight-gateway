@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using NetZeroGateway.Application.Utilities;
 using NetZeroGateway.Infrastructure.HttpClients.Models;
 using System.Text;
 using System.Text.Json;
@@ -17,11 +18,13 @@ public class NetZeroVoiceClient(
     public async Task<NetZeroVoiceResponse> RunCampaignAsync(
         string owner, string password, string authUserId,
         string campaignId, string lotNumber,
-        List<string> destinationNumbers, CancellationToken ct = default)
+        List<string> destinationNumbers,
+        string? baseUrl = null, CancellationToken ct = default)
     {
+        var url = ProviderEndpoint.Resolve(baseUrl, CampaignPath);
         logger.LogInformation(
-            "[VOICE] POST {Path} campaign={Campaign} count={Count}",
-            CampaignPath, campaignId, destinationNumbers.Count);
+            "[VOICE] POST {Url} campaign={Campaign} count={Count}",
+            url, campaignId, destinationNumbers.Count);
 
         var payload = new
         {
@@ -36,7 +39,7 @@ public class NetZeroVoiceClient(
         };
         var content = new StringContent(
             JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-        var resp = await http.PostAsync(CampaignPath, content, ct);
+        var resp = await http.PostAsync(url, content, ct);
         var body = await resp.Content.ReadAsStringAsync(ct);
         logger.LogDebug("[VOICE] Response: {Body}", body);
         try

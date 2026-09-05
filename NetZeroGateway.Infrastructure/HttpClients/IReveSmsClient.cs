@@ -7,5 +7,6 @@ public interface IReveSmsClient
     Task<ReveSmsResponse> SendAsync(
         string apiKey, string secretKey, string callerID,
         string toUser, string message,
+        string? baseUrl = null,
         CancellationToken ct = default);
 }

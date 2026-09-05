@@ -12,6 +12,12 @@ Load this when: building/pushing images, running the stack, debugging containers
 | web | built from `../learnersight-netzero-gateway-ui` | 18080 | nginx serves SPA, proxies `/api/`, `/sendtext` and `/media/`. Waits for `api: condition: service_healthy` |
 | backup | built from `../backup` | — | nightly exports, writes next to compose file |
 
+**Environment overrides work as of R3.0.** `Providers__Voice__BaseUrl` and friends were
+silently ignored before it: `authorization.json` loaded after the environment source and
+won. If a deployment carries such an override, check what it actually points at now that
+it takes effect — it has never been applied. A per-channel `baseUrl` in the admin UI
+overrides both, and is the better place for one channel's host.
+
 ```powershell
 docker compose up -d --build          # run everything from source
 docker compose ps                     # health

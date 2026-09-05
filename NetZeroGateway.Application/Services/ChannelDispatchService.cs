@@ -11,6 +11,7 @@ namespace NetZeroGateway.Application.Services;
 public class ChannelDispatchService(
     IMessageRequestRepository msgRepo,
     IDispatchJobRepository jobRepo,
+    IDispatchJobRecipientRepository recipientRepo,
     IChannelConfigRepository configRepo,
     IEncryptionService enc,
     IChannelSenderFactory senderFactory,
@@ -64,14 +65,17 @@ public class ChannelDispatchService(
             switch (job.ChannelType)
             {
                 case ChannelType.SMS:
-                    await DispatchSmsAsync(messageRequestId, config.Id, job, cfg, numbers);
+                    await DispatchSmsAsync(
+                        messageRequestId, config.Id, config.Provider, job, cfg, numbers);
                     break;
                 case ChannelType.Voice:
-                    await DispatchVoiceAsync(messageRequestId, config.Id, job, cfg, numbers);
+                    await DispatchVoiceAsync(
+                        messageRequestId, config.Id, config.Provider, job, cfg, numbers);
                     break;
                 default:
                     await DispatchPerNumberAsync(
-                        messageRequestId, config.Id, job, cfg, numbers, config.DelaySeconds);
+                        messageRequestId, config.Id, config.Provider, job, cfg, numbers,
+                        config.DelaySeconds);
                     break;
             }
         }
@@ -84,7 +88,7 @@ public class ChannelDispatchService(
 
     // ── SMS — one call, comma-joined numbers ──────────────────────────────
     private async Task DispatchSmsAsync(
-        Guid requestId, Guid configId,
+        Guid requestId, Guid configId, Provider provider,
         ParsedChannelJob job, Dictionary<string, string> cfg,
         List<string> numbers)
     {
@@ -96,25 +100,28 @@ public class ChannelDispatchService(
         if (!string.IsNullOrWhiteSpace(job.CallerId))
             cfg["callerID"] = job.CallerId;
 
-        var sender = senderFactory.GetSender(ChannelType.SMS);
+        var sender = senderFactory.GetSender(ChannelType.SMS, provider);
         await sender.SendAsync(dispatchJob, cfg);
         await jobRepo.SaveChangesAsync();
+        await RecordRecipientsAsync(dispatchJob, numbers);
     }
 
     // ── WhatsApp Text/Media — one job per number, all in parallel ─────────
     private async Task DispatchPerNumberAsync(
-        Guid requestId, Guid configId,
+        Guid requestId, Guid configId, Provider provider,
         ParsedChannelJob job, Dictionary<string, string> cfg,
         List<string> numbers, int delaySeconds)
     {
         // WhatsApp text and media share ChannelType.WP — the MediaUrl picks the sender.
-        var sender = senderFactory.GetSender(job.ChannelType, job.MediaUrl is not null);
+        var sender = senderFactory.GetSender(
+            job.ChannelType, provider, job.MediaUrl is not null);
         foreach (var number in numbers)
         {
             var dispatchJob = await CreateJobAsync(requestId, configId, job, number);
             await PaceAsync(delaySeconds, job.ChannelType);
             await sender.SendAsync(dispatchJob, cfg);
             await jobRepo.SaveChangesAsync();
+            await RecordRecipientsAsync(dispatchJob, [number]);
         }
     }
 
@@ -136,7 +143,7 @@ public class ChannelDispatchService(
 
     // ── Voice — one call, full array ──────────────────────────────────────
     private async Task DispatchVoiceAsync(
-        Guid requestId, Guid configId,
+        Guid requestId, Guid configId, Provider provider,
         ParsedChannelJob job, Dictionary<string, string> cfg,
         List<string> numbers)
     {
@@ -149,9 +156,53 @@ public class ChannelDispatchService(
         if (!string.IsNullOrWhiteSpace(job.LotNumber))
             cfg["lotNumber"] = job.LotNumber;
 
-        var sender = senderFactory.GetSender(ChannelType.Voice);
+        var sender = senderFactory.GetSender(ChannelType.Voice, provider);
         await sender.SendAsync(dispatchJob, cfg);
         await jobRepo.SaveChangesAsync();
+        await RecordRecipientsAsync(dispatchJob, numbers);
+    }
+
+    /// <summary>
+    /// Writes one row per recipient of a completed job.
+    /// <para>
+    /// SMS and Voice batch every number into a single job, so without these rows a
+    /// partially delivered batch has nowhere to record which numbers actually arrived.
+    /// The provider reference is whatever the sender captured: REVE returns one id for
+    /// the whole batch, so every row here carries the same one and will resolve to the
+    /// same status — a REVE limitation, not a gap in the table. Voice returns none.
+    /// </para>
+    /// <para>
+    /// Failure is swallowed deliberately. These rows exist for reporting and for the
+    /// status sync to write into later; the message has already been handed to the
+    /// provider by this point, and losing the audit rows must not turn a delivered
+    /// send into a failed one.
+    /// </para>
+    /// </summary>
+    private async Task RecordRecipientsAsync(DispatchJob dispatchJob, List<string> numbers)
+    {
+        try
+        {
+            var rows = numbers.Select(number => new DispatchJobRecipient
+            {
+                DispatchJobId = dispatchJob.Id,
+                Recipient = number,
+                ProviderReferenceId = dispatchJob.ProviderMessageId,
+                // Pending means "accepted, nothing synced back yet". A job that failed
+                // outright never reached the recipient, so it starts Failed rather than
+                // waiting on a status that will never arrive.
+                DeliveryStatus = dispatchJob.Status == JobStatus.Failed
+                    ? DeliveryStatus.Failed
+                    : DeliveryStatus.Pending
+            }).ToList();
+
+            await recipientRepo.AddRangeAsync(rows);
+            await recipientRepo.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(
+                ex, "[DISPATCH] Could not record recipient rows for job {JobId}", dispatchJob.Id);
+        }
     }
 
     private async Task<DispatchJob> CreateJobAsync(

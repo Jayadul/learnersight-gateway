@@ -39,7 +39,8 @@ with layer-specific conventions — those load automatically when you edit files
    - Creates one `MessageRequest` + `DispatchJob`s, returns `0 ACCEPTD` with
      `Message_ID`. Response confirms **queuing, not delivery**.
 2. Dispatch (async): `ChannelDispatchService` resolves the channel sender strategy
-   (`IChannelSenderFactory`) and calls the provider.
+   (`IChannelSenderFactory`, keyed on channel type **plus provider** since R3.0) and calls
+   the provider, then writes one `dispatch_job_recipients` row per recipient.
 3. On failure: `FallbackHandlerService` retries on the fallback channel — unless the
    request was tagged for more than one channel, in which case fallback is skipped
    entirely. See [Fallback](#fallback) for which policy applies and when.
@@ -58,6 +59,28 @@ with layer-specific conventions — those load automatically when you edit files
   flag to pick `WhatsAppTextSender` or `WhatsAppMediaSender`. Both remain separate
   strategies — only how they are selected changed. See
   [adr/0006](adr/0006-unify-whatsapp-channel-type.md).
+- **Every job also writes `dispatch_job_recipients`** — one row per number, so a batched
+  SMS or Voice job can record which recipients actually arrived. Job status is what the
+  provider said at hand-off; recipient status is what happened afterwards, and the two
+  can legitimately disagree. Writing these rows never fails a send: the message has
+  already gone out by then, so an error is logged and swallowed.
+
+## Providers (R3.0)
+
+A channel type no longer implies its vendor. `ChannelConfig.Provider` names it, and
+`IChannelSenderFactory` resolves on `(ChannelType, Provider, HandlesMedia)` — a channel
+naming a provider with no registered sender throws rather than substituting another
+vendor, because substituting would bill the wrong account. Duplicate registrations fail
+at startup instead of resolving by DI order.
+
+Each channel may carry its own `baseUrl` in `config_json`; blank falls back to
+`Providers:*:BaseUrl`. Before R3.0 the base URL was bound once per channel type at DI
+registration, which is what made one-provider-per-type structural. See
+[adr/0008](adr/0008-multi-provider-channels.md).
+
+Only providers with a registered sender are selectable
+(`ChannelConfigService.ProvidersFor`): REVE for SMS, WaTrend for WhatsApp, NetZero Voice
+for Voice. GenNet, Chithi and NetZero Inbox exist in the enum and arrive in R3.1.
 
 ## Fallback
 
@@ -137,6 +160,12 @@ mid-migration. Full contract: [api.md](api.md).
 - **Auth policies**: convention-driven from `NetZeroGateway.API/authorization.json` —
   never `[Authorize]` attributes. ChannelConfig, FallbackPolicy, AdminUser and
   GatewayCredential require SuperAdmin. `/health` is anonymous.
+- **Configuration precedence**: `Program.cs` loads `authorization.json`, then re-adds the
+  environment-variable and command-line sources. The re-add is deliberate — `CreateBuilder`
+  registers those before the file, and the last source added wins, so without it the file
+  silently outranks every `Providers__*` and `Authorization__*` override set in a
+  container. Fixed in R3.0 after an override was set, verified with `printenv` and still
+  ignored at dispatch.
 - **Middleware order**: GlobalException → ApiLogging (masks `apikey`/`secretkey` in
   stored bodies) → routing/CORS/auth.
 - **Errors**: GlobalExceptionMiddleware returns ProblemDetails (`title`/`detail`) for

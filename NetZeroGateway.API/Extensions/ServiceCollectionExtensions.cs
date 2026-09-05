@@ -39,6 +39,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IChannelConfigRepository, ChannelConfigRepository>();
         services.AddScoped<IMessageRequestRepository, MessageRequestRepository>();
         services.AddScoped<IDispatchJobRepository, DispatchJobRepository>();
+        services.AddScoped<IDispatchJobRecipientRepository, DispatchJobRecipientRepository>();
         services.AddScoped<IApiLogRepository, ApiLogRepository>();
         services.AddScoped<IFallbackPolicyRepository, FallbackPolicyRepository>();
         services.AddScoped<IMediaFileRepository, MediaFileRepository>();
@@ -85,11 +86,13 @@ public static class ServiceCollectionExtensions
             })
             .AddStandardResilienceHandler(o => Resilience(o, retryCount, retryDelay));
 
-        // Channel sender strategies
-        services.AddScoped<IChannelSender, SmsSender>();
-        services.AddScoped<IChannelSender, WhatsAppTextSender>();
-        services.AddScoped<IChannelSender, WhatsAppMediaSender>();
-        services.AddScoped<IChannelSender, VoiceSender>();
+        // Channel sender strategies. One per (ChannelType, Provider, HandlesMedia) —
+        // the factory rejects a duplicate key at startup, so adding a second provider for
+        // a channel type is additive here. See ADR 0008.
+        services.AddScoped<IChannelSender, SmsSender>();            // SMS  / Reve
+        services.AddScoped<IChannelSender, WhatsAppTextSender>();   // WP   / WaTrend
+        services.AddScoped<IChannelSender, WhatsAppMediaSender>();  // WP   / WaTrend + media
+        services.AddScoped<IChannelSender, VoiceSender>();          // Voice/ NetZeroVoice
         services.AddScoped<IChannelSenderFactory, ChannelSenderFactory>();
 
         return services;
