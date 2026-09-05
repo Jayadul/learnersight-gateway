@@ -119,6 +119,44 @@ The country code is `880`, not `88`. `8801748848039` is `880` + the subscriber n
 so the local form is `0` + that. Treating it as `88` leaves two leading zeros — a
 different number.
 
+### Delivery status sync (R3.2)
+
+A third provider capability, independent of the other two. REVE, Chithi and NetZero
+Voice answer what became of a message; **GenNet has no status endpoint at all**, so its
+recipient rows stay `Pending` until it offers one.
+
+The distinction the design turns on: a recipient the provider says failed is a delivery
+failure and belongs on the row, while a request the provider rejected — expired session,
+bad credentials — says nothing about any recipient. A rejected request leaves every row
+untouched **including `last_checked_at`**, so the next run retries the same window.
+Conflating the two writes "undelivered" against messages that arrived.
+
+An unrecognised state is recorded `Unknown`, never guessed into `Failed`, and the raw
+payload is stored either way. Chithi ages its reference ids out, so a rejected lookup
+(`FAILED` with an empty `smsinfo`) is `Unknown` rather than a delivery failure.
+
+REVE returns one id per batched job, so its lookups are grouped by that id — a
+500-recipient batch is one call, not 500 identical ones.
+
+**Voice has no correlation id.** The combined report gives a destination, a start time
+and a call state. Records match a recipient row by number plus a tolerance window around
+dispatch (`Providers:Voice:StatusMatchToleranceMinutes`, default 5). A row matching more
+than one record is left alone and logged rather than guessed. Report times are
+business-zone wall clock with no offset; reading them as UTC shifts every call six hours
+and matches nothing.
+
+Runs nightly at 00:00 Dhaka for the previous full day (`delivery-status-sync`), and on
+demand per channel over a chosen window.
+
+### Resend (R3.2)
+
+Operates on recipient rows, not jobs: SMS and Voice batch many numbers into one job, so
+retrying the job would send again to everyone it already reached. Every attempt creates
+a new job and new rows linked by `resent_from_recipient_id` rather than mutating the
+originals — a retry that succeeds must not erase the evidence that the first attempt
+failed. Crossing channel types is refused, the same rule fallback uses. Authorized at
+the ManualSend tier, not SuperAdmin: this is operational recovery, not configuration.
+
 ### Balances
 
 `IChannelBalanceProvider` is separate from `IChannelSender`: sending and balance are

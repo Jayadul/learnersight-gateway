@@ -56,6 +56,11 @@ new senders, and `ChannelBalanceService` — in particular that a failed refresh
 last known figure rather than blanking it. Provider clients are faked at the interface,
 so no test reaches a real vendor.
 
+R3.2 covers the status sync providers — in particular that a rejected *request* leaves
+every row untouched while a reported *delivery failure* is written, and that voice
+refuses to resolve a row two report records both match — and the resend service's
+append-only audit trail and same-type restriction.
+
 The test project references Infrastructure as of R3.0, so sender resolution can be tested
 directly. It decides which vendor a message is billed to, which is not something to cover
 only through the services that happen to call it.
