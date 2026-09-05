@@ -270,6 +270,32 @@ public class ChannelConfigService(
     /// <summary>Placeholder returned instead of a secret value; never persisted.</summary>
     private const string MaskedValue = "***";
 
-    private static bool IsSecret(string key) =>
-        key is "apikey" or "secretkey" or "access_token" or "password" or "authUserId";
+    /// <summary>
+    /// Whether a config field is a credential and must be masked on read.
+    /// <para>
+    /// This used to be an exact list of the five field names REVE, WaTrend and Voice
+    /// happened to use, which meant every provider added afterwards leaked its
+    /// credential through the admin API until someone remembered to extend the list.
+    /// Matching on the shape of the name makes the safe behaviour the default: a new
+    /// provider's <c>api_token</c> or session cookie is masked without anyone
+    /// remembering anything.
+    /// </para>
+    /// <para>
+    /// Deliberately not masked: <c>baseUrl</c>, <c>callerID</c>, <c>instance_id</c>,
+    /// <c>sid</c>, <c>balanceClientId</c>, <c>campaignId</c>, <c>lotNumber</c> and
+    /// <c>owner</c> — identifiers an operator needs to read to tell two channels apart.
+    /// <c>authUserId</c> stays listed by name because it carries a credential despite
+    /// reading like an identifier.
+    /// </para>
+    /// </summary>
+    private static bool IsSecret(string key)
+    {
+        if (key.Equals("authUserId", StringComparison.OrdinalIgnoreCase)) return true;
+
+        return SecretMarkers.Any(marker =>
+            key.Contains(marker, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static readonly string[] SecretMarkers =
+        ["secret", "token", "password", "cookie", "apikey"];
 }
