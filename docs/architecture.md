@@ -79,8 +79,43 @@ registration, which is what made one-provider-per-type structural. See
 [adr/0008](adr/0008-multi-provider-channels.md).
 
 Only providers with a registered sender are selectable
-(`ChannelConfigService.ProvidersFor`): REVE for SMS, WaTrend for WhatsApp, NetZero Voice
-for Voice. GenNet, Chithi and NetZero Inbox exist in the enum and arrive in R3.1.
+(`ChannelConfigService.ProvidersFor`): **SMS** — REVE, GenNet, Chithi; **WhatsApp** —
+WaTrend, NetZero Inbox; **Voice** — NetZero Voice.
+
+### Recipient formats differ per provider (R3.1)
+
+Numbers are stored canonically: digits, country code, no plus (`8801700000001`). Two
+providers disagree, in opposite directions, so `RecipientFormat` converts per provider
+rather than per vendor platform:
+
+| Provider | On the wire | Note |
+|---|---|---|
+| REVE, WaTrend, NetZero Voice, **Chithi** | `8801700000001` | the stored form |
+| GenNet | `01700000001` | country code dropped, trunk `0` restored |
+| NetZero Inbox | `+8801700000001` | WhatsApp Cloud API shape |
+
+Chithi shares GenNet's `api_token`, `sid` and API family but **not** its number format
+or request shape — GenNet takes an array of recipients at `/send-sms/bulk`, Chithi one
+`msisdn` per call at `/send-sms`. Shared credentials say nothing about the wire format;
+do not collapse the two implementations.
+
+The country code is `880`, not `88`. `8801748848039` is `880` + the subscriber number,
+so the local form is `0` + that. Treating it as `88` leaves two leading zeros — a
+different number.
+
+### Balances
+
+`IChannelBalanceProvider` is separate from `IChannelSender`: sending and balance are
+independent capabilities. REVE, GenNet and Chithi report one; WaTrend, NetZero Inbox and
+Voice do not, and their channels are omitted from the balance list rather than shown
+blank. REVE also reports a credit limit; the others have no such concept, and null there
+means *not applicable*, never zero.
+
+Figures are cached on `channel_configs` and refreshed by the `channel-balance-refresh`
+Hangfire job every 15 minutes, matching the dashboard's existing cycle. Reads never call
+a provider — the dashboard shows several channels at once and one slow vendor would
+stall the page. A failed refresh keeps the last known figure and its timestamp and sets
+only `balance_error`, so the card shows a stale number with a reason instead of blanking.
 
 ## Fallback
 

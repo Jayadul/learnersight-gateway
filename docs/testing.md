@@ -51,6 +51,11 @@ the `dispatch_job_recipients` rows written at dispatch. Test doubles are hand-ro
 `Fakes.cs` — no mocking library; members a test does not exercise throw rather than
 returning null.
 
+R3.1 adds `RecipientFormat` (every provider's wire format, both directions), the three
+new senders, and `ChannelBalanceService` — in particular that a failed refresh keeps the
+last known figure rather than blanking it. Provider clients are faked at the interface,
+so no test reaches a real vendor.
+
 The test project references Infrastructure as of R3.0, so sender resolution can be tested
 directly. It decides which vendor a message is billed to, which is not something to cover
 only through the services that happen to call it.

@@ -12,6 +12,18 @@ Load this when: building/pushing images, running the stack, debugging containers
 | web | built from `../learnersight-netzero-gateway-ui` | 18080 | nginx serves SPA, proxies `/api/`, `/sendtext` and `/media/`. Waits for `api: condition: service_healthy` |
 | backup | built from `../backup` | — | nightly exports, writes next to compose file |
 
+**Provider endpoints (R3.1).** GenNet (`isms.gennet.com.bd`), Chithi (`sms.chithi.net`)
+and NetZero Inbox (`inbox.netzero.com.bd`) have defaults under `Providers:*` in
+`authorization.json`, but unlike REVE/WaTrend/Voice their channels are seeded with an
+explicit `baseUrl`, since a blank one on a provider without a central default leaves the
+channel nowhere to send. REVE's *balance* uses a separate host (`https://smpp.revesms.com`,
+no port) from its send endpoint and is configured per channel as `balanceBaseUrl`.
+
+These provider secrets are still seeded in `appsettings.json` in plaintext — R1 debt
+item 4, now covering six channels rather than three. Rotate the REVE session cookie, the
+shared GenNet/Chithi `api_token` and the NetZero Inbox token before they carry
+production traffic.
+
 **Environment overrides work as of R3.0.** `Providers__Voice__BaseUrl` and friends were
 silently ignored before it: `authorization.json` loaded after the environment source and
 won. If a deployment carries such an override, check what it actually points at now that
