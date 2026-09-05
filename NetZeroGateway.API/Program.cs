@@ -98,6 +98,15 @@ try
             s => s.CleanupExpiredAsync(),
             Cron.Weekly(DayOfWeek.Friday, 0, 0),
             new RecurringJobOptions { TimeZone = AppTime.Resolve(app.Configuration) });
+
+        // Provider balances: refreshed on the quarter-hour so the dashboard's existing
+        // 15-minute cycle always has a recent figure to show, rather than introducing a
+        // second interval for an operator to reason about.
+        scope.ServiceProvider.GetRequiredService<IRecurringJobManager>().AddOrUpdate<IChannelBalanceService>(
+            "channel-balance-refresh",
+            s => s.RefreshAllAsync(),
+            "*/15 * * * *",
+            new RecurringJobOptions { TimeZone = AppTime.Resolve(app.Configuration) });
     }
 
     // ── Swagger ────────────────────────────────────────────────────────────

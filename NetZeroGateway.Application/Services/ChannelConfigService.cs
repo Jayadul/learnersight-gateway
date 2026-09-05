@@ -223,16 +223,15 @@ public class ChannelConfigService(
 
     /// <summary>
     /// Which vendors an operator may currently select for a channel type. This lists
-    /// providers that have a registered sender, not every member of the enum — GenNet,
-    /// Chithi and NetZeroInbox exist in <see cref="Provider"/> and land in R3.1, and
-    /// allowing one to be saved before its sender exists would create a channel that
-    /// looks configured and throws on the first real message. Add each here as its
-    /// sender is registered. See ADR 0008.
+    /// providers that have a registered sender, not every member of the enum — allowing
+    /// one to be saved before its sender exists would create a channel that looks
+    /// configured and throws on the first real message. Add each here as its sender is
+    /// registered. See ADR 0008.
     /// </summary>
     private static Provider[] ProvidersFor(ChannelType channelType) => channelType switch
     {
-        ChannelType.SMS => [Provider.Reve],
-        ChannelType.WP => [Provider.WaTrend],
+        ChannelType.SMS => [Provider.Reve, Provider.GenNet, Provider.Chithi],
+        ChannelType.WP => [Provider.WaTrend, Provider.NetZeroInbox],
         ChannelType.Voice => [Provider.NetZeroVoice],
         _ => []
     };

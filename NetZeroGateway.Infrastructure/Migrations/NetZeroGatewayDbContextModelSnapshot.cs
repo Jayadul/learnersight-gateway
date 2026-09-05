@@ -155,6 +155,25 @@ namespace NetZeroGateway.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<decimal?>("Balance")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("balance");
+
+                    b.Property<DateTimeOffset?>("BalanceCheckedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("balance_checked_at");
+
+                    b.Property<decimal?>("BalanceCreditLimit")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("balance_credit_limit");
+
+                    b.Property<string>("BalanceError")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("balance_error");
+
                     b.Property<string>("ChannelType")
                         .IsRequired()
                         .HasMaxLength(50)

@@ -27,6 +27,9 @@ public static class ConfigKeys
 
     // ── Provider base URLs ─────────────────────────────────────────────────
     public const string SmsBaseUrl = "Providers:Sms:BaseUrl";
+    public const string GenNetBaseUrl = "Providers:GenNet:BaseUrl";
+    public const string ChithiBaseUrl = "Providers:Chithi:BaseUrl";
+    public const string NetZeroInboxBaseUrl = "Providers:NetZeroInbox:BaseUrl";
     public const string WhatsAppBaseUrl = "Providers:WhatsApp:BaseUrl";
     public const string VoiceBaseUrl = "Providers:Voice:BaseUrl";
 
@@ -60,4 +63,10 @@ public static class ConfigKeys
     public const string VoiceActionId = "Providers:Voice:ActionId";
     public const string VoiceService = "Providers:Voice:Service";
     public const string VoiceDefaultLot = "Providers:Voice:LotNumber";
+    public const string GenNetSendPath = "Providers:GenNet:SendPath";
+    public const string GenNetBalancePath = "Providers:GenNet:BalancePath";
+    public const string ChithiSendPath = "Providers:Chithi:SendPath";
+    public const string ChithiBalancePath = "Providers:Chithi:BalancePath";
+    public const string NetZeroInboxSendPath = "Providers:NetZeroInbox:SendPath";
+    public const string ReveBalancePath = "Providers:Sms:BalancePath";
 }

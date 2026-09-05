@@ -39,6 +39,11 @@ public class NetZeroGatewayDbContext(DbContextOptions<NetZeroGatewayDbContext> o
             e.Property(x => x.Label).HasMaxLength(200).IsRequired();
             e.Property(x => x.LabelSlug).HasMaxLength(50).IsRequired();
             e.Property(x => x.ConfigJson).HasColumnType("text").IsRequired();
+            // Explicit precision: the Npgsql default for decimal is unconstrained
+            // numeric, and a provider balance is money — two places, not floating error.
+            e.Property(x => x.Balance).HasPrecision(18, 2);
+            e.Property(x => x.BalanceCreditLimit).HasPrecision(18, 2);
+            e.Property(x => x.BalanceError).HasMaxLength(1000);
             // Unique partial index: exactly one DEFAULT config per channel type. This
             // replaces the old one-active-per-type index — several configs of a type may
             // now be active at once, so uniqueness moved to the default flag.

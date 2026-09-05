@@ -26,6 +26,7 @@
       "ChannelConfig": {
         "Roles": [ "SuperAdmin" ]
       },
+      "ChannelBalance": {},
       "FallbackPolicy": {
         "Roles": [ "SuperAdmin" ]
       },
@@ -61,13 +62,28 @@
   "Providers": {
     "Sms": {
       "BaseUrl": "http://smpp.revesms.com:7788",
-      "SendPath": "/sendtext"
+      "SendPath": "/sendtext",
+      "BalancePath": "/sms/smsConfiguration/smsClientBalance.jsp"
     },
     "WhatsApp": {
       "BaseUrl": "https://app.watrend.com",
       "SendPath": "/api/send",
       "TextType": "text",
       "MediaType": "media"
+    },
+    "GenNet": {
+      "BaseUrl": "https://isms.gennet.com.bd",
+      "SendPath": "/api/v3/send-sms/bulk",
+      "BalancePath": "/api/v3/balance"
+    },
+    "Chithi": {
+      "BaseUrl": "https://sms.chithi.net",
+      "SendPath": "/api/v3/send-sms",
+      "BalancePath": "/api/v3/balance"
+    },
+    "NetZeroInbox": {
+      "BaseUrl": "https://inbox.netzero.com.bd",
+      "SendPath": "/api/v1/send-message"
     },
     "Voice": {
       "BaseUrl": "http://api.sms.netzero.com.bd:8000",

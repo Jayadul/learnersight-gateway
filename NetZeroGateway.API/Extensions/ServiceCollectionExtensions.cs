@@ -8,6 +8,7 @@ using NetZeroGateway.Application.Interfaces;
 using NetZeroGateway.Application.Services;
 using NetZeroGateway.Application.Strategies;
 using NetZeroGateway.Application.Utilities;
+using NetZeroGateway.Infrastructure.Balances;
 using NetZeroGateway.Infrastructure.HttpClients;
 using NetZeroGateway.Infrastructure.Persistence;
 using NetZeroGateway.Infrastructure.Repositories;
@@ -86,6 +87,53 @@ public static class ServiceCollectionExtensions
             })
             .AddStandardResilienceHandler(o => Resilience(o, retryCount, retryDelay));
 
+        // The three Release 3 providers. Their base URLs live on the channel config
+        // (ADR 0008), so the registered BaseAddress is only the fallback default for a
+        // channel that leaves the field blank.
+        services
+            .AddHttpClient<IGenNetClient, GenNetClient>(c =>
+            {
+                c.BaseAddress = new Uri(
+                    config[ConfigKeys.GenNetBaseUrl] ?? "https://isms.gennet.com.bd");
+                c.Timeout = TimeSpan.FromSeconds(timeout);
+            })
+            .AddStandardResilienceHandler(o => Resilience(o, retryCount, retryDelay));
+
+        services
+            .AddHttpClient<IChithiClient, ChithiClient>(c =>
+            {
+                c.BaseAddress = new Uri(
+                    config[ConfigKeys.ChithiBaseUrl] ?? "https://sms.chithi.net");
+                c.Timeout = TimeSpan.FromSeconds(timeout);
+            })
+            .AddStandardResilienceHandler(o => Resilience(o, retryCount, retryDelay));
+
+        services
+            .AddHttpClient<INetZeroInboxClient, NetZeroInboxClient>(c =>
+            {
+                c.BaseAddress = new Uri(
+                    config[ConfigKeys.NetZeroInboxBaseUrl] ?? "https://inbox.netzero.com.bd");
+                // WhatsApp sends can sit while the provider works, as WaTrend does.
+                c.Timeout = TimeSpan.FromSeconds(waTimeout + 20);
+            })
+            .AddStandardResilienceHandler(o => Resilience(o, retryCount, retryDelay, waTimeout));
+
+        // REVE's balance sits on a different host and scheme from its send endpoint
+        // (https, no port), so it gets its own client rather than reusing the send one.
+        services
+            .AddHttpClient<IReveBalanceClient, ReveBalanceClient>(c =>
+            {
+                c.BaseAddress = new Uri("https://smpp.revesms.com");
+                c.Timeout = TimeSpan.FromSeconds(timeout);
+            })
+            .AddStandardResilienceHandler(o => Resilience(o, retryCount, retryDelay));
+
+        // Balance readers. Not every provider has one, and a channel type never implies
+        // that it does — Voice and WhatsApp report no balance at all.
+        services.AddScoped<IChannelBalanceProvider, ReveBalanceProvider>();
+        services.AddScoped<IChannelBalanceProvider, GenNetBalanceProvider>();
+        services.AddScoped<IChannelBalanceProvider, ChithiBalanceProvider>();
+
         // Channel sender strategies. One per (ChannelType, Provider, HandlesMedia) —
         // the factory rejects a duplicate key at startup, so adding a second provider for
         // a channel type is additive here. See ADR 0008.
@@ -93,6 +141,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IChannelSender, WhatsAppTextSender>();   // WP   / WaTrend
         services.AddScoped<IChannelSender, WhatsAppMediaSender>();  // WP   / WaTrend + media
         services.AddScoped<IChannelSender, VoiceSender>();          // Voice/ NetZeroVoice
+        services.AddScoped<IChannelSender, GenNetSmsSender>();      // SMS  / GenNet
+        services.AddScoped<IChannelSender, ChithiSmsSender>();      // SMS  / Chithi
+        services.AddScoped<IChannelSender, NetZeroInboxWhatsAppSender>(); // WP / NetZeroInbox
         services.AddScoped<IChannelSenderFactory, ChannelSenderFactory>();
 
         return services;
@@ -107,6 +158,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IJwtService, JwtService>();
         services.AddScoped<IChannelConfigService, ChannelConfigService>();
+        services.AddScoped<IChannelBalanceService, ChannelBalanceService>();
         services.AddScoped<IFallbackPolicyService, FallbackPolicyService>();
         services.AddScoped<IFallbackHandlerService, FallbackHandlerService>();
         services.AddScoped<IChannelDispatchService, ChannelDispatchService>();

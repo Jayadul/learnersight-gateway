@@ -47,4 +47,25 @@ public class ChannelConfig : BaseEntity
     public int DelaySeconds { get; set; }
     /// <summary>AES-256 encrypted JSON string.</summary>
     public string ConfigJson { get; set; } = string.Empty;
+
+    // ── Cached provider balance ───────────────────────────────────────────
+    // Cached rather than fetched per page load: the dashboard would otherwise call
+    // every provider on every render, and a slow vendor would stall the page. A failed
+    // refresh keeps the last known figure and records the error, so the card shows a
+    // stale value with a reason instead of going blank.
+
+    /// <summary>Last known available balance. Null when never checked.</summary>
+    public decimal? Balance { get; set; }
+
+    /// <summary>
+    /// Credit limit, where the provider has the concept. REVE reports one; GenNet and
+    /// Chithi do not, and null means "not applicable" rather than "zero".
+    /// </summary>
+    public decimal? BalanceCreditLimit { get; set; }
+
+    /// <summary>When the balance was last successfully read.</summary>
+    public DateTimeOffset? BalanceCheckedAt { get; set; }
+
+    /// <summary>Why the most recent refresh failed, or null when it succeeded.</summary>
+    public string? BalanceError { get; set; }
 }
