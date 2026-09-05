@@ -27,6 +27,7 @@
         "Roles": [ "SuperAdmin" ]
       },
       "ChannelBalance": {},
+      "StatusSync": {},
       "FallbackPolicy": {
         "Roles": [ "SuperAdmin" ]
       },
@@ -63,7 +64,8 @@
     "Sms": {
       "BaseUrl": "http://smpp.revesms.com:7788",
       "SendPath": "/sendtext",
-      "BalancePath": "/sms/smsConfiguration/smsClientBalance.jsp"
+      "BalancePath": "/sms/smsConfiguration/smsClientBalance.jsp",
+      "StatusPath": "/getstatus"
     },
     "WhatsApp": {
       "BaseUrl": "https://app.watrend.com",
@@ -79,7 +81,8 @@
     "Chithi": {
       "BaseUrl": "https://sms.chithi.net",
       "SendPath": "/api/v3/send-sms",
-      "BalancePath": "/api/v3/balance"
+      "BalancePath": "/api/v3/balance",
+      "StatusPath": "/api/v3/send-sms/status"
     },
     "NetZeroInbox": {
       "BaseUrl": "https://inbox.netzero.com.bd",
@@ -92,6 +95,9 @@
     "Voice": {
       "BaseUrl": "http://api.sms.netzero.com.bd:8000",
       "CampaignPath": "/api/v1/run-campaign",
+      "ReportPath": "/api/v1/combined-report",
+      "ReportPageSize": 100,
+      "StatusMatchToleranceMinutes": 5,
       "ActionId": "runCampaign",
       "Service": "campaign",
       "LotNumber": "1"

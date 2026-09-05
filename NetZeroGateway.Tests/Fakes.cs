@@ -123,6 +123,10 @@ internal sealed class FakeDispatchJobRecipientRepository : IDispatchJobRecipient
     public Task<List<DispatchJobRecipient>> GetByDispatchJobIdAsync(Guid dispatchJobId)
         => Task.FromResult(Added.Where(r => r.DispatchJobId == dispatchJobId).ToList());
 
+    public Task<List<DispatchJobRecipient>> GetPendingForChannelAsync(
+        Guid channelConfigId, DateTimeOffset from, DateTimeOffset to, int limit)
+        => Unused.Fail<Task<List<DispatchJobRecipient>>>();
+
     public Task<DispatchJobRecipient?> GetByIdAsync(Guid id) => Unused.Fail<Task<DispatchJobRecipient?>>();
     public Task<List<DispatchJobRecipient>> GetAllAsync() => Unused.Fail<Task<List<DispatchJobRecipient>>>();
     public Task<List<DispatchJobRecipient>> FindAsync(Expression<Func<DispatchJobRecipient, bool>> p)

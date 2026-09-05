@@ -99,6 +99,16 @@ try
             Cron.Weekly(DayOfWeek.Friday, 0, 0),
             new RecurringJobOptions { TimeZone = AppTime.Resolve(app.Configuration) });
 
+        // Delivery status: pulled once a day at 00:00 Dhaka for the previous full day,
+        // matching the media-cleanup convention. Providers report a final status well
+        // after a send, so a daily pass is the right granularity — and a per-row
+        // lookup on two of the three providers makes anything tighter expensive.
+        scope.ServiceProvider.GetRequiredService<IRecurringJobManager>().AddOrUpdate<IStatusSyncService>(
+            "delivery-status-sync",
+            s => s.SyncAllAsync(),
+            Cron.Daily(0, 0),
+            new RecurringJobOptions { TimeZone = AppTime.Resolve(app.Configuration) });
+
         // Provider balances: refreshed on the quarter-hour so the dashboard's existing
         // 15-minute cycle always has a recent figure to show, rather than introducing a
         // second interval for an operator to reason about.

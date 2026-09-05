@@ -14,6 +14,7 @@ using NetZeroGateway.Infrastructure.Persistence;
 using NetZeroGateway.Infrastructure.Repositories;
 using NetZeroGateway.Infrastructure.Security;
 using NetZeroGateway.Infrastructure.Services;
+using NetZeroGateway.Infrastructure.StatusSync;
 using NetZeroGateway.Infrastructure.Strategies;
 using System.Text;
 
@@ -139,6 +140,39 @@ public static class ServiceCollectionExtensions
             })
             .AddStandardResilienceHandler(o => Resilience(o, retryCount, retryDelay));
 
+        // Status lookups. REVE and Chithi reuse their send host and credentials; the
+        // voice report is on the voice host. GenNet has no status endpoint at all, so
+        // its rows stay Pending — a channel type never implies a sync exists.
+        services
+            .AddHttpClient<IReveStatusClient, ReveStatusClient>(c =>
+            {
+                c.BaseAddress = new Uri(config[ConfigKeys.SmsBaseUrl]!);
+                c.Timeout = TimeSpan.FromSeconds(timeout);
+            })
+            .AddStandardResilienceHandler(o => Resilience(o, retryCount, retryDelay));
+
+        services
+            .AddHttpClient<IChithiStatusClient, ChithiStatusClient>(c =>
+            {
+                c.BaseAddress = new Uri(
+                    config[ConfigKeys.ChithiBaseUrl] ?? "https://sms.chithi.net");
+                c.Timeout = TimeSpan.FromSeconds(timeout);
+            })
+            .AddStandardResilienceHandler(o => Resilience(o, retryCount, retryDelay));
+
+        services
+            .AddHttpClient<INetZeroVoiceReportClient, NetZeroVoiceReportClient>(c =>
+            {
+                c.BaseAddress = new Uri(config[ConfigKeys.VoiceBaseUrl]!);
+                // The report pages over a whole day and is slower than a send.
+                c.Timeout = TimeSpan.FromSeconds(timeout * 2);
+            })
+            .AddStandardResilienceHandler(o => Resilience(o, retryCount, retryDelay));
+
+        services.AddScoped<IChannelStatusSyncProvider, ReveStatusSyncProvider>();
+        services.AddScoped<IChannelStatusSyncProvider, ChithiStatusSyncProvider>();
+        services.AddScoped<IChannelStatusSyncProvider, NetZeroVoiceStatusSyncProvider>();
+
         // Balance readers. Not every provider has one, and a channel type never implies
         // that it does — Voice and WhatsApp report no balance at all.
         services.AddScoped<IChannelBalanceProvider, ReveBalanceProvider>();
@@ -171,6 +205,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IJwtService, JwtService>();
         services.AddScoped<IChannelConfigService, ChannelConfigService>();
         services.AddScoped<IChannelBalanceService, ChannelBalanceService>();
+        services.AddScoped<IStatusSyncService, StatusSyncService>();
         services.AddScoped<IFallbackPolicyService, FallbackPolicyService>();
         services.AddScoped<IFallbackHandlerService, FallbackHandlerService>();
         services.AddScoped<IChannelDispatchService, ChannelDispatchService>();
