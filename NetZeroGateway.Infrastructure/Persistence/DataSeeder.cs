@@ -238,10 +238,14 @@ public static class DataSeeder
                     ProviderName = item.ProviderName,
                     Label = item.Label,
                     LabelSlug = UniqueSlug(item.Label, siblings.Select(c => c.LabelSlug)),
-                    IsActive = true,
+                    // A seed entry may opt out of being active. A channel for a provider
+                    // whose credentials are not settled yet should exist so an operator can
+                    // fill it in, without being reachable by a tag in the meantime.
+                    IsActive = item.IsActive,
                     // First config of a type becomes its default; later ones are added
-                    // active but non-default so they never silently steal live traffic.
-                    IsDefault = !siblings.Any(c => c.IsDefault),
+                    // non-default so they never silently steal live traffic. An inactive
+                    // channel is never the default — the default must be dispatchable.
+                    IsDefault = item.IsActive && !siblings.Any(c => c.IsDefault),
                     ConfigJson = enc.Encrypt(plainJson)
                 });
                 logger.LogInformation("[SEED] ChannelConfig ADD: {Type} / {Label}",
@@ -462,6 +466,13 @@ file sealed class SeedChannelConfig
     /// </summary>
     public string Provider { get; set; } = "";
     public string ProviderName { get; set; } = "";
+    /// <summary>
+    /// Whether the channel is reachable once seeded. Defaults to true so seed files
+    /// written before this keep behaving identically. Set false for a channel whose
+    /// credentials still need filling in from the admin panel — an active channel with
+    /// placeholder credentials fails real messages.
+    /// </summary>
+    public bool IsActive { get; set; } = true;
     public string Label { get; set; } = "";
     public Dictionary<string, string> Config { get; set; } = [];
 }
