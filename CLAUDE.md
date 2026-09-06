@@ -4,9 +4,12 @@
 fallback. Clean Architecture: Domain ← Application ← Infrastructure, API hosts all.
 Frontend lives in the sibling repo `../learnersight-netzero-gateway-ui`.
 
-Current baseline: **Release 2.1.0** — read `docs/releases/2.1.0.md` before large work,
-and `1.0.0.md` for the original delivery. The `/sendtext` tag grammar and the gateway's
-credentials both changed in 2.1; `docs/adr/0007` records why.
+Current baseline: **Release 3.0.0** — read `docs/releases/3.0.0.md` before large work,
+then `2.1.0.md` and `1.0.0.md` for what came before. Two decisions there will bite a
+session that assumes otherwise: a channel type no longer implies its provider
+(`docs/adr/0008` — six vendors now, each with its own recipient format and request
+shape), and since 2.1 every `/sendtext` tag must name its channel label while the
+gateway's own credentials live outside the channel configs (`docs/adr/0007`).
 
 **Fresh machine?** Clone both repos into one workspace folder; docker compose lives
 at the workspace root. Skills load from each repo's `.claude/skills/` automatically
