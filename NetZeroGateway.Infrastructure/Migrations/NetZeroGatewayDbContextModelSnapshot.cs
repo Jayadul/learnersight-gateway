@@ -155,6 +155,25 @@ namespace NetZeroGateway.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<decimal?>("Balance")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("balance");
+
+                    b.Property<DateTimeOffset?>("BalanceCheckedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("balance_checked_at");
+
+                    b.Property<decimal?>("BalanceCreditLimit")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("balance_credit_limit");
+
+                    b.Property<string>("BalanceError")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("balance_error");
+
                     b.Property<string>("ChannelType")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -193,6 +212,12 @@ namespace NetZeroGateway.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
                         .HasColumnName("label_slug");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("provider");
 
                     b.Property<string>("ProviderName")
                         .IsRequired()
@@ -317,6 +342,75 @@ namespace NetZeroGateway.Infrastructure.Migrations
                         .HasDatabaseName("ix_dispatch_jobs_status");
 
                     b.ToTable("dispatch_jobs", (string)null);
+                });
+
+            modelBuilder.Entity("NetZeroGateway.Domain.Entities.DispatchJobRecipient", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DeliveryStatus")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("delivery_status");
+
+                    b.Property<Guid>("DispatchJobId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dispatch_job_id");
+
+                    b.Property<DateTimeOffset?>("LastCheckedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_checked_at");
+
+                    b.Property<string>("ProviderReferenceId")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("provider_reference_id");
+
+                    b.Property<string>("RawStatusResponse")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("raw_status_response");
+
+                    b.Property<string>("Recipient")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("recipient");
+
+                    b.Property<Guid?>("ResentFromRecipientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("resent_from_recipient_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_dispatch_job_recipients");
+
+                    b.HasIndex("DeliveryStatus")
+                        .HasDatabaseName("ix_dispatch_job_recipients_delivery_status");
+
+                    b.HasIndex("DispatchJobId")
+                        .HasDatabaseName("ix_dispatch_job_recipients_dispatch_job_id");
+
+                    b.HasIndex("ProviderReferenceId")
+                        .HasDatabaseName("ix_dispatch_job_recipients_provider_reference_id");
+
+                    b.HasIndex("Recipient")
+                        .HasDatabaseName("ix_dispatch_job_recipients_recipient");
+
+                    b.HasIndex("ResentFromRecipientId")
+                        .HasDatabaseName("ix_dispatch_job_recipients_resent_from_recipient_id");
+
+                    b.ToTable("dispatch_job_recipients", (string)null);
                 });
 
             modelBuilder.Entity("NetZeroGateway.Domain.Entities.FallbackPolicy", b =>
@@ -613,6 +707,18 @@ namespace NetZeroGateway.Infrastructure.Migrations
                     b.Navigation("MessageRequest");
                 });
 
+            modelBuilder.Entity("NetZeroGateway.Domain.Entities.DispatchJobRecipient", b =>
+                {
+                    b.HasOne("NetZeroGateway.Domain.Entities.DispatchJob", "DispatchJob")
+                        .WithMany("Recipients")
+                        .HasForeignKey("DispatchJobId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_dispatch_job_recipients_dispatch_jobs_dispatch_job_id");
+
+                    b.Navigation("DispatchJob");
+                });
+
             modelBuilder.Entity("NetZeroGateway.Domain.Entities.FallbackPolicy", b =>
                 {
                     b.HasOne("NetZeroGateway.Domain.Entities.ChannelConfig", "FallbackChannelConfig")
@@ -630,6 +736,11 @@ namespace NetZeroGateway.Infrastructure.Migrations
                     b.Navigation("FallbackChannelConfig");
 
                     b.Navigation("TriggerChannelConfig");
+                });
+
+            modelBuilder.Entity("NetZeroGateway.Domain.Entities.DispatchJob", b =>
+                {
+                    b.Navigation("Recipients");
                 });
 
             modelBuilder.Entity("NetZeroGateway.Domain.Entities.MessageRequest", b =>

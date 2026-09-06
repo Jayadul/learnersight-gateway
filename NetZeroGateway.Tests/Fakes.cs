@@ -26,9 +26,11 @@ internal sealed class PlainTextEncryption : IEncryptionService
 }
 
 /// <summary>Records the config dictionary the dispatcher hands to the sender.</summary>
-internal sealed class CapturingSender(ChannelType channelType) : IChannelSender
+internal sealed class CapturingSender(
+    ChannelType channelType, Provider provider = Provider.Reve) : IChannelSender
 {
     public ChannelType ChannelType { get; } = channelType;
+    public Provider Provider { get; } = provider;
     public Dictionary<string, string>? CapturedConfig { get; private set; }
     public DispatchJob? CapturedJob { get; private set; }
 
@@ -45,8 +47,10 @@ internal sealed class CapturingSender(ChannelType channelType) : IChannelSender
 
 internal sealed class FakeSenderFactory(IChannelSender sender) : IChannelSenderFactory
 {
-    // hasMedia is ignored: these tests supply one sender and assert on what reaches it.
-    public IChannelSender GetSender(ChannelType channelType, bool hasMedia = false) => sender;
+    // provider and hasMedia are ignored: these tests supply one sender and assert on
+    // what reaches it. Factory resolution has its own tests.
+    public IChannelSender GetSender(
+        ChannelType channelType, Provider provider, bool hasMedia = false) => sender;
 }
 
 internal sealed class FakeChannelConfigRepository(ChannelConfig active) : IChannelConfigRepository
@@ -85,13 +89,51 @@ internal sealed class FakeDispatchJobRepository : IDispatchJobRepository
     public Task<List<DispatchJob>> GetFailedWithChannelAsync() => Unused.Fail<Task<List<DispatchJob>>>();
     public Task<(List<DispatchJob> Items, int Total)> GetPagedAsync(
         int page, int size, DateTimeOffset? from, DateTimeOffset? to,
-        ChannelType? channelType, JobStatus? status, string? toNumber)
+        ChannelType? channelType, JobStatus? status, string? toNumber,
+        DeliveryStatus? deliveryStatus = null)
         => Unused.Fail<Task<(List<DispatchJob>, int)>>();
     public Task<DispatchJob?> GetByIdAsync(Guid id) => Unused.Fail<Task<DispatchJob?>>();
     public Task<List<DispatchJob>> GetAllAsync() => Unused.Fail<Task<List<DispatchJob>>>();
     public Task<List<DispatchJob>> FindAsync(Expression<Func<DispatchJob, bool>> p) => Unused.Fail<Task<List<DispatchJob>>>();
     public void Update(DispatchJob entity) { }
     public void Delete(DispatchJob entity) => Unused.Fail<bool>();
+}
+
+/// <summary>
+/// Collects the per-recipient rows the dispatcher writes after a send, so tests can
+/// assert one row per number without a database.
+/// </summary>
+internal sealed class FakeDispatchJobRecipientRepository : IDispatchJobRecipientRepository
+{
+    public List<DispatchJobRecipient> Added { get; } = [];
+
+    public Task AddRangeAsync(IEnumerable<DispatchJobRecipient> recipients)
+    {
+        Added.AddRange(recipients);
+        return Task.CompletedTask;
+    }
+
+    public Task AddAsync(DispatchJobRecipient entity)
+    {
+        Added.Add(entity);
+        return Task.CompletedTask;
+    }
+
+    public Task<int> SaveChangesAsync() => Task.FromResult(0);
+
+    public Task<List<DispatchJobRecipient>> GetByDispatchJobIdAsync(Guid dispatchJobId)
+        => Task.FromResult(Added.Where(r => r.DispatchJobId == dispatchJobId).ToList());
+
+    public Task<List<DispatchJobRecipient>> GetPendingForChannelAsync(
+        Guid channelConfigId, DateTimeOffset from, DateTimeOffset to, int limit)
+        => Unused.Fail<Task<List<DispatchJobRecipient>>>();
+
+    public Task<DispatchJobRecipient?> GetByIdAsync(Guid id) => Unused.Fail<Task<DispatchJobRecipient?>>();
+    public Task<List<DispatchJobRecipient>> GetAllAsync() => Unused.Fail<Task<List<DispatchJobRecipient>>>();
+    public Task<List<DispatchJobRecipient>> FindAsync(Expression<Func<DispatchJobRecipient, bool>> p)
+        => Unused.Fail<Task<List<DispatchJobRecipient>>>();
+    public void Update(DispatchJobRecipient entity) { }
+    public void Delete(DispatchJobRecipient entity) => Unused.Fail<bool>();
 }
 
 /// <summary>
@@ -160,7 +202,8 @@ internal sealed class FakeJobRepositoryWithExisting(List<DispatchJob> existing) 
 
     public Task<(List<DispatchJob> Items, int Total)> GetPagedAsync(
         int page, int size, DateTimeOffset? from, DateTimeOffset? to,
-        ChannelType? channelType, JobStatus? status, string? toNumber)
+        ChannelType? channelType, JobStatus? status, string? toNumber,
+        DeliveryStatus? deliveryStatus = null)
         => Unused.Fail<Task<(List<DispatchJob>, int)>>();
     public Task<DispatchJob?> GetByIdAsync(Guid id) => Unused.Fail<Task<DispatchJob?>>();
     public Task<List<DispatchJob>> GetAllAsync() => Unused.Fail<Task<List<DispatchJob>>>();

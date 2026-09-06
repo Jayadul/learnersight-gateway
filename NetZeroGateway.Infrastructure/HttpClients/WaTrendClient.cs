@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using NetZeroGateway.Application.Utilities;
 using NetZeroGateway.Infrastructure.HttpClients.Models;
 using System.Text;
 using System.Text.Json;
@@ -18,7 +19,8 @@ public class WaTrendClient(
 
     public Task<WaTrendResponse> SendTextAsync(
         string instanceId, string accessToken,
-        string number, string message, CancellationToken ct = default) =>
+        string number, string message,
+        string? baseUrl = null, CancellationToken ct = default) =>
         PostAsync(new
         {
             number,
@@ -26,11 +28,12 @@ public class WaTrendClient(
             message,
             instance_id = instanceId,
             access_token = accessToken
-        }, number, ct);
+        }, number, baseUrl, ct);
 
     public Task<WaTrendResponse> SendMediaAsync(
         string instanceId, string accessToken,
-        string number, string message, string mediaUrl, CancellationToken ct = default) =>
+        string number, string message, string mediaUrl,
+        string? baseUrl = null, CancellationToken ct = default) =>
         PostAsync(new
         {
             number,
@@ -39,15 +42,16 @@ public class WaTrendClient(
             media_url = mediaUrl,
             instance_id = instanceId,
             access_token = accessToken
-        }, number, ct);
+        }, number, baseUrl, ct);
 
     private async Task<WaTrendResponse> PostAsync(
-        object payload, string number, CancellationToken ct)
+        object payload, string number, string? baseUrl, CancellationToken ct)
     {
-        logger.LogInformation("[WATREND] POST {Path} to={Number}", SendPath, number);
+        var url = ProviderEndpoint.Resolve(baseUrl, SendPath);
+        logger.LogInformation("[WATREND] POST {Url} to={Number}", url, number);
         var content = new StringContent(
             JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-        var resp = await http.PostAsync(SendPath, content, ct);
+        var resp = await http.PostAsync(url, content, ct);
         var body = (await resp.Content.ReadAsStringAsync(ct)).Trim();
         logger.LogDebug("[WATREND] Response for {Number}: {Body}", number, body);
 

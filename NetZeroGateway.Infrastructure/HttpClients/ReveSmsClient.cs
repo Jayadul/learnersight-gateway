@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using NetZeroGateway.Application.Utilities;
 using NetZeroGateway.Infrastructure.HttpClients.Models;
 using System.Text.Json;
 
@@ -13,9 +14,13 @@ public class ReveSmsClient(
 
     public async Task<ReveSmsResponse> SendAsync(
         string apiKey, string secretKey, string callerID,
-        string toUser, string message, CancellationToken ct = default)
+        string toUser, string message,
+        string? baseUrl = null, CancellationToken ct = default)
     {
-        logger.LogInformation("[REVE_SMS] POST {Path} to={To}", SendPath, toUser);
+        // Absolute when the channel names its own host, else the bare path against the
+        // registered BaseAddress — two REVE channels may point at different hosts.
+        var url = ProviderEndpoint.Resolve(baseUrl, SendPath);
+        logger.LogInformation("[REVE_SMS] POST {Url} to={To}", url, toUser);
         var form = new FormUrlEncodedContent([
             new("apikey",         apiKey),
             new("secretkey",      secretKey),
@@ -23,7 +28,7 @@ public class ReveSmsClient(
             new("toUser",         toUser),
             new("messageContent", message)
         ]);
-        var resp = await http.PostAsync(SendPath, form, ct);
+        var resp = await http.PostAsync(url, form, ct);
         var body = await resp.Content.ReadAsStringAsync(ct);
         logger.LogDebug("[REVE_SMS] Response: {Body}", body);
         try

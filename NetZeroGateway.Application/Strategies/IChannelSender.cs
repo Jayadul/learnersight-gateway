@@ -5,17 +5,23 @@ namespace NetZeroGateway.Application.Strategies;
 
 /// <summary>
 /// Strategy interface for dispatching a message through one channel.
-/// One implementation per ChannelType. Open/closed — add new channels
-/// by adding a new IChannelSender implementation without touching existing code.
+/// One implementation per (ChannelType, Provider, HandlesMedia) combination. Open/closed
+/// — add a provider by adding an implementation and registering it, without touching
+/// existing code. See ADR 0008.
 /// </summary>
 public interface IChannelSender
 {
     ChannelType ChannelType { get; }
 
     /// <summary>
-    /// Whether this sender handles jobs that carry a MediaUrl. Since WhatsApp text and
-    /// media share one ChannelType, the type alone no longer identifies a sender —
-    /// the factory keys on ChannelType plus this flag.
+    /// The vendor this sender talks to. Two senders may share a ChannelType — REVE and
+    /// GenNet both send SMS — so the type alone no longer identifies an implementation.
+    /// </summary>
+    Provider Provider { get; }
+
+    /// <summary>
+    /// Whether this sender handles jobs that carry a MediaUrl. WhatsApp text and media
+    /// share one ChannelType and one provider, so this is the third part of the key.
     /// </summary>
     bool HandlesMedia => false;
 

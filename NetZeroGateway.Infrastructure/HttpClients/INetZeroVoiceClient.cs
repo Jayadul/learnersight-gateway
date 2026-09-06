@@ -8,5 +8,6 @@ public interface INetZeroVoiceClient
         string owner, string password, string authUserId,
         string campaignId, string lotNumber,
         List<string> destinationNumbers,
+        string? baseUrl = null,
         CancellationToken ct = default);
 }

@@ -23,6 +23,10 @@
   <ItemGroup>
     <ProjectReference Include="..\NetZeroGateway.Application\NetZeroGateway.Application.csproj" />
     <ProjectReference Include="..\NetZeroGateway.Domain\NetZeroGateway.Domain.csproj" />
+    <!-- Sender resolution lives in Infrastructure alongside the senders it resolves, and
+         since Release 3 it decides which vendor a message is billed to — worth covering
+         directly rather than only through the services that call it. -->
+    <ProjectReference Include="..\NetZeroGateway.Infrastructure\NetZeroGateway.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using NetZeroGateway.Application.Strategies;
+using NetZeroGateway.Application.Utilities;
 using NetZeroGateway.Domain.Entities;
 using NetZeroGateway.Domain.Enums;
 using NetZeroGateway.Infrastructure.HttpClients;
@@ -13,6 +14,7 @@ public class VoiceSender(
 ) : IChannelSender
 {
     public ChannelType ChannelType => ChannelType.Voice;
+    public Provider Provider => Provider.NetZeroVoice;
 
     public async Task SendAsync(
         DispatchJob job, Dictionary<string, string> cfg, CancellationToken ct = default)
@@ -33,7 +35,7 @@ public class VoiceSender(
             var r = await client.RunCampaignAsync(
                 cfg["owner"], cfg["password"], cfg["authUserId"],
                 campaignId, cfg.GetValueOrDefault("lotNumber", "1"),
-                numbers, ct);
+                numbers, ProviderEndpoint.BaseUrlOf(cfg), ct);
 
             job.ProviderRawResponse = JsonSerializer.Serialize(r);
 
@@ -41,9 +43,14 @@ public class VoiceSender(
             {
                 job.Status = JobStatus.Sent;
                 job.SentAt = DateTimeOffset.UtcNow;
-                job.CampaignId = r.TaskId ?? job.CampaignId;
+                // The provider's task id goes here, not into CampaignId. It used to
+                // overwrite the requested campaign, which left the delivery log showing a
+                // GUID where the operator expected the campaign they asked for — and the
+                // status sync needs the requested campaign intact to correlate against.
+                job.ProviderMessageId = r.TaskId;
                 logger.LogInformation(
-                    "[VOICE] Campaign queued OK. TaskId={TaskId}", r.TaskId);
+                    "[VOICE] Campaign queued OK. Campaign={Campaign} TaskId={TaskId}",
+                    campaignId, r.TaskId);
             }
             else
             {

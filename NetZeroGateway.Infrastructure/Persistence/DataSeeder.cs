@@ -110,6 +110,42 @@ public static class DataSeeder
     /// Accepts the pre-unification WP_Text/WP_Media names, and the friendly names the
     /// admin UI displays: someone editing this file reads "WhatsApp" on screen, not "WP".
     /// </summary>
+    /// <summary>
+    /// Resolves a seed entry's provider. Seed files name the vendor in free text
+    /// (<c>"REVE"</c>, <c>"WaTrend"</c>), which is all that existed before Release 3 made
+    /// the provider part of the sender-resolution key. Rather than require every
+    /// installation to edit its seed file, the text is matched here, and a channel type
+    /// with a single provider falls back to that one.
+    /// </summary>
+    private static Provider? ParseProvider(string? name, ChannelType channelType)
+    {
+        var trimmed = (name ?? "").Trim().ToLowerInvariant().Replace(" ", "");
+
+        var named = trimmed switch
+        {
+            "reve" or "revesms" or "revesystems" => Provider.Reve,
+            "watrend" => Provider.WaTrend,
+            "gennet" => Provider.GenNet,
+            "chithi" => Provider.Chithi,
+            "netzeroinbox" or "inbox" => Provider.NetZeroInbox,
+            "netzeroinboxqr" or "inboxqr" => Provider.NetZeroInboxQr,
+            "netzerovoice" => Provider.NetZeroVoice,
+            // Bare "netzero" is ambiguous — it is the voice vendor, the WhatsApp vendor
+            // and the product name. Fall through to the channel type rather than guess.
+            _ => (Provider?)null
+        };
+
+        if (named is { } p) return p;
+
+        return channelType switch
+        {
+            ChannelType.SMS => Provider.Reve,
+            ChannelType.WP => Provider.WaTrend,
+            ChannelType.Voice => Provider.NetZeroVoice,
+            _ => null
+        };
+    }
+
     private static ChannelType? ParseChannelType(string name)
     {
         var trimmed = name?.Trim() ?? "";
@@ -166,6 +202,20 @@ public static class DataSeeder
                 continue;
             }
 
+            // Seed entries may name the provider explicitly; otherwise it is inferred
+            // from ProviderName, then from the channel type's sole provider.
+            var provider = ParseProvider(
+                string.IsNullOrWhiteSpace(item.Provider) ? item.ProviderName : item.Provider,
+                channelType);
+            if (provider is not { } resolvedProvider)
+            {
+                logger.LogError(
+                    "[SEED] ChannelConfig SKIP: '{Label}' names provider '{Provider}', which "
+                    + "does not exist. The channel was not created.",
+                    item.Label, item.Provider);
+                continue;
+            }
+
             var plainJson = JsonSerializer.Serialize(item.Config,
                 new JsonSerializerOptions { WriteIndented = false });
 
@@ -185,13 +235,18 @@ public static class DataSeeder
                 db.ChannelConfigs.Add(new ChannelConfig
                 {
                     ChannelType = channelType,
+                    Provider = resolvedProvider,
                     ProviderName = item.ProviderName,
                     Label = item.Label,
                     LabelSlug = UniqueSlug(item.Label, siblings.Select(c => c.LabelSlug)),
-                    IsActive = true,
+                    // A seed entry may opt out of being active. A channel for a provider
+                    // whose credentials are not settled yet should exist so an operator can
+                    // fill it in, without being reachable by a tag in the meantime.
+                    IsActive = item.IsActive,
                     // First config of a type becomes its default; later ones are added
-                    // active but non-default so they never silently steal live traffic.
-                    IsDefault = !siblings.Any(c => c.IsDefault),
+                    // non-default so they never silently steal live traffic. An inactive
+                    // channel is never the default — the default must be dispatchable.
+                    IsDefault = item.IsActive && !siblings.Any(c => c.IsDefault),
                     ConfigJson = enc.Encrypt(plainJson)
                 });
                 logger.LogInformation("[SEED] ChannelConfig ADD: {Type} / {Label}",
@@ -219,6 +274,12 @@ public static class DataSeeder
                 if (existing.ProviderName != item.ProviderName)
                 {
                     existing.ProviderName = item.ProviderName;
+                    changed = true;
+                }
+
+                if (existing.Provider != resolvedProvider)
+                {
+                    existing.Provider = resolvedProvider;
                     changed = true;
                 }
 
@@ -399,7 +460,20 @@ file sealed class SeedAdminUser
 file sealed class SeedChannelConfig
 {
     public string ChannelType { get; set; } = "";
+    /// <summary>
+    /// Optional. Names the vendor exactly (Reve, WaTrend, GenNet, Chithi, NetZeroInbox,
+    /// NetZeroVoice). Left out, it is inferred from ProviderName and the channel type,
+    /// so seed files written before Release 3 keep working unchanged.
+    /// </summary>
+    public string Provider { get; set; } = "";
     public string ProviderName { get; set; } = "";
+    /// <summary>
+    /// Whether the channel is reachable once seeded. Defaults to true so seed files
+    /// written before this keep behaving identically. Set false for a channel whose
+    /// credentials still need filling in from the admin panel — an active channel with
+    /// placeholder credentials fails real messages.
+    /// </summary>
+    public bool IsActive { get; set; } = true;
     public string Label { get; set; } = "";
     public Dictionary<string, string> Config { get; set; } = [];
 }

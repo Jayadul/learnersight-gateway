@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using NetZeroGateway.Application.Strategies;
+using NetZeroGateway.Application.Utilities;
 using NetZeroGateway.Domain.Entities;
 using NetZeroGateway.Domain.Enums;
 using NetZeroGateway.Infrastructure.HttpClients;
@@ -13,6 +14,7 @@ public class WhatsAppMediaSender(
 ) : IChannelSender
 {
     public ChannelType ChannelType => ChannelType.WP;
+    public Provider Provider => Provider.WaTrend;
     public bool HandlesMedia => true;
 
     public async Task SendAsync(
@@ -27,7 +29,8 @@ public class WhatsAppMediaSender(
 
             var r = await client.SendMediaAsync(
                 cfg["instance_id"], cfg["access_token"],
-                job.ToNumber, job.MessageContent, mediaUrl, ct);
+                job.ToNumber, job.MessageContent, mediaUrl,
+                ProviderEndpoint.BaseUrlOf(cfg), ct);
 
             job.ProviderRawResponse = JsonSerializer.Serialize(r);
 

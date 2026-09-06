@@ -9,6 +9,7 @@ namespace NetZeroGateway.Application.Services;
 
 public class FallbackHandlerService(
     IDispatchJobRepository jobRepo,
+    IDispatchJobRecipientRepository recipientRepo,
     IMessageRequestRepository msgRepo,
     IFallbackPolicyRepository policyRepo,
     IChannelConfigRepository configRepo,
@@ -119,7 +120,8 @@ public class FallbackHandlerService(
                 enc.Decrypt(fallbackConfig.ConfigJson)) ?? [];
 
             var sender = senderFactory.GetSender(
-                policy.FallbackChannel, fallbackJob.MediaUrl is not null);
+                policy.FallbackChannel, fallbackConfig.Provider,
+                fallbackJob.MediaUrl is not null);
 
             // The pacing delay applies to every attempt on a channel, so a fallback
             // dispatch waits too — otherwise a burst of failures would bypass the very
@@ -134,10 +136,44 @@ public class FallbackHandlerService(
 
             await sender.SendAsync(fallbackJob, cfg);
             await jobRepo.SaveChangesAsync();
+            await RecordRecipientsAsync(fallbackJob);
 
             logger.LogInformation(
                 "[FALLBACK] Complete. FallbackJobId={FbJobId} Status={Status}",
                 fallbackJob.Id, fallbackJob.Status);
+        }
+    }
+
+    /// <summary>
+    /// Records the fallback attempt's recipients. A fallback job carries the original
+    /// job's recipient list, so the rows mirror the primary attempt's — the two are told
+    /// apart by their job's IsFallback flag, not by anything stored here.
+    /// Failures are logged and swallowed: the message has already gone out.
+    /// </summary>
+    private async Task RecordRecipientsAsync(DispatchJob fallbackJob)
+    {
+        try
+        {
+            var rows = fallbackJob.ToNumber
+                .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(n => new DispatchJobRecipient
+                {
+                    DispatchJobId = fallbackJob.Id,
+                    Recipient = n.Trim(),
+                    ProviderReferenceId = fallbackJob.ProviderMessageId,
+                    DeliveryStatus = fallbackJob.Status == JobStatus.Failed
+                        ? DeliveryStatus.Failed
+                        : DeliveryStatus.Pending
+                })
+                .ToList();
+
+            await recipientRepo.AddRangeAsync(rows);
+            await recipientRepo.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(
+                ex, "[FALLBACK] Could not record recipient rows for job {JobId}", fallbackJob.Id);
         }
     }
 }

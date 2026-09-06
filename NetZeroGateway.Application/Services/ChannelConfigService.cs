@@ -31,6 +31,7 @@ public class ChannelConfigService(
         var entity = new ChannelConfig
         {
             ChannelType = req.ChannelType,
+            Provider = ValidateProvider(req.ChannelType, req.Provider),
             ProviderName = req.ProviderName,
             Label = req.Label,
             LabelSlug = await ResolveSlugAsync(req.ChannelType, req.LabelSlug, req.Label, null),
@@ -53,6 +54,7 @@ public class ChannelConfigService(
     {
         var entity = await repo.GetByIdAsync(id)
             ?? throw new NotFoundException($"ChannelConfig {id} not found.");
+        entity.Provider = ValidateProvider(entity.ChannelType, req.Provider);
         entity.ProviderName = req.ProviderName;
         entity.Label = req.Label;
         entity.LabelSlug = await ResolveSlugAsync(
@@ -204,6 +206,36 @@ public class ChannelConfigService(
         return enc.Decrypt(entity.ConfigJson);
     }
 
+    /// <summary>
+    /// Rejects a provider that cannot serve this channel type. Saving a Voice channel
+    /// with the WaTrend provider would otherwise persist happily and then throw at
+    /// dispatch, when there is a real message to lose — better to refuse the save.
+    /// </summary>
+    private static Provider ValidateProvider(ChannelType channelType, Provider provider)
+    {
+        var allowed = ProvidersFor(channelType);
+        if (allowed.Contains(provider)) return provider;
+
+        throw new InvalidOperationException(
+            $"Provider '{provider}' does not serve {channelType} channels. "
+            + $"Valid providers for {channelType}: {string.Join(", ", allowed)}.");
+    }
+
+    /// <summary>
+    /// Which vendors an operator may currently select for a channel type. This lists
+    /// providers that have a registered sender, not every member of the enum — allowing
+    /// one to be saved before its sender exists would create a channel that looks
+    /// configured and throws on the first real message. Add each here as its sender is
+    /// registered. See ADR 0008.
+    /// </summary>
+    private static Provider[] ProvidersFor(ChannelType channelType) => channelType switch
+    {
+        ChannelType.SMS => [Provider.Reve, Provider.GenNet, Provider.Chithi],
+        ChannelType.WP => [Provider.WaTrend, Provider.NetZeroInbox, Provider.NetZeroInboxQr],
+        ChannelType.Voice => [Provider.NetZeroVoice],
+        _ => []
+    };
+
     private ChannelConfigDto ToDto(ChannelConfig c)
     {
         var masked = new Dictionary<string, string>();
@@ -221,6 +253,7 @@ public class ChannelConfigService(
         {
             Id = c.Id,
             ChannelType = c.ChannelType,
+            Provider = c.Provider,
             ProviderName = c.ProviderName,
             Label = c.Label,
             LabelSlug = c.LabelSlug,
@@ -236,6 +269,32 @@ public class ChannelConfigService(
     /// <summary>Placeholder returned instead of a secret value; never persisted.</summary>
     private const string MaskedValue = "***";
 
-    private static bool IsSecret(string key) =>
-        key is "apikey" or "secretkey" or "access_token" or "password" or "authUserId";
+    /// <summary>
+    /// Whether a config field is a credential and must be masked on read.
+    /// <para>
+    /// This used to be an exact list of the five field names REVE, WaTrend and Voice
+    /// happened to use, which meant every provider added afterwards leaked its
+    /// credential through the admin API until someone remembered to extend the list.
+    /// Matching on the shape of the name makes the safe behaviour the default: a new
+    /// provider's <c>api_token</c> or session cookie is masked without anyone
+    /// remembering anything.
+    /// </para>
+    /// <para>
+    /// Deliberately not masked: <c>baseUrl</c>, <c>callerID</c>, <c>instance_id</c>,
+    /// <c>sid</c>, <c>balanceClientId</c>, <c>campaignId</c>, <c>lotNumber</c> and
+    /// <c>owner</c> — identifiers an operator needs to read to tell two channels apart.
+    /// <c>authUserId</c> stays listed by name because it carries a credential despite
+    /// reading like an identifier.
+    /// </para>
+    /// </summary>
+    private static bool IsSecret(string key)
+    {
+        if (key.Equals("authUserId", StringComparison.OrdinalIgnoreCase)) return true;
+
+        return SecretMarkers.Any(marker =>
+            key.Contains(marker, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static readonly string[] SecretMarkers =
+        ["secret", "token", "password", "cookie", "apikey"];
 }

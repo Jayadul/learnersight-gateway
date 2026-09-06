@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using NetZeroGateway.Application.Strategies;
+using NetZeroGateway.Application.Utilities;
 using NetZeroGateway.Domain.Entities;
 using NetZeroGateway.Domain.Enums;
 using NetZeroGateway.Infrastructure.HttpClients;
@@ -13,6 +14,7 @@ public class SmsSender(
 ) : IChannelSender
 {
     public ChannelType ChannelType => ChannelType.SMS;
+    public Provider Provider => Provider.Reve;
 
     public async Task SendAsync(
         DispatchJob job, Dictionary<string, string> cfg, CancellationToken ct = default)
@@ -26,7 +28,8 @@ public class SmsSender(
             var r = await client.SendAsync(
                 cfg["apikey"], cfg["secretkey"],
                 cfg.GetValueOrDefault("callerID", ""),
-                job.ToNumber, job.MessageContent, ct);
+                job.ToNumber, job.MessageContent,
+                ProviderEndpoint.BaseUrlOf(cfg), ct);
 
             job.ProviderRawResponse = JsonSerializer.Serialize(r);
             job.ProviderMessageId = r.Message_ID;

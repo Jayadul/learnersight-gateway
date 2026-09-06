@@ -36,6 +36,7 @@ public class ChannelDispatchServiceLotNumberTests
         var service = new ChannelDispatchService(
             new FakeMessageRequestRepository(),
             new FakeDispatchJobRepository(),
+            new FakeDispatchJobRecipientRepository(),
             new FakeChannelConfigRepository(voiceConfig),
             new PlainTextEncryption(),
             new FakeSenderFactory(sender),

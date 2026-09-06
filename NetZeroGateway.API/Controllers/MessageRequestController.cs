@@ -75,7 +75,19 @@ public class MessageRequestController(IMessageRequestRepository repo) : Controll
                 IsFallback = j.IsFallback,
                 CampaignId = j.CampaignId,
                 FallbackFromJobId = j.FallbackFromJobId,
-                CreatedAt = j.CreatedAt
+                CreatedAt = j.CreatedAt,
+                Recipients = j.Recipients
+                    .OrderBy(r => r.CreatedAt)
+                    .Select(r => new DispatchJobRecipientDto
+                    {
+                        Id = r.Id,
+                        DispatchJobId = r.DispatchJobId,
+                        Recipient = r.Recipient,
+                        ProviderReferenceId = r.ProviderReferenceId,
+                        DeliveryStatus = r.DeliveryStatus,
+                        LastCheckedAt = r.LastCheckedAt,
+                        CreatedAt = r.CreatedAt
+                    }).ToList()
             }).ToList()
         });
     }

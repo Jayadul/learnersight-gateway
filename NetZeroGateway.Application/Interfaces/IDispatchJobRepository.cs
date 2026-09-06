@@ -12,8 +12,14 @@ public interface IDispatchJobRepository : IRepository<DispatchJob>
     /// The generic Find cannot eager-load, so the labels would come back null.
     /// </summary>
     Task<List<DispatchJob>> GetFailedWithChannelAsync();
+    /// <summary>
+    /// <paramref name="deliveryStatus"/> filters on the job's recipient rows rather than
+    /// the job itself: a Sent job can hold a mix of Delivered and Failed recipients, so
+    /// the two filters are related but not interchangeable.
+    /// </summary>
     Task<(List<DispatchJob> Items, int Total)> GetPagedAsync(
         int page, int size,
         DateTimeOffset? from, DateTimeOffset? to,
-        ChannelType? channelType, JobStatus? status, string? toNumber);
+        ChannelType? channelType, JobStatus? status, string? toNumber,
+        DeliveryStatus? deliveryStatus = null);
 }

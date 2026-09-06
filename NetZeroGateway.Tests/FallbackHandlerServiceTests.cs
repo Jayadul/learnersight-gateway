@@ -55,6 +55,7 @@ public class FallbackHandlerServiceTests
 
         var service = new FallbackHandlerService(
             jobs,
+            new FakeDispatchJobRecipientRepository(),
             new FakeMessageRequestRepository(request),
             new FakeFallbackPolicyRepository(policies),
             new FakeChannelConfigRepository(Backup()),
@@ -125,6 +126,7 @@ public class FallbackHandlerServiceTests
 
         var service = new FallbackHandlerService(
             jobs,
+            new FakeDispatchJobRecipientRepository(),
             new FakeMessageRequestRepository(Request(isMultiChannel: false)),
             new FakeFallbackPolicyRepository(selfReferential),
             new FakeChannelConfigRepository(primary),
@@ -144,6 +146,7 @@ public class FallbackHandlerServiceTests
 
         var service = new FallbackHandlerService(
             jobs,
+            new FakeDispatchJobRecipientRepository(),
             new FakeMessageRequestRepository(Request(isMultiChannel: false)),
             new FakeFallbackPolicyRepository(SameTypePolicy()),
             new FakeChannelConfigRepository(Backup()),

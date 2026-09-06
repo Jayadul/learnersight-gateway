@@ -17,7 +17,27 @@ public class ManualSendService(
     {
         var numbers = request.ToNumbers
             .Split(',', StringSplitOptions.RemoveEmptyEntries)
-            .Select(n => n.Trim()).ToList();
+            .Select(n => n.Trim())
+            .Where(n => n.Length > 0)
+            .ToList();
+
+        // Rejected here rather than accepted and failed later. A request with no
+        // recipients used to return 202 and then resolve to Failed, which reads in the
+        // log as a delivery problem rather than a malformed request — and left a row
+        // that never had anywhere to go. A comma-only string lands here too.
+        if (numbers.Count == 0)
+        {
+            throw new InvalidOperationException(
+                "Enter at least one recipient number.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Message)
+            && string.IsNullOrWhiteSpace(request.CampaignId))
+        {
+            // Voice carries a campaign instead of body text, so either satisfies this.
+            throw new InvalidOperationException(
+                "Enter a message to send.");
+        }
 
         var jobs = new List<ParsedChannelJob>
         {

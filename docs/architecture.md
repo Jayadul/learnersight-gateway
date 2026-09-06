@@ -39,7 +39,8 @@ with layer-specific conventions — those load automatically when you edit files
    - Creates one `MessageRequest` + `DispatchJob`s, returns `0 ACCEPTD` with
      `Message_ID`. Response confirms **queuing, not delivery**.
 2. Dispatch (async): `ChannelDispatchService` resolves the channel sender strategy
-   (`IChannelSenderFactory`) and calls the provider.
+   (`IChannelSenderFactory`, keyed on channel type **plus provider** since R3.0) and calls
+   the provider, then writes one `dispatch_job_recipients` row per recipient.
 3. On failure: `FallbackHandlerService` retries on the fallback channel — unless the
    request was tagged for more than one channel, in which case fallback is skipped
    entirely. See [Fallback](#fallback) for which policy applies and when.
@@ -58,6 +59,117 @@ with layer-specific conventions — those load automatically when you edit files
   flag to pick `WhatsAppTextSender` or `WhatsAppMediaSender`. Both remain separate
   strategies — only how they are selected changed. See
   [adr/0006](adr/0006-unify-whatsapp-channel-type.md).
+- **Every job also writes `dispatch_job_recipients`** — one row per number, so a batched
+  SMS or Voice job can record which recipients actually arrived. Job status is what the
+  provider said at hand-off; recipient status is what happened afterwards, and the two
+  can legitimately disagree. Writing these rows never fails a send: the message has
+  already gone out by then, so an error is logged and swallowed.
+
+## Providers (R3.0)
+
+A channel type no longer implies its vendor. `ChannelConfig.Provider` names it, and
+`IChannelSenderFactory` resolves on `(ChannelType, Provider, HandlesMedia)` — a channel
+naming a provider with no registered sender throws rather than substituting another
+vendor, because substituting would bill the wrong account. Duplicate registrations fail
+at startup instead of resolving by DI order.
+
+Each channel may carry its own `baseUrl` in `config_json`; blank falls back to
+`Providers:*:BaseUrl`. Before R3.0 the base URL was bound once per channel type at DI
+registration, which is what made one-provider-per-type structural. See
+[adr/0008](adr/0008-multi-provider-channels.md).
+
+Only providers with a registered sender are selectable
+(`ChannelConfigService.ProvidersFor`): **SMS** — REVE, GenNet, Chithi; **WhatsApp** —
+WaTrend, NetZero Inbox (v1), NetZero Inbox (QR); **Voice** — NetZero Voice.
+
+**NetZero Inbox is two providers, not one.** The vendor exposes two unrelated WhatsApp
+APIs on one host, sharing only the token:
+
+| | `NetZeroInbox` (v1) | `NetZeroInboxQr` (QR device) |
+|---|---|---|
+| Request | `POST /api/v1/send-message`, JSON body | `GET /api/qr/rest/send_message`, query string |
+| Scheme | `https` | `http` |
+| Sender | none | `from` — the linked device's number |
+| Recipient | `+8801700000001` | `8801700000001` |
+
+Sending either recipient form to the other API is a wrong number, which is why they are
+separate `Provider` members rather than a mode flag: the format is resolved from the
+provider alone, and a mode would put that decision out of `RecipientFormat`'s reach.
+Neither supports media — both refuse a media send rather than guess a request shape the
+vendor has not documented.
+
+### Recipient formats differ per provider (R3.1)
+
+Numbers are stored canonically: digits, country code, no plus (`8801700000001`). Two
+providers disagree, in opposite directions, so `RecipientFormat` converts per provider
+rather than per vendor platform:
+
+| Provider | On the wire | Note |
+|---|---|---|
+| REVE, WaTrend, NetZero Voice, **Chithi**, **NetZero Inbox QR** | `8801700000001` | the stored form |
+| GenNet | `01700000001` | country code dropped, trunk `0` restored |
+| NetZero Inbox (v1) | `+8801700000001` | WhatsApp Cloud API shape |
+
+Chithi shares GenNet's `api_token`, `sid` and API family but **not** its number format
+or request shape — GenNet takes an array of recipients at `/send-sms/bulk`, Chithi one
+`msisdn` per call at `/send-sms`. Shared credentials say nothing about the wire format;
+do not collapse the two implementations.
+
+The country code is `880`, not `88`. `8801748848039` is `880` + the subscriber number,
+so the local form is `0` + that. Treating it as `88` leaves two leading zeros — a
+different number.
+
+### Delivery status sync (R3.2)
+
+A third provider capability, independent of the other two. REVE, Chithi and NetZero
+Voice answer what became of a message; **GenNet has no status endpoint at all**, so its
+recipient rows stay `Pending` until it offers one.
+
+The distinction the design turns on: a recipient the provider says failed is a delivery
+failure and belongs on the row, while a request the provider rejected — expired session,
+bad credentials — says nothing about any recipient. A rejected request leaves every row
+untouched **including `last_checked_at`**, so the next run retries the same window.
+Conflating the two writes "undelivered" against messages that arrived.
+
+An unrecognised state is recorded `Unknown`, never guessed into `Failed`, and the raw
+payload is stored either way. Chithi ages its reference ids out, so a rejected lookup
+(`FAILED` with an empty `smsinfo`) is `Unknown` rather than a delivery failure.
+
+REVE returns one id per batched job, so its lookups are grouped by that id — a
+500-recipient batch is one call, not 500 identical ones.
+
+**Voice has no correlation id.** The combined report gives a destination, a start time
+and a call state. Records match a recipient row by number plus a tolerance window around
+dispatch (`Providers:Voice:StatusMatchToleranceMinutes`, default 5). A row matching more
+than one record is left alone and logged rather than guessed. Report times are
+business-zone wall clock with no offset; reading them as UTC shifts every call six hours
+and matches nothing.
+
+Runs nightly at 00:00 Dhaka for the previous full day (`delivery-status-sync`), and on
+demand per channel over a chosen window.
+
+### Resend (R3.2)
+
+Operates on recipient rows, not jobs: SMS and Voice batch many numbers into one job, so
+retrying the job would send again to everyone it already reached. Every attempt creates
+a new job and new rows linked by `resent_from_recipient_id` rather than mutating the
+originals — a retry that succeeds must not erase the evidence that the first attempt
+failed. Crossing channel types is refused, the same rule fallback uses. Authorized at
+the ManualSend tier, not SuperAdmin: this is operational recovery, not configuration.
+
+### Balances
+
+`IChannelBalanceProvider` is separate from `IChannelSender`: sending and balance are
+independent capabilities. REVE, GenNet and Chithi report one; WaTrend, NetZero Inbox and
+Voice do not, and their channels are omitted from the balance list rather than shown
+blank. REVE also reports a credit limit; the others have no such concept, and null there
+means *not applicable*, never zero.
+
+Figures are cached on `channel_configs` and refreshed by the `channel-balance-refresh`
+Hangfire job every 15 minutes, matching the dashboard's existing cycle. Reads never call
+a provider — the dashboard shows several channels at once and one slow vendor would
+stall the page. A failed refresh keeps the last known figure and its timestamp and sets
+only `balance_error`, so the card shows a stale number with a reason instead of blanking.
 
 ## Fallback
 
@@ -137,6 +249,12 @@ mid-migration. Full contract: [api.md](api.md).
 - **Auth policies**: convention-driven from `NetZeroGateway.API/authorization.json` —
   never `[Authorize]` attributes. ChannelConfig, FallbackPolicy, AdminUser and
   GatewayCredential require SuperAdmin. `/health` is anonymous.
+- **Configuration precedence**: `Program.cs` loads `authorization.json`, then re-adds the
+  environment-variable and command-line sources. The re-add is deliberate — `CreateBuilder`
+  registers those before the file, and the last source added wins, so without it the file
+  silently outranks every `Providers__*` and `Authorization__*` override set in a
+  container. Fixed in R3.0 after an override was set, verified with `printenv` and still
+  ignored at dispatch.
 - **Middleware order**: GlobalException → ApiLogging (masks `apikey`/`secretkey` in
   stored bodies) → routing/CORS/auth.
 - **Errors**: GlobalExceptionMiddleware returns ProblemDetails (`title`/`detail`) for
