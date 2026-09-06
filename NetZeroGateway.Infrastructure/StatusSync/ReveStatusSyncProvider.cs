@@ -62,14 +62,26 @@ public class ReveStatusSyncProvider(
     }
 
     /// <summary>
-    /// DELIVRD is the only success. Everything else recognised is a failure, and an
-    /// unrecognised state stays Unknown rather than being guessed into Failed — the raw
-    /// payload is stored either way so a new state is visible for review.
+    /// DELIVRD is the only success. Recognised terminal failures are failures, and
+    /// anything unrecognised stays Unknown rather than being guessed into Failed — the
+    /// raw payload is stored either way so a new state is visible for review.
+    /// <para>
+    /// The in-flight states matter as much as the terminal ones. REVE answers SENT while
+    /// a message is with the carrier, and mapping that to Unknown strands it: the sync
+    /// only picks up Pending rows, so a message that would have resolved to DELIVRD on
+    /// the next run never gets asked about again. They stay Pending so it does.
+    /// </para>
     /// </summary>
     private static DeliveryStatus MapState(string? text) => text?.Trim().ToUpperInvariant() switch
     {
         "DELIVRD" => DeliveryStatus.Delivered,
+
+        // Terminal failures.
         "REJECTD" or "EXPIRED" or "UNDELIV" or "DELETED" => DeliveryStatus.Failed,
+
+        // Still on its way — ask again next run rather than settling on an answer.
+        "SENT" or "ACCEPTD" or "ENROUTE" or "PENDING" => DeliveryStatus.Pending,
+
         null or "" => DeliveryStatus.Unknown,
         _ => DeliveryStatus.Unknown
     };

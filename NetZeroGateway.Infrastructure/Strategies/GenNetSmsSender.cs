@@ -51,6 +51,18 @@ public class GenNetSmsSender(
                 // identifies this job in GenNet's system. Per-recipient reference ids
                 // live on the recipient rows.
                 job.ProviderMessageId = batchId;
+
+                // GenNet returns a reference id per recipient inside smsinfo, and those
+                // are what a per-recipient status lookup would need. The batch id
+                // identifies the job, not any one message, so keeping only that would
+                // discard the detail the bulk response exists to give. It echoes numbers
+                // back in country-code form, so they are normalised to match our rows.
+                job.RecipientReferences = r.SmsInfo?
+                    .Where(i => !string.IsNullOrWhiteSpace(i.Msisdn)
+                             && !string.IsNullOrWhiteSpace(i.ReferenceId))
+                    .GroupBy(i => RecipientFormat.ToCanonical(i.Msisdn!))
+                    .ToDictionary(g => g.Key, g => g.First().ReferenceId!);
+
                 logger.LogInformation(
                     "[GENNET] Sent OK. Batch={Batch} Recipients={Count}",
                     batchId, r.SmsInfo?.Count ?? recipients.Count);

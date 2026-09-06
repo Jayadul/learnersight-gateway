@@ -72,9 +72,14 @@ public class ChithiStatusSyncProvider(
     {
         "success" or "delivered" => DeliveryStatus.Delivered,
         "failed" or "rejected" or "expired" or "undelivered" => DeliveryStatus.Failed,
+
+        // In flight. Kept Pending, not Unknown, so the next run asks again — the sync
+        // only revisits Pending rows, so anything else here is a final answer.
+        "sent" or "pending" or "queued" or "processing" => DeliveryStatus.Pending,
+
         null or "" => DeliveryStatus.Unknown,
-        // Still in flight at the provider, or a state we have not catalogued. Either
-        // way, not a failure.
+        // A state we have not catalogued. Not a failure, and not retried until its
+        // meaning is confirmed.
         _ => DeliveryStatus.Unknown
     };
 }

@@ -90,6 +90,58 @@ public class DispatchJobRecipientTests
     }
 
     [Fact]
+    public async Task A_per_recipient_reference_beats_the_job_level_one_when_the_provider_gives_it()
+    {
+        // GenNet and Chithi return one id per recipient; those must land on their own
+        // rows rather than every row sharing the job's id as REVE's legitimately do.
+        var config = new ChannelConfig
+        {
+            ChannelType = ChannelType.SMS,
+            Provider = Provider.GenNet,
+            ProviderName = "test",
+            Label = "GenNet",
+            IsActive = true,
+            ConfigJson = """{"api_token":"t","sid":"s"}"""
+        };
+
+        var recipients = new FakeDispatchJobRecipientRepository();
+        var service = new ChannelDispatchService(
+            new FakeMessageRequestRepository(),
+            new FakeDispatchJobRepository(),
+            recipients,
+            new FakeChannelConfigRepository(config),
+            new PlainTextEncryption(),
+            new FakeSenderFactory(new PerRecipientSender()),
+            new NoOpFallbackHandler(),
+            NullLogger<ChannelDispatchService>.Instance);
+
+        await service.DispatchAsync(Guid.NewGuid(), "8801700000001,8801700000002",
+            [new ParsedChannelJob { ChannelType = ChannelType.SMS, Message = "hi" }]);
+
+        Assert.Equal(
+            ["REF-8801700000001", "REF-8801700000002"],
+            recipients.Added.Select(r => r.ProviderReferenceId));
+    }
+
+    /// <summary>Reports a distinct provider id for every recipient, as GenNet does.</summary>
+    private sealed class PerRecipientSender : Application.Strategies.IChannelSender
+    {
+        public ChannelType ChannelType => ChannelType.SMS;
+        public Provider Provider => Provider.GenNet;
+
+        public Task SendAsync(
+            DispatchJob job, Dictionary<string, string> config, CancellationToken ct = default)
+        {
+            job.Status = JobStatus.Sent;
+            job.ProviderMessageId = "BATCH-ID";
+            job.RecipientReferences = job.ToNumber
+                .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .ToDictionary(n => n.Trim(), n => $"REF-{n.Trim()}");
+            return Task.CompletedTask;
+        }
+    }
+
+    [Fact]
     public async Task An_accepted_send_leaves_recipients_pending_for_the_sync_to_resolve()
     {
         var (service, recipients) = Build(ChannelType.SMS);

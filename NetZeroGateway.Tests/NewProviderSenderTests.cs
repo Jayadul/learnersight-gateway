@@ -50,7 +50,16 @@ public class NewProviderSenderTests
             return Task.FromResult(new GenNetSendResponse
             {
                 Status = success ? "SUCCESS" : "FAILED",
-                ErrorMessage = success ? null : "Insufficient balance"
+                ErrorMessage = success ? null : "Insufficient balance",
+                // The vendor echoes numbers back in country-code form and gives each
+                // its own reference id.
+                SmsInfo = success
+                    ? [.. msisdns.Select((m, i) => new GenNetSmsInfo
+                    {
+                        Msisdn = "880" + m.TrimStart('0'),
+                        ReferenceId = $"REF{i + 1}"
+                    })]
+                    : null
             });
         }
 
@@ -98,6 +107,35 @@ public class NewProviderSenderTests
 
         Assert.Equal(JobStatus.Failed, job.Status);
         Assert.Equal("Insufficient balance", job.FailureReason);
+    }
+
+    [Fact]
+    public async Task GenNet_maps_each_recipients_own_reference_id_onto_its_row()
+    {
+        // The batch id identifies the job, not any one message. Keeping only that would
+        // discard exactly the detail a bulk response exists to give.
+        var client = new FakeGenNetClient();
+        var sender = new GenNetSmsSender(client, NullLogger<GenNetSmsSender>.Instance);
+        var job = SmsJob("8801748848039,8801969155575");
+
+        await sender.SendAsync(job, Cfg());
+
+        Assert.NotNull(job.RecipientReferences);
+        // Keyed by the stored form, though the provider echoed its own.
+        Assert.Equal("REF1", job.RecipientReferences!["8801748848039"]);
+        Assert.Equal("REF2", job.RecipientReferences!["8801969155575"]);
+    }
+
+    [Fact]
+    public async Task GenNet_reports_no_per_recipient_references_when_the_send_failed()
+    {
+        var sender = new GenNetSmsSender(
+            new FakeGenNetClient(success: false), NullLogger<GenNetSmsSender>.Instance);
+        var job = SmsJob("8801748848039");
+
+        await sender.SendAsync(job, Cfg());
+
+        Assert.Null(job.RecipientReferences);
     }
 
     // ── Chithi ───────────────────────────────────────────────────────────────
@@ -155,6 +193,21 @@ public class NewProviderSenderTests
 
         Assert.Equal(JobStatus.Failed, job.Status);
         Assert.Contains("1 of 2", job.FailureReason);
+    }
+
+    [Fact]
+    public async Task Chithi_maps_each_recipients_own_reference_id_onto_its_row()
+    {
+        var sender = new ChithiSmsSender(
+            new FakeChithiClient(true, true), NullLogger<ChithiSmsSender>.Instance);
+        var job = SmsJob("8801748848039,8801969155575");
+
+        await sender.SendAsync(job, Cfg());
+
+        Assert.NotNull(job.RecipientReferences);
+        Assert.Equal(2, job.RecipientReferences!.Count);
+        // Each came from its own call, so no two recipients share an id.
+        Assert.Equal(2, job.RecipientReferences!.Values.Distinct().Count());
     }
 
     // ── NetZero Inbox ────────────────────────────────────────────────────────

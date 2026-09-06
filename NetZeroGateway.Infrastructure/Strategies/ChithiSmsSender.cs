@@ -60,6 +60,14 @@ public class ChithiSmsSender(
                 // One reference id per recipient, so there is no single job-level id.
                 // The first stands in for the job; the rest live on the recipient rows.
                 job.ProviderMessageId = responses.FirstOrDefault()?.ReferenceId;
+
+                // One id per recipient here too, and unlike GenNet each came from its
+                // own call, so the mapping is exact.
+                job.RecipientReferences = responses
+                    .Where(x => x.ReferenceId is not null)
+                    .GroupBy(x => RecipientFormat.ToCanonical(x.Msisdn))
+                    .ToDictionary(g => g.Key, g => g.First().ReferenceId!);
+
                 logger.LogInformation("[CHITHI] Sent OK to {Count} recipients", responses.Count);
             }
             else

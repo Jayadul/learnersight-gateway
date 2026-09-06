@@ -186,7 +186,12 @@ public class ChannelDispatchService(
             {
                 DispatchJobId = dispatchJob.Id,
                 Recipient = number,
-                ProviderReferenceId = dispatchJob.ProviderMessageId,
+                // A per-recipient id when the provider gave one, else the job-level id.
+                // REVE returns a single id for a whole batch, so its rows legitimately
+                // share one; GenNet and Chithi return one each and must not.
+                ProviderReferenceId =
+                    dispatchJob.RecipientReferences?.GetValueOrDefault(number)
+                    ?? dispatchJob.ProviderMessageId,
                 // Pending means "accepted, nothing synced back yet". A job that failed
                 // outright never reached the recipient, so it starts Failed rather than
                 // waiting on a status that will never arrive.

@@ -92,14 +92,36 @@ public class StatusSyncProviderTests
     [Fact]
     public async Task REVE_leaves_an_unrecognised_state_unknown_rather_than_guessing_failed()
     {
+        // A state genuinely not in the mapping. ACCEPTD used to stand in for this and no
+        // longer can — it is a real in-flight state, covered by the theory below.
         var provider = new ReveStatusSyncProvider(
-            new FakeReveStatusClient(new ReveStatusResponse { Status = "7", Text = "ACCEPTD" }),
+            new FakeReveStatusClient(new ReveStatusResponse { Status = "9", Text = "UNKNOWNSTATE" }),
             NullLogger<ReveStatusSyncProvider>.Instance);
         var rows = new List<DispatchJobRecipient> { Row() };
 
         await provider.SyncAsync(ReveCfg(), rows, DispatchedAt, DispatchedAt);
 
         Assert.Equal(DeliveryStatus.Unknown, rows[0].DeliveryStatus);
+    }
+
+    [Theory]
+    [InlineData("SENT")]
+    [InlineData("ACCEPTD")]
+    [InlineData("ENROUTE")]
+    public async Task An_in_flight_REVE_state_stays_pending_so_the_next_run_asks_again(
+        string state)
+    {
+        // The sync only revisits Pending rows. Recording an in-flight state as Unknown
+        // strands the message: it would have resolved to DELIVRD on a later run, but
+        // nothing ever asks about it again.
+        var provider = new ReveStatusSyncProvider(
+            new FakeReveStatusClient(new ReveStatusResponse { Status = "4", Text = state }),
+            NullLogger<ReveStatusSyncProvider>.Instance);
+        var rows = new List<DispatchJobRecipient> { Row() };
+
+        await provider.SyncAsync(ReveCfg(), rows, DispatchedAt, DispatchedAt);
+
+        Assert.Equal(DeliveryStatus.Pending, rows[0].DeliveryStatus);
     }
 
     [Fact]
