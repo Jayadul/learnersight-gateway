@@ -62,18 +62,29 @@ public class WaTrendClient(
             logger.LogWarning(
                 "[WATREND] Non-success response for {Number} (number may not be on WhatsApp). Body={Body}",
                 number, body);
-            return new WaTrendResponse { Status = "error" };
+            return Failure("Number is not reachable on WhatsApp");
         }
 
         try
         {
             return JsonSerializer.Deserialize<WaTrendResponse>(body, _opts)
-                ?? new WaTrendResponse { Status = "error" };
+                ?? Failure("Provider returned an empty response");
         }
         catch (JsonException ex)
         {
             logger.LogError(ex, "[WATREND] Parse error for {Number}. Body={Body}", number, body);
-            return new WaTrendResponse { Status = "error" };
+            // Keep the raw body as the reason — an unrecognised shape is still diagnostic,
+            // and discarding it is what made these failures unexplainable.
+            return Failure(Truncate(body, 500));
         }
     }
+
+    private static WaTrendResponse Failure(string reason) => new()
+    {
+        Status = "error",
+        Message = new WaTrendMessageDetail { Text = reason }
+    };
+
+    private static string Truncate(string value, int max) =>
+        value.Length <= max ? value : value[..max] + "…";
 }

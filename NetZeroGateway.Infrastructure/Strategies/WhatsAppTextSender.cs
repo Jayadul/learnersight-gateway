@@ -41,9 +41,10 @@ public class WhatsAppTextSender(
             else
             {
                 job.Status = JobStatus.Failed;
-                job.FailureReason = r.Status;
+                job.FailureReason = r.FailureReason;
                 logger.LogWarning(
-                    "[WA_TEXT] Failed for {ToNumber} | Status={Status}", job.ToNumber, r.Status);
+                    "[WA_TEXT] Failed for {ToNumber} | Status={Status} | Reason={Reason}",
+                    job.ToNumber, r.Status, r.FailureReason);
             }
         }
         catch (Exception ex)
