@@ -4,7 +4,9 @@
 fallback. Clean Architecture: Domain ← Application ← Infrastructure, API hosts all.
 Frontend lives in the sibling repo `../learnersight-netzero-gateway-ui`.
 
-Current baseline: **Release 1.0.0** — read `docs/releases/1.0.0.md` before large work.
+Current baseline: **Release 2.1.0** — read `docs/releases/2.1.0.md` before large work,
+and `1.0.0.md` for the original delivery. The `/sendtext` tag grammar and the gateway's
+credentials both changed in 2.1; `docs/adr/0007` records why.
 
 **Fresh machine?** Clone both repos into one workspace folder; docker compose lives
 at the workspace root. Skills load from each repo's `.claude/skills/` automatically
