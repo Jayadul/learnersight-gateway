@@ -27,7 +27,8 @@ public class ChithiBalanceProvider(
             if (!r.IsSuccess || balance is null)
             {
                 return ChannelBalanceResult.Failed(
-                    r.ErrorMessage ?? r.Status ?? "Chithi did not return a balance.");
+                    r.Description ?? r.StatusMeaning ?? r.ErrorMessage ?? r.Status
+                    ?? "Chithi did not return a balance.");
             }
 
             // As with GenNet, no credit-limit concept.

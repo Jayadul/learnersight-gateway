@@ -79,7 +79,7 @@ public class NetZeroInboxQrWhatsAppSender(
             else
             {
                 job.Status = JobStatus.Failed;
-                job.FailureReason = r.Error ?? r.Message ?? r.Status ?? "unknown_error";
+                job.FailureReason = r.Reason ?? "unknown_error";
                 logger.LogWarning(
                     "[NZ_INBOX_QR] Failed for {ToNumber} | Reason={Reason}",
                     job.ToNumber, job.FailureReason);

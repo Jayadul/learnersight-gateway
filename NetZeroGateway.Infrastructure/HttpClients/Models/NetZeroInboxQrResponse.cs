@@ -17,6 +17,12 @@ public class NetZeroInboxQrResponse
     [JsonPropertyName("messageId")] public string? MessageId { get; set; }
 
     /// <summary>
+    /// The vendor's own remediation text, e.g. "Please give a number which is available
+    /// on WhatsApp". Worth keeping — it is more actionable than the message alone.
+    /// </summary>
+    [JsonPropertyName("solution")] public string? Solution { get; set; }
+
+    /// <summary>
     /// Success is not pinned down by any sample, so accept the plausible markers and
     /// treat an error field as decisive against. Erring toward "failed" is the safer
     /// direction: a false failure is visible in the log, a false success is not.
@@ -31,4 +37,10 @@ public class NetZeroInboxQrResponse
             || !string.IsNullOrWhiteSpace(MessageId));
 
     [JsonIgnore] public string? ProviderMessageId => Id ?? MessageId;
+
+    /// <summary>The message plus the vendor's suggested fix, when it offers one.</summary>
+    [JsonIgnore]
+    public string? Reason => string.IsNullOrWhiteSpace(Solution)
+        ? Error ?? Message ?? Status
+        : $"{Error ?? Message ?? Status} — {Solution}";
 }

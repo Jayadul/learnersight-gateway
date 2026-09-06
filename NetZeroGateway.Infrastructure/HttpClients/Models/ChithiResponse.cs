@@ -13,11 +13,22 @@ public class ChithiSendResponse
     [JsonPropertyName("status")] public string? Status { get; set; }
     [JsonPropertyName("status_code")] public int? StatusCode { get; set; }
     [JsonPropertyName("error_message")] public string? ErrorMessage { get; set; }
+
+    // As with GenNet, a rejection explains itself here rather than in error_message —
+    // "Insufficient SMS balance" arrives as description, and losing it leaves the
+    // delivery log saying only "FAILED".
+    [JsonPropertyName("status_meaning")] public string? StatusMeaning { get; set; }
+    [JsonPropertyName("description")] public string? Description { get; set; }
+
     [JsonPropertyName("smsinfo")] public List<ChithiSmsInfo>? SmsInfo { get; set; }
 
     [JsonIgnore]
     public bool IsSuccess =>
         string.Equals(Status, "SUCCESS", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>The most specific explanation the response carries.</summary>
+    [JsonIgnore]
+    public string? Reason => Description ?? StatusMeaning ?? ErrorMessage ?? Status;
 
     /// <summary>Chithi sends one recipient per call, so there is at most one reference id.</summary>
     [JsonIgnore]
@@ -36,6 +47,8 @@ public class ChithiBalanceResponse
 {
     [JsonPropertyName("status")] public string? Status { get; set; }
     [JsonPropertyName("error_message")] public string? ErrorMessage { get; set; }
+    [JsonPropertyName("status_meaning")] public string? StatusMeaning { get; set; }
+    [JsonPropertyName("description")] public string? Description { get; set; }
     [JsonPropertyName("smsinfo")] public ChithiBalanceInfo? SmsInfo { get; set; }
 
     [JsonIgnore]

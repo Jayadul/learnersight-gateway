@@ -27,7 +27,8 @@ public class GenNetBalanceProvider(
             if (!r.IsSuccess || balance is null)
             {
                 return ChannelBalanceResult.Failed(
-                    r.ErrorMessage ?? r.Status ?? "GenNet did not return a balance.");
+                    r.Description ?? r.StatusMeaning ?? r.ErrorMessage ?? r.Status
+                    ?? "GenNet did not return a balance.");
             }
 
             // GenNet has no credit-limit concept — null, not zero.

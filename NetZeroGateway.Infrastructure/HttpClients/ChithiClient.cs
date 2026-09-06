@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using NetZeroGateway.Application.Utilities;
 using NetZeroGateway.Infrastructure.HttpClients.Models;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 
@@ -31,11 +32,16 @@ public class ChithiClient(
             csms_id = csmsId
         };
 
-        var content = new StringContent(
-            JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-        content.Headers.Add("Accept", "application/json");
+        // Accept is a request header, not a content header — setting it on the body
+        // throws "Misused header name" before the call is ever made.
+        using var request = new HttpRequestMessage(HttpMethod.Post, url)
+        {
+            Content = new StringContent(
+                JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json")
+        };
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
-        var resp = await http.PostAsync(url, content, ct);
+        var resp = await http.SendAsync(request, ct);
         var body = await resp.Content.ReadAsStringAsync(ct);
         logger.LogDebug("[CHITHI] Response for {Msisdn}: {Body}", msisdn, body);
 

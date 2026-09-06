@@ -12,12 +12,23 @@ public class GenNetSendResponse
     [JsonPropertyName("status")] public string? Status { get; set; }
     [JsonPropertyName("status_code")] public int? StatusCode { get; set; }
     [JsonPropertyName("error_message")] public string? ErrorMessage { get; set; }
+
+    // On a rejection the vendor leaves error_message null and explains itself in these
+    // two instead. Without them the delivery log reads "FAILED", which tells an operator
+    // nothing they can act on.
+    [JsonPropertyName("status_meaning")] public string? StatusMeaning { get; set; }
+    [JsonPropertyName("description")] public string? Description { get; set; }
+
     [JsonPropertyName("smsinfo")] public List<GenNetSmsInfo>? SmsInfo { get; set; }
 
     /// <summary>The vendor signals success with the literal string SUCCESS.</summary>
     [JsonIgnore]
     public bool IsSuccess =>
         string.Equals(Status, "SUCCESS", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>The most specific explanation the response carries.</summary>
+    [JsonIgnore]
+    public string? Reason => Description ?? StatusMeaning ?? ErrorMessage ?? Status;
 }
 
 public class GenNetSmsInfo
@@ -36,6 +47,8 @@ public class GenNetBalanceResponse
 {
     [JsonPropertyName("status")] public string? Status { get; set; }
     [JsonPropertyName("error_message")] public string? ErrorMessage { get; set; }
+    [JsonPropertyName("status_meaning")] public string? StatusMeaning { get; set; }
+    [JsonPropertyName("description")] public string? Description { get; set; }
     [JsonPropertyName("smsinfo")] public GenNetBalanceInfo? SmsInfo { get; set; }
 
     [JsonIgnore]

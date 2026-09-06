@@ -39,13 +39,13 @@ public class ChithiSmsSender(
 
             foreach (var msisdn in recipients)
             {
-                var csmsId = Guid.NewGuid().ToString("N").ToUpperInvariant();
+                var csmsId = CsmsId.New();
                 var r = await client.SendAsync(
                     cfg["api_token"], cfg["sid"], msisdn, job.MessageContent, csmsId,
                     baseUrl, ct);
 
                 responses.Add(new ChithiCallResult(msisdn, csmsId, r.IsSuccess,
-                    r.ErrorMessage ?? r.Status, r.ReferenceId));
+                    r.Reason, r.ReferenceId));
             }
 
             // The whole set is stored, not just the last call, so a partial failure is

@@ -90,7 +90,7 @@
       "SendPath": "/api/v1/send-message"
     },
     "NetZeroInboxQr": {
-      "BaseUrl": "http://inbox.netzero.com.bd",
+      "BaseUrl": "https://inbox.netzero.com.bd",
       "SendPath": "/api/qr/rest/send_message"
     },
     "Voice": {

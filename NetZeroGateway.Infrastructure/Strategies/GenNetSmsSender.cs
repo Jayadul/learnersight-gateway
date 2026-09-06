@@ -28,9 +28,9 @@ public class GenNetSmsSender(
                 .Select(n => RecipientFormat.For(Provider.GenNet, n.Trim()))
                 .ToList();
 
-            // Per-job identifier the vendor echoes back. A GUID satisfies "unique per
-            // batch" without needing a counter we would have to persist.
-            var batchId = Guid.NewGuid().ToString("N").ToUpperInvariant();
+            // Exactly 20 characters — GenNet rejects any other length with
+            // "Invalid CSMS ID" over HTTP 200, so a GUID fails every send.
+            var batchId = CsmsId.New();
 
             logger.LogInformation(
                 "[GENNET] Sending to {Count} recipients | RequestId={RequestId}",
@@ -58,7 +58,7 @@ public class GenNetSmsSender(
             else
             {
                 job.Status = JobStatus.Failed;
-                job.FailureReason = r.ErrorMessage ?? r.Status ?? "unknown_error";
+                job.FailureReason = r.Reason ?? "unknown_error";
                 logger.LogWarning("[GENNET] Failed | Reason={Reason}", job.FailureReason);
             }
         }

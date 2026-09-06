@@ -122,10 +122,12 @@ public static class ServiceCollectionExtensions
         services
             .AddHttpClient<INetZeroInboxQrClient, NetZeroInboxQrClient>(c =>
             {
-                // Plain http, unlike the v1 API on the same host — that is what the
-                // vendor documents for the QR device endpoint.
+                // https, despite the vendor documenting http: the host 301s to https,
+                // and this endpoint carries its token in the query string, so the plain
+                // request would put a credential on the wire in the clear before the
+                // redirect. Following a redirect is not a substitute for not sending it.
                 c.BaseAddress = new Uri(
-                    config[ConfigKeys.NetZeroInboxQrBaseUrl] ?? "http://inbox.netzero.com.bd");
+                    config[ConfigKeys.NetZeroInboxQrBaseUrl] ?? "https://inbox.netzero.com.bd");
                 c.Timeout = TimeSpan.FromSeconds(waTimeout + 20);
             })
             .AddStandardResilienceHandler(o => Resilience(o, retryCount, retryDelay, waTimeout));
