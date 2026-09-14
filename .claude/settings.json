@@ -2,9 +2,6 @@
   "model": "sonnet",
   "permissions": {
     "deny": [
-      "Read(file_path:**/appsettings*.json)",
-      "Edit(file_path:**/appsettings*.json)",
-      "Write(file_path:**/appsettings*.json)",
       "Read(file_path:**/.env*)",
       "Edit(file_path:**/.env*)",
       "Write(file_path:**/.env*)",
