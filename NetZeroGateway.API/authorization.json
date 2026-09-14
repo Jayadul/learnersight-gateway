@@ -10,6 +10,10 @@
         "SwaggerGroup": "gateway",
         "RequireAuth": false
       },
+      "Balance": {
+        "SwaggerGroup": "gateway",
+        "RequireAuth": false
+      },
       "Auth": {
         "RequireAuth": false
       },
@@ -73,11 +77,6 @@
       "SendPath": "/api/send",
       "TextType": "text",
       "MediaType": "media"
-    },
-    "GenNet": {
-      "BaseUrl": "https://isms.gennet.com.bd",
-      "SendPath": "/api/v3/send-sms/bulk",
-      "BalancePath": "/api/v3/balance"
     },
     "Chithi": {
       "BaseUrl": "https://sms.chithi.net",

@@ -125,7 +125,6 @@ public static class DataSeeder
         {
             "reve" or "revesms" or "revesystems" => Provider.Reve,
             "watrend" => Provider.WaTrend,
-            "gennet" => Provider.GenNet,
             "chithi" => Provider.Chithi,
             "netzeroinbox" or "inbox" => Provider.NetZeroInbox,
             "netzeroinboxqr" or "inboxqr" => Provider.NetZeroInboxQr,

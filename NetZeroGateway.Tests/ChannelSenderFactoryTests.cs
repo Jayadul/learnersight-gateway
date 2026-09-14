@@ -28,11 +28,11 @@ public class ChannelSenderFactoryTests
     public void Two_providers_on_one_channel_type_resolve_to_their_own_sender()
     {
         var reve = new StubSender(ChannelType.SMS, Provider.Reve);
-        var genNet = new StubSender(ChannelType.SMS, Provider.GenNet);
-        var factory = new ChannelSenderFactory([reve, genNet]);
+        var chithi = new StubSender(ChannelType.SMS, Provider.Chithi);
+        var factory = new ChannelSenderFactory([reve, chithi]);
 
         Assert.Same(reve, factory.GetSender(ChannelType.SMS, Provider.Reve));
-        Assert.Same(genNet, factory.GetSender(ChannelType.SMS, Provider.GenNet));
+        Assert.Same(chithi, factory.GetSender(ChannelType.SMS, Provider.Chithi));
     }
 
     [Fact]
@@ -60,14 +60,14 @@ public class ChannelSenderFactoryTests
     [Fact]
     public void An_unregistered_provider_throws_rather_than_substituting_another_vendor()
     {
-        // The whole point of the provider key: a GenNet channel must never quietly
+        // The whole point of the provider key: a Chithi channel must never quietly
         // dispatch through REVE and bill the wrong account.
         var factory = new ChannelSenderFactory([new StubSender(ChannelType.SMS, Provider.Reve)]);
 
         var ex = Assert.Throws<InvalidOperationException>(
-            () => factory.GetSender(ChannelType.SMS, Provider.GenNet));
+            () => factory.GetSender(ChannelType.SMS, Provider.Chithi));
 
-        Assert.Contains("GenNet", ex.Message);
+        Assert.Contains("Chithi", ex.Message);
     }
 
     [Fact]

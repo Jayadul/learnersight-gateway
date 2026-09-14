@@ -92,14 +92,14 @@ public class DispatchJobRecipientTests
     [Fact]
     public async Task A_per_recipient_reference_beats_the_job_level_one_when_the_provider_gives_it()
     {
-        // GenNet and Chithi return one id per recipient; those must land on their own
-        // rows rather than every row sharing the job's id as REVE's legitimately do.
+        // Chithi returns one id per recipient; those must land on their own rows rather
+        // than every row sharing the job's id as REVE's legitimately do.
         var config = new ChannelConfig
         {
             ChannelType = ChannelType.SMS,
-            Provider = Provider.GenNet,
+            Provider = Provider.Chithi,
             ProviderName = "test",
-            Label = "GenNet",
+            Label = "Chithi",
             IsActive = true,
             ConfigJson = """{"api_token":"t","sid":"s"}"""
         };
@@ -123,11 +123,11 @@ public class DispatchJobRecipientTests
             recipients.Added.Select(r => r.ProviderReferenceId));
     }
 
-    /// <summary>Reports a distinct provider id for every recipient, as GenNet does.</summary>
+    /// <summary>Reports a distinct provider id for every recipient, as Chithi does.</summary>
     private sealed class PerRecipientSender : Application.Strategies.IChannelSender
     {
         public ChannelType ChannelType => ChannelType.SMS;
-        public Provider Provider => Provider.GenNet;
+        public Provider Provider => Provider.Chithi;
 
         public Task SendAsync(
             DispatchJob job, Dictionary<string, string> config, CancellationToken ct = default)

@@ -15,7 +15,7 @@ public interface IChannelSender
 
     /// <summary>
     /// The vendor this sender talks to. Two senders may share a ChannelType — REVE and
-    /// GenNet both send SMS — so the type alone no longer identifies an implementation.
+    /// Chithi both send SMS — so the type alone no longer identifies an implementation.
     /// </summary>
     Provider Provider { get; }
 

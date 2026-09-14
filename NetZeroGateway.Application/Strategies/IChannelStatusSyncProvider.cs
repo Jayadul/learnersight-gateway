@@ -7,10 +7,10 @@ namespace NetZeroGateway.Application.Strategies;
 /// Asks one provider what became of messages it accepted, and writes the answers onto
 /// the recipient rows.
 /// <para>
-/// A third capability alongside sending and balance, and just as independent: GenNet
-/// accepts messages and reports a balance but exposes no status endpoint at all, so its
-/// rows stay <see cref="DeliveryStatus.Pending"/> until it offers one. A channel type
-/// never implies that a status sync exists.
+/// A third capability alongside sending and balance, and just as independent: a provider
+/// can accept messages and report a balance while exposing no status endpoint at all, in
+/// which case its rows stay <see cref="DeliveryStatus.Pending"/> until it offers one. A
+/// channel type never implies that a status sync exists.
 /// </para>
 /// </summary>
 public interface IChannelStatusSyncProvider
