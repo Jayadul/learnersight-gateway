@@ -28,6 +28,34 @@ public class GatewayCredentialService(
         return ToDto(entity);
     }
 
+    /// <summary>
+    /// Keeps Username (display label "Username (Balance Client ID)") in step with the
+    /// default SMS channel's own Balance Client ID — called by ChannelConfigService
+    /// whenever that changes or the default SMS channel itself changes. A no-op when
+    /// there is nothing to sync from (blank value, or the value already matches), or no
+    /// credential row exists yet: this never blanks a manually-set Username, it only
+    /// overwrites it with a real value. Still admin-editable afterward — the next trigger
+    /// re-syncs, but nothing locks the field between triggers.
+    /// </summary>
+    public async Task SyncUsernameFromDefaultSmsChannelAsync(string? balanceClientId)
+    {
+        if (string.IsNullOrWhiteSpace(balanceClientId)) return;
+
+        var entity = await repo.GetCurrentAsync();
+        if (entity is null) return;
+
+        var trimmed = balanceClientId.Trim();
+        if (entity.Username == trimmed) return;
+
+        entity.Username = trimmed;
+        repo.Update(entity);
+        await repo.SaveChangesAsync();
+
+        logger.LogInformation(
+            "[GATEWAY_AUTH] Username auto-synced to the default SMS channel's Balance "
+            + "Client ID: {Username}", trimmed);
+    }
+
     public async Task<GatewayCredentialDto> UpdateAsync(UpdateGatewayCredentialRequest request)
     {
         var entity = await repo.GetCurrentAsync()

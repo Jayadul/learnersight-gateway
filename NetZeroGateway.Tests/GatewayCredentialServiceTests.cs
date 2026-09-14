@@ -157,6 +157,41 @@ public class GatewayCredentialServiceTests
 
         Assert.Equal("original-api-key", row.ApiKeyEncrypted);
     }
+
+    [Fact]
+    public async Task Syncing_from_the_default_sms_channel_overwrites_the_username()
+    {
+        var (service, row) = Build();
+
+        await service.SyncUsernameFromDefaultSmsChannelAsync("net zero");
+
+        Assert.Equal("net zero", row.Username);
+    }
+
+    [Fact]
+    public async Task Syncing_a_blank_value_leaves_the_username_untouched()
+    {
+        // No Balance Client ID to sync from (e.g. the default SMS channel is Chithi,
+        // which has none) — never blank a real username just because there is nothing
+        // to replace it with.
+        var (service, row) = Build();
+
+        await service.SyncUsernameFromDefaultSmsChannelAsync(null);
+        await service.SyncUsernameFromDefaultSmsChannelAsync("   ");
+
+        Assert.Equal("netzero-gateway", row.Username);
+    }
+
+    [Fact]
+    public async Task Syncing_the_same_value_is_a_no_op()
+    {
+        var (service, row) = Build();
+        row.Username = "already-in-sync";
+
+        await service.SyncUsernameFromDefaultSmsChannelAsync("already-in-sync");
+
+        Assert.Equal("already-in-sync", row.Username);
+    }
 }
 
 /// <summary>Stands in for a changed encryption key: stored ciphertext no longer opens.</summary>
