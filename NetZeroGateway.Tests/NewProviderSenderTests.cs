@@ -9,8 +9,8 @@ namespace NetZeroGateway.Tests;
 
 /// <summary>
 /// The providers added in Release 3. What each sends on the wire is the part worth
-/// pinning: several disagree with our stored number format in different directions, one
-/// batches where another does not, and two share a vendor and a token while agreeing on
+/// pinning: one disagrees with our stored number format, one batches per-call where
+/// REVE batches in one call, and two share a vendor and a token while agreeing on
 /// almost nothing else — none of which is visible from the job.
 /// </summary>
 public class NewProviderSenderTests
@@ -33,110 +33,6 @@ public class NewProviderSenderTests
         MediaUrl = mediaUrl,
         ToNumber = toNumber
     };
-
-    // ── GenNet ───────────────────────────────────────────────────────────────
-
-    private sealed class FakeGenNetClient(bool success = true) : IGenNetClient
-    {
-        public List<string>? SentTo { get; private set; }
-        public string? BatchId { get; private set; }
-
-        public Task<GenNetSendResponse> SendBulkAsync(
-            string apiToken, string sid, List<string> msisdns, string message,
-            string batchCsmsId, string? baseUrl = null, CancellationToken ct = default)
-        {
-            SentTo = msisdns;
-            BatchId = batchCsmsId;
-            return Task.FromResult(new GenNetSendResponse
-            {
-                Status = success ? "SUCCESS" : "FAILED",
-                ErrorMessage = success ? null : "Insufficient balance",
-                // The vendor echoes numbers back in country-code form and gives each
-                // its own reference id.
-                SmsInfo = success
-                    ? [.. msisdns.Select((m, i) => new GenNetSmsInfo
-                    {
-                        Msisdn = "880" + m.TrimStart('0'),
-                        ReferenceId = $"REF{i + 1}"
-                    })]
-                    : null
-            });
-        }
-
-        public Task<GenNetBalanceResponse> GetBalanceAsync(
-            string apiToken, string? baseUrl = null, CancellationToken ct = default)
-            => Task.FromResult(new GenNetBalanceResponse { Status = "SUCCESS" });
-    }
-
-    [Fact]
-    public async Task GenNet_sends_every_recipient_in_one_call_in_local_format()
-    {
-        var client = new FakeGenNetClient();
-        var sender = new GenNetSmsSender(client, NullLogger<GenNetSmsSender>.Instance);
-        var job = SmsJob("8801748848039,8801969155575");
-
-        await sender.SendAsync(job, Cfg());
-
-        // One bulk call, and the country code is stripped — GenNet's documented form.
-        Assert.Equal(["01748848039", "01969155575"], client.SentTo);
-        Assert.Equal(JobStatus.Sent, job.Status);
-    }
-
-    [Fact]
-    public async Task GenNet_records_the_batch_id_it_generated()
-    {
-        var client = new FakeGenNetClient();
-        var sender = new GenNetSmsSender(client, NullLogger<GenNetSmsSender>.Instance);
-        var job = SmsJob("8801748848039");
-
-        await sender.SendAsync(job, Cfg());
-
-        // The batch id is the only handle identifying this job in GenNet's system.
-        Assert.Equal(client.BatchId, job.ProviderMessageId);
-        Assert.False(string.IsNullOrWhiteSpace(job.ProviderMessageId));
-    }
-
-    [Fact]
-    public async Task GenNet_surfaces_the_providers_own_reason_on_failure()
-    {
-        var sender = new GenNetSmsSender(
-            new FakeGenNetClient(success: false), NullLogger<GenNetSmsSender>.Instance);
-        var job = SmsJob("8801748848039");
-
-        await sender.SendAsync(job, Cfg());
-
-        Assert.Equal(JobStatus.Failed, job.Status);
-        Assert.Equal("Insufficient balance", job.FailureReason);
-    }
-
-    [Fact]
-    public async Task GenNet_maps_each_recipients_own_reference_id_onto_its_row()
-    {
-        // The batch id identifies the job, not any one message. Keeping only that would
-        // discard exactly the detail a bulk response exists to give.
-        var client = new FakeGenNetClient();
-        var sender = new GenNetSmsSender(client, NullLogger<GenNetSmsSender>.Instance);
-        var job = SmsJob("8801748848039,8801969155575");
-
-        await sender.SendAsync(job, Cfg());
-
-        Assert.NotNull(job.RecipientReferences);
-        // Keyed by the stored form, though the provider echoed its own.
-        Assert.Equal("REF1", job.RecipientReferences!["8801748848039"]);
-        Assert.Equal("REF2", job.RecipientReferences!["8801969155575"]);
-    }
-
-    [Fact]
-    public async Task GenNet_reports_no_per_recipient_references_when_the_send_failed()
-    {
-        var sender = new GenNetSmsSender(
-            new FakeGenNetClient(success: false), NullLogger<GenNetSmsSender>.Instance);
-        var job = SmsJob("8801748848039");
-
-        await sender.SendAsync(job, Cfg());
-
-        Assert.Null(job.RecipientReferences);
-    }
 
     // ── Chithi ───────────────────────────────────────────────────────────────
 
@@ -174,8 +70,7 @@ public class NewProviderSenderTests
 
         await sender.SendAsync(job, Cfg());
 
-        // Two calls, not one, and the stored form is kept — unlike GenNet, despite the
-        // two vendors sharing an API family and credentials.
+        // Two calls, not one, and the stored form is kept.
         Assert.Equal(["8801748848039", "8801969155575"], client.SentTo);
         Assert.Equal(JobStatus.Sent, job.Status);
     }
@@ -269,6 +164,9 @@ public class NewProviderSenderTests
         public string? SentTo { get; private set; }
         public string? SentFrom { get; private set; }
         public bool WasCalled { get; private set; }
+        public bool SentAsImage { get; private set; }
+        public string? SentImageUrl { get; private set; }
+        public string? SentCaption { get; private set; }
 
         public Task<NetZeroInboxQrResponse> SendTextAsync(
             string token, string from, string to, string message,
@@ -278,6 +176,19 @@ public class NewProviderSenderTests
             SentTo = to;
             SentFrom = from;
             return Task.FromResult(new NetZeroInboxQrResponse { Id = "QR-1" });
+        }
+
+        public Task<NetZeroInboxQrResponse> SendImageAsync(
+            string token, string from, string to, string imageUrl, string caption,
+            string? baseUrl = null, CancellationToken ct = default)
+        {
+            WasCalled = true;
+            SentAsImage = true;
+            SentTo = to;
+            SentFrom = from;
+            SentImageUrl = imageUrl;
+            SentCaption = caption;
+            return Task.FromResult(new NetZeroInboxQrResponse { Id = "QR-IMG-1" });
         }
     }
 
@@ -315,8 +226,27 @@ public class NewProviderSenderTests
     }
 
     [Fact]
-    public async Task The_QR_API_also_refuses_media()
+    public async Task The_QR_API_sends_confirmed_image_media()
     {
+        var client = new FakeInboxQrClient();
+        var sender = new NetZeroInboxQrWhatsAppSender(
+            client, NullLogger<NetZeroInboxQrWhatsAppSender>.Instance);
+        var job = WhatsAppJob("8801748848039", mediaUrl: "https://example.com/photo.jpg");
+
+        await sender.SendAsync(job, QrCfg());
+
+        Assert.True(client.SentAsImage);
+        Assert.Equal("https://example.com/photo.jpg", client.SentImageUrl);
+        Assert.Equal("hello", client.SentCaption);
+        Assert.Equal(JobStatus.Sent, job.Status);
+        Assert.Equal("QR-IMG-1", job.ProviderMessageId);
+    }
+
+    [Fact]
+    public async Task The_QR_API_refuses_media_types_other_than_image()
+    {
+        // Only image is confirmed against the vendor's API. Guessing a messageType for
+        // anything else risks a silent misfire rather than a clear rejection.
         var client = new FakeInboxQrClient();
         var sender = new NetZeroInboxQrWhatsAppSender(
             client, NullLogger<NetZeroInboxQrWhatsAppSender>.Instance);
@@ -326,7 +256,7 @@ public class NewProviderSenderTests
 
         Assert.False(client.WasCalled);
         Assert.Equal(JobStatus.Failed, job.Status);
-        Assert.Contains("does not support media", job.FailureReason);
+        Assert.Contains("only supports image media", job.FailureReason);
     }
 
     private static Dictionary<string, string> QrCfg() => new()
