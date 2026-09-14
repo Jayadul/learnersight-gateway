@@ -8,8 +8,9 @@ using System.Text;
 namespace NetZeroGateway.API.Middleware;
 
 /// <summary>
-/// Logs all POST /sendtext requests and responses to the ApiLogs table.
-/// Captures request body (form) and response body without breaking the pipeline.
+/// Logs all POST and GET /sendtext requests and responses to the ApiLogs table.
+/// Captures the request payload — form body for POST, query string for GET — and the
+/// response body without breaking the pipeline.
 /// </summary>
 public class ApiLoggingMiddleware(RequestDelegate next, ILogger<ApiLoggingMiddleware> logger)
 {
@@ -17,16 +18,28 @@ public class ApiLoggingMiddleware(RequestDelegate next, ILogger<ApiLoggingMiddle
     {
         var config = ctx.RequestServices.GetRequiredService<IConfiguration>();
         var endpointPath = config[ConfigKeys.GatewayEndpointPath] ?? "/sendtext";
+        var isGet = ctx.Request.Method == "GET";
 
-        if (ctx.Request.Method != "POST" ||
+        if ((!isGet && ctx.Request.Method != "POST") ||
             !ctx.Request.Path.Equals(endpointPath, StringComparison.OrdinalIgnoreCase))
         {
             await next(ctx); return;
         }
 
-        ctx.Request.EnableBuffering();
-        var reqBody = MaskSecrets(await ReadBodyAsync(ctx.Request));
-        ctx.Request.Body.Position = 0;
+        string reqBody;
+        if (isGet)
+        {
+            // Credentials arrive in the query string here, not a form body — mask the
+            // same two fields there. A URL shows up in more places than a POST body
+            // (access logs, browser history, proxies), so this matters even more on GET.
+            reqBody = MaskSecrets(ctx.Request.QueryString.Value ?? "");
+        }
+        else
+        {
+            ctx.Request.EnableBuffering();
+            reqBody = MaskSecrets(await ReadBodyAsync(ctx.Request));
+            ctx.Request.Body.Position = 0;
+        }
 
         var originalBody = ctx.Response.Body;
         using var capture = new MemoryStream();
@@ -46,7 +59,13 @@ public class ApiLoggingMiddleware(RequestDelegate next, ILogger<ApiLoggingMiddle
         string? requestedChannels = null;
         try
         {
-            if (ctx.Request.HasFormContentType)
+            if (isGet)
+            {
+                toUserVal = ctx.Request.Query["toUser"].FirstOrDefault();
+                requestedChannels = DescribeChannels(
+                    ctx.RequestServices, ctx.Request.Query["messageContent"].FirstOrDefault());
+            }
+            else if (ctx.Request.HasFormContentType)
             {
                 ctx.Request.Body.Position = 0;
                 var form = await ctx.Request.ReadFormAsync();
