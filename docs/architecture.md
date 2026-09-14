@@ -5,7 +5,7 @@ Load this when: changing message flow, adding a channel, touching fallback logic
 ## System
 
 ```
-Third-party app ──POST /sendtext──▶ API ──▶ queue (DB) ──▶ dispatch ──▶ SMS (REVE)
+Third-party app ──POST/GET /sendtext──▶ API ──▶ queue (DB) ──▶ dispatch ──▶ SMS (REVE)
 Admin UI (Angular) ──/api/*──────▶ API                        ├──▶ WhatsApp (WaTrend)
                                                               └──▶ Voice (NetZero campaigns)
 ```
@@ -27,7 +27,8 @@ with layer-specific conventions — those load automatically when you edit files
 
 ## Message flow (the core path)
 
-1. `POST /sendtext` → `SendTextOrchestratorService`
+1. `POST /sendtext` (or `GET /sendtext` — same fields as query params, same call, R3.3)
+   → `SendTextOrchestratorService`
    - Validates `apikey`/`secretkey` against the single **`gateway_credentials`** row
      (AES-decrypted, constant-time comparison), and requires `callerID` to be present.
      Invalid → `101 REJECTD`. Independent of any channel since 2.1 — see
@@ -79,7 +80,7 @@ registration, which is what made one-provider-per-type structural. See
 [adr/0008](adr/0008-multi-provider-channels.md).
 
 Only providers with a registered sender are selectable
-(`ChannelConfigService.ProvidersFor`): **SMS** — REVE, GenNet, Chithi; **WhatsApp** —
+(`ChannelConfigService.ProvidersFor`): **SMS** — REVE, Chithi; **WhatsApp** —
 WaTrend, NetZero Inbox (v1), NetZero Inbox (QR); **Voice** — NetZero Voice.
 
 **NetZero Inbox is two providers, not one.** The vendor exposes two unrelated WhatsApp
@@ -91,12 +92,16 @@ APIs on one host, sharing only the token:
 | Scheme | `https` | `http` |
 | Sender | none | `from` — the linked device's number |
 | Recipient | `+8801700000001` | `8801700000001` |
+| Media | none (undocumented, refused) | image only (`messageType=image&imageUrl=…&caption=…`), confirmed working |
 
 Sending either recipient form to the other API is a wrong number, which is why they are
 separate `Provider` members rather than a mode flag: the format is resolved from the
 provider alone, and a mode would put that decision out of `RecipientFormat`'s reach.
-Neither supports media — both refuse a media send rather than guess a request shape the
-vendor has not documented.
+v1 has no documented media contract at all and refuses a media send rather than guess a
+request shape the vendor has not described. The QR API does support media — a `wp` tag
+with `||mediaUrl` sends `messageType=image` when the URL's extension is a known image
+type (jpg, jpeg, png, gif, webp, bmp); any other extension is refused rather than risk a
+guessed `messageType` on an unconfirmed file type (R3.3).
 
 ### Recipient formats differ per provider (R3.1)
 
@@ -107,13 +112,13 @@ rather than per vendor platform:
 | Provider | On the wire | Note |
 |---|---|---|
 | REVE, WaTrend, NetZero Voice, **Chithi**, **NetZero Inbox QR** | `8801700000001` | the stored form |
-| GenNet | `01700000001` | country code dropped, trunk `0` restored |
 | NetZero Inbox (v1) | `+8801700000001` | WhatsApp Cloud API shape |
 
-Chithi shares GenNet's `api_token`, `sid` and API family but **not** its number format
-or request shape — GenNet takes an array of recipients at `/send-sms/bulk`, Chithi one
-`msisdn` per call at `/send-sms`. Shared credentials say nothing about the wire format;
-do not collapse the two implementations.
+GenNet (SMS, `api_token`/`sid`, bulk `/send-sms/bulk`, local-form recipients) was retired
+in a later release once it turned out to be the same vendor account as Chithi — see
+`docs/releases/` for when. Chithi kept its own implementation (one `msisdn` per call at
+`/send-sms`, stored-form recipients) rather than inheriting GenNet's, since shared
+credentials said nothing about the wire format.
 
 The country code is `880`, not `88`. `8801748848039` is `880` + the subscriber number,
 so the local form is `0` + that. Treating it as `88` leaves two leading zeros — a
@@ -122,8 +127,9 @@ different number.
 ### Delivery status sync (R3.2)
 
 A third provider capability, independent of the other two. REVE, Chithi and NetZero
-Voice answer what became of a message; **GenNet has no status endpoint at all**, so its
-recipient rows stay `Pending` until it offers one.
+Voice answer what became of a message. A provider with no status endpoint at all leaves
+its recipient rows `Pending` until it offers one — a channel type never implies a sync
+exists.
 
 The distinction the design turns on: a recipient the provider says failed is a delivery
 failure and belongs on the row, while a request the provider rejected — expired session,
@@ -160,7 +166,7 @@ the ManualSend tier, not SuperAdmin: this is operational recovery, not configura
 ### Balances
 
 `IChannelBalanceProvider` is separate from `IChannelSender`: sending and balance are
-independent capabilities. REVE, GenNet and Chithi report one; WaTrend, NetZero Inbox and
+independent capabilities. REVE and Chithi report one; WaTrend, NetZero Inbox and
 Voice do not, and their channels are omitted from the balance list rather than shown
 blank. REVE also reports a credit limit; the others have no such concept, and null there
 means *not applicable*, never zero.
@@ -170,6 +176,21 @@ Hangfire job every 15 minutes, matching the dashboard's existing cycle. Reads ne
 a provider — the dashboard shows several channels at once and one slow vendor would
 stall the page. A failed refresh keeps the last known figure and its timestamp and sets
 only `balance_error`, so the card shows a stale number with a reason instead of blanking.
+
+**`GET /balance?LABEL=…`** (R3.3, API root, unauthenticated) is a third-party
+integrator's entry point to this same balance data — a `labelSlug` resolves to an
+active, balance-capable channel the same way a gateway tag does — but unlike every
+other reader here it calls the provider **live** on every request (a batch-2 hotfix
+reversal of the endpoint's original cached-only design; no authentication guards it, so
+there is no rate limit on how often that live call fires). A failed live read falls back
+to the last cached figure, same graceful-degradation rule as everywhere else. See
+[api.md](api.md) for the shape.
+
+`GatewayCredential.Username` ("Username (Balance Client ID)" in the admin UI, R3.3)
+auto-syncs to the default SMS channel's own `balanceClientId` whenever that value or the
+default SMS channel itself changes (`ChannelConfigService` calls
+`GatewayCredentialService.SyncUsernameFromDefaultSmsChannelAsync`) — still admin-editable
+between syncs, and never blanked when there is nothing to sync from.
 
 ## Fallback
 
@@ -256,7 +277,7 @@ mid-migration. Full contract: [api.md](api.md).
   container. Fixed in R3.0 after an override was set, verified with `printenv` and still
   ignored at dispatch.
 - **Middleware order**: GlobalException → ApiLogging (masks `apikey`/`secretkey` in
-  stored bodies) → routing/CORS/auth.
+  stored POST bodies and, since R3.3, GET query strings) → routing/CORS/auth.
 - **Errors**: GlobalExceptionMiddleware returns ProblemDetails (`title`/`detail`) for
   admin routes, REVE-format `{Status,Text}` for the gateway path.
 - **Channel resolution**: several configs per type may be **active**; exactly one is the
