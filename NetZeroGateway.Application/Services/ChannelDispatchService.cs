@@ -188,7 +188,7 @@ public class ChannelDispatchService(
                 Recipient = number,
                 // A per-recipient id when the provider gave one, else the job-level id.
                 // REVE returns a single id for a whole batch, so its rows legitimately
-                // share one; GenNet and Chithi return one each and must not.
+                // share one; Chithi returns one each and must not.
                 ProviderReferenceId =
                     dispatchJob.RecipientReferences?.GetValueOrDefault(number)
                     ?? dispatchJob.ProviderMessageId,

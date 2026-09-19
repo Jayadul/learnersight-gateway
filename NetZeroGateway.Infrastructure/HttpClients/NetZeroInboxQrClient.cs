@@ -14,7 +14,7 @@ public class NetZeroInboxQrClient(
     private string SendPath =>
         config["Providers:NetZeroInboxQr:SendPath"] ?? "/api/qr/rest/send_message";
 
-    public async Task<NetZeroInboxQrResponse> SendTextAsync(
+    public Task<NetZeroInboxQrResponse> SendTextAsync(
         string token, string from, string to, string message,
         string? baseUrl = null, CancellationToken ct = default)
     {
@@ -29,10 +29,35 @@ public class NetZeroInboxQrClient(
         q["to"] = to;
         q["text"] = message;
 
+        return ExecuteAsync(q, from, to, ct, baseUrl);
+    }
+
+    public Task<NetZeroInboxQrResponse> SendImageAsync(
+        string token, string from, string to, string imageUrl, string caption,
+        string? baseUrl = null, CancellationToken ct = default)
+    {
+        var q = HttpUtility.ParseQueryString(string.Empty);
+        q["messageType"] = "image";
+        q["requestType"] = "GET";
+        q["token"] = token;
+        q["from"] = from;
+        q["to"] = to;
+        q["imageUrl"] = imageUrl;
+        q["caption"] = caption;
+
+        return ExecuteAsync(q, from, to, ct, baseUrl);
+    }
+
+    private async Task<NetZeroInboxQrResponse> ExecuteAsync(
+        System.Collections.Specialized.NameValueCollection q, string from, string to,
+        CancellationToken ct, string? baseUrl = null)
+    {
         var url = ProviderEndpoint.Resolve(baseUrl, $"{SendPath}?{q}");
 
         // The token is in the URL, so the URL is never logged — only the path.
-        logger.LogInformation("[NZ_INBOX_QR] GET {Path} from={From} to={To}", SendPath, from, to);
+        logger.LogInformation(
+            "[NZ_INBOX_QR] GET {Path} ({MessageType}) from={From} to={To}",
+            SendPath, q["messageType"], from, to);
 
         var resp = await http.GetAsync(url, ct);
         var body = (await resp.Content.ReadAsStringAsync(ct)).Trim();

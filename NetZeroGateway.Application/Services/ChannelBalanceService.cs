@@ -10,8 +10,10 @@ namespace NetZeroGateway.Application.Services;
 
 /// <summary>
 /// Keeps each channel's provider balance cached on the channel row, and refreshes it on
-/// demand or on a schedule. Reads never call a provider: the dashboard shows several
-/// channels at once, and one slow vendor would otherwise hold up the whole page.
+/// demand or on a schedule. <see cref="GetAllAsync"/> never calls a provider — the
+/// dashboard shows several channels at once, and one slow vendor would otherwise hold up
+/// the whole page — but <see cref="GetByLabelAsync"/> (the public, unauthenticated
+/// endpoint) does call live on every request; see its own doc comment.
 /// </summary>
 public class ChannelBalanceService(
     IChannelConfigRepository repo,
@@ -43,7 +45,7 @@ public class ChannelBalanceService(
         {
             throw new InvalidOperationException(
                 $"Provider '{config.Provider}' does not report a balance. "
-                + "Balance is available for REVE, GenNet and Chithi channels.");
+                + "Balance is available for REVE and Chithi channels.");
         }
 
         await RefreshOneAsync(config);
@@ -106,6 +108,45 @@ public class ChannelBalanceService(
         }
 
         repo.Update(config);
+    }
+
+    /// <summary>
+    /// Team-lead-approved reversal of the original R3.3 design (this used to read the
+    /// cache only, like <see cref="GetAllAsync"/>): the public endpoint now calls the
+    /// provider live on every request. Flagged once, for the record — this endpoint has
+    /// no authentication, so a label is now enough to trigger unlimited live REVE/Chithi
+    /// balance calls; there is no rate limiting here.
+    /// <para>
+    /// A failed live read still returns the last known cached figure — the same
+    /// graceful-degradation rule <see cref="RefreshOneAsync"/> already applies
+    /// everywhere else, so a transient provider hiccup does not turn into a bare error
+    /// for an integrator polling this endpoint.
+    /// </para>
+    /// </summary>
+    public async Task<PublicBalanceDto?> GetByLabelAsync(string label)
+    {
+        var config = (await repo.GetAllAsync()).FirstOrDefault(c =>
+            c.IsActive && string.Equals(c.LabelSlug, label, StringComparison.OrdinalIgnoreCase));
+
+        if (config is null || !_providers.ContainsKey(config.Provider)) return null;
+
+        try
+        {
+            await RefreshOneAsync(config);
+            await repo.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "[BALANCE] Live read failed for label {Label}", label);
+        }
+
+        return new PublicBalanceDto
+        {
+            Label = config.Label,
+            Balance = config.Balance,
+            CreditLimit = config.BalanceCreditLimit,
+            LastCheckedAt = config.BalanceCheckedAt
+        };
     }
 
     private static ChannelBalanceDto ToDto(ChannelConfig c) => new()

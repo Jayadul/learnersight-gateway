@@ -149,4 +149,91 @@ public class ChannelBalanceServiceTests
 
         Assert.Contains("does not report a balance", ex.Message);
     }
+
+    [Fact]
+    public async Task The_public_balance_lookup_resolves_an_active_balance_capable_channel_by_label()
+    {
+        var config = SmsChannel(existingBalance: 250m);
+        config.LabelSlug = "revemain";
+        config.Label = "SMS Default";
+        var repo = new FakeConfigRepo(config);
+        var service = Build(repo, ChannelBalanceResult.Ok(250m));
+
+        var dto = await service.GetByLabelAsync("REVEMAIN"); // case-insensitive, like a gateway tag
+
+        Assert.NotNull(dto);
+        Assert.Equal("SMS Default", dto!.Label);
+        Assert.Equal(250m, dto.Balance);
+    }
+
+    [Fact]
+    public async Task The_public_balance_lookup_calls_the_provider_live_rather_than_the_cache()
+    {
+        // A stale cached figure that must NOT be what comes back — proves this reads the
+        // provider on every call rather than the cache RefreshAsync/GetAllAsync use.
+        var config = SmsChannel(existingBalance: 100m);
+        config.LabelSlug = "revemain";
+        var repo = new FakeConfigRepo(config);
+        var service = Build(repo, ChannelBalanceResult.Ok(777m));
+
+        var dto = await service.GetByLabelAsync("revemain");
+
+        Assert.Equal(777m, dto!.Balance);
+        Assert.NotEqual(100m, dto.Balance);
+    }
+
+    [Fact]
+    public async Task The_public_balance_lookup_falls_back_to_the_last_known_figure_when_the_live_call_fails()
+    {
+        // Same graceful-degradation rule as every other refresh path: a transient
+        // provider failure must not turn into a bare error for an integrator polling
+        // this endpoint.
+        var config = SmsChannel(existingBalance: 900m);
+        config.LabelSlug = "revemain";
+        var repo = new FakeConfigRepo(config);
+        var service = Build(repo, ChannelBalanceResult.Failed("session expired"));
+
+        var dto = await service.GetByLabelAsync("revemain");
+
+        Assert.NotNull(dto);
+        Assert.Equal(900m, dto!.Balance);
+    }
+
+    [Fact]
+    public async Task The_public_balance_lookup_returns_null_for_an_unknown_label()
+    {
+        var config = SmsChannel();
+        config.LabelSlug = "revemain";
+        var repo = new FakeConfigRepo(config);
+        var service = Build(repo, ChannelBalanceResult.Ok(10m));
+
+        Assert.Null(await service.GetByLabelAsync("nosuchlabel"));
+    }
+
+    [Fact]
+    public async Task The_public_balance_lookup_returns_null_for_an_inactive_channel()
+    {
+        // Never leaks whether an inactive channel's label exists — same null, same
+        // generic error, as a label that was never valid at all.
+        var config = SmsChannel();
+        config.LabelSlug = "revemain";
+        config.IsActive = false;
+        var repo = new FakeConfigRepo(config);
+        var service = Build(repo, ChannelBalanceResult.Ok(10m));
+
+        Assert.Null(await service.GetByLabelAsync("revemain"));
+    }
+
+    [Fact]
+    public async Task The_public_balance_lookup_returns_null_for_a_non_balance_provider()
+    {
+        var voice = SmsChannel();
+        voice.LabelSlug = "voicemain";
+        voice.ChannelType = ChannelType.Voice;
+        voice.Provider = Provider.NetZeroVoice;
+        var repo = new FakeConfigRepo(voice);
+        var service = Build(repo, ChannelBalanceResult.Ok(10m));
+
+        Assert.Null(await service.GetByLabelAsync("voicemain"));
+    }
 }

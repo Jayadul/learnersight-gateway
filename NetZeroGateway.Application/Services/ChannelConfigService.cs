@@ -10,7 +10,8 @@ namespace NetZeroGateway.Application.Services;
 public class ChannelConfigService(
     IChannelConfigRepository repo,
     IFallbackPolicyRepository policyRepo,
-    IEncryptionService enc
+    IEncryptionService enc,
+    IGatewayCredentialService gatewayCredentials
 ) : IChannelConfigService
 {
     public async Task<List<ChannelConfigDto>> GetAllAsync(ChannelType? filter)
@@ -54,6 +55,8 @@ public class ChannelConfigService(
     {
         var entity = await repo.GetByIdAsync(id)
             ?? throw new NotFoundException($"ChannelConfig {id} not found.");
+        var balanceClientIdBefore = BalanceClientIdOf(entity);
+
         entity.Provider = ValidateProvider(entity.ChannelType, req.Provider);
         entity.ProviderName = req.ProviderName;
         entity.Label = req.Label;
@@ -63,6 +66,17 @@ public class ChannelConfigService(
         entity.ConfigJson = enc.Encrypt(MergeConfigJson(entity.ConfigJson, req.ConfigJson));
         repo.Update(entity);
         await repo.SaveChangesAsync();
+
+        // The gateway's Username tracks the default SMS channel's own Balance Client
+        // ID — only relevant when this is that channel, and only worth a write when the
+        // value actually moved.
+        if (entity.IsDefault && entity.ChannelType == ChannelType.SMS)
+        {
+            var balanceClientIdAfter = BalanceClientIdOf(entity);
+            if (balanceClientIdAfter != balanceClientIdBefore)
+                await gatewayCredentials.SyncUsernameFromDefaultSmsChannelAsync(balanceClientIdAfter);
+        }
+
         return ToDto(entity);
     }
 
@@ -148,6 +162,23 @@ public class ChannelConfigService(
         var entity = await repo.GetByIdAsync(id)
             ?? throw new NotFoundException($"ChannelConfig {id} not found.");
         await repo.SetDefaultAsync(id, entity.ChannelType);
+
+        if (entity.ChannelType == ChannelType.SMS)
+            await gatewayCredentials.SyncUsernameFromDefaultSmsChannelAsync(BalanceClientIdOf(entity));
+    }
+
+    /// <summary>
+    /// The channel's own Balance Client ID, or null when it has none — only REVE-style
+    /// configs carry this field, and an undecryptable config must not throw here.
+    /// </summary>
+    private string? BalanceClientIdOf(ChannelConfig c)
+    {
+        try
+        {
+            var dict = JsonSerializer.Deserialize<Dictionary<string, string>>(enc.Decrypt(c.ConfigJson));
+            return dict?.GetValueOrDefault("balanceClientId");
+        }
+        catch { return null; }
     }
 
     /// <summary>
@@ -206,6 +237,23 @@ public class ChannelConfigService(
         return enc.Decrypt(entity.ConfigJson);
     }
 
+    public async Task<List<ChannelOptionDto>> GetOptionsAsync(ChannelType? filter)
+    {
+        var list = filter is null
+            ? await repo.GetAllAsync()
+            : await repo.GetAllByChannelTypeAsync(filter.Value);
+
+        return list.Select(c => new ChannelOptionDto
+        {
+            Id = c.Id,
+            Label = c.Label,
+            LabelSlug = c.LabelSlug,
+            ChannelType = c.ChannelType,
+            IsActive = c.IsActive,
+            IsDefault = c.IsDefault
+        }).ToList();
+    }
+
     /// <summary>
     /// Rejects a provider that cannot serve this channel type. Saving a Voice channel
     /// with the WaTrend provider would otherwise persist happily and then throw at
@@ -230,7 +278,7 @@ public class ChannelConfigService(
     /// </summary>
     private static Provider[] ProvidersFor(ChannelType channelType) => channelType switch
     {
-        ChannelType.SMS => [Provider.Reve, Provider.GenNet, Provider.Chithi],
+        ChannelType.SMS => [Provider.Reve, Provider.Chithi],
         ChannelType.WP => [Provider.WaTrend, Provider.NetZeroInbox, Provider.NetZeroInboxQr],
         ChannelType.Voice => [Provider.NetZeroVoice],
         _ => []

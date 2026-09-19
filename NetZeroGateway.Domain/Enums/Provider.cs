@@ -24,8 +24,7 @@ public enum Provider
     /// </summary>
     NetZeroVoice = 2,
 
-    /// <summary>GenNet SMS (isms.gennet.com.bd).</summary>
-    GenNet = 3,
+    // 3 was GenNet SMS — retired (folded into Chithi, same vendor account). Never reuse.
 
     /// <summary>
     /// NetZero Inbox WhatsApp, structured v1 API

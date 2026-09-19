@@ -4,10 +4,10 @@ using NetZeroGateway.Domain.Enums;
 namespace NetZeroGateway.Tests;
 
 /// <summary>
-/// Recipient numbers are stored canonically (digits, country code, no plus). Two of the
-/// Release 3 providers disagree with that in opposite directions, and one that shares a
-/// vendor platform with another does not — so the format is a per-provider fact rather
-/// than something to infer. Getting it wrong sends to the wrong number or is rejected.
+/// Recipient numbers are stored canonically (digits, country code, no plus). NetZero
+/// Inbox's v1 API disagrees with that, wanting a leading plus, while its own QR API on
+/// the same host does not — so the format is a per-provider fact rather than something
+/// to infer. Getting it wrong sends to the wrong number or is rejected.
 /// </summary>
 public class RecipientFormatTests
 {
@@ -22,24 +22,12 @@ public class RecipientFormatTests
     }
 
     [Fact]
-    public void GenNet_takes_the_local_form()
-        => Assert.Equal("01748848039", RecipientFormat.For(Provider.GenNet, Canonical));
-
-    [Fact]
     public void NetZero_Inbox_takes_a_leading_plus()
         => Assert.Equal("+8801748848039", RecipientFormat.For(Provider.NetZeroInbox, Canonical));
 
     [Fact]
-    public void Chithi_takes_the_stored_form_even_though_it_shares_GenNets_credentials()
-    {
-        // The two vendors issue one api_token and one sid between them and their APIs are
-        // the same family, which makes it tempting to give them one implementation. Their
-        // documented request bodies disagree on this, so they do not share one.
-        Assert.Equal(Canonical, RecipientFormat.For(Provider.Chithi, Canonical));
-        Assert.NotEqual(
-            RecipientFormat.For(Provider.GenNet, Canonical),
-            RecipientFormat.For(Provider.Chithi, Canonical));
-    }
+    public void Chithi_takes_the_stored_form()
+        => Assert.Equal(Canonical, RecipientFormat.For(Provider.Chithi, Canonical));
 
     [Fact]
     public void The_two_NetZero_Inbox_APIs_disagree_about_the_plus()
@@ -52,12 +40,6 @@ public class RecipientFormatTests
             RecipientFormat.For(Provider.NetZeroInbox, Canonical),
             RecipientFormat.For(Provider.NetZeroInboxQr, Canonical));
     }
-
-    [Theory]
-    [InlineData("8801748848039", "01748848039")]
-    [InlineData("01748848039", "01748848039")]   // already local, left alone
-    public void ToLocal_drops_the_country_code_and_is_idempotent(string input, string expected)
-        => Assert.Equal(expected, RecipientFormat.ToLocal(input));
 
     [Theory]
     [InlineData("8801748848039", "8801748848039")]

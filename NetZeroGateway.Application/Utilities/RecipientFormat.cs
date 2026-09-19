@@ -7,11 +7,10 @@ namespace NetZeroGateway.Application.Utilities;
 /// <para>
 /// Numbers are stored canonically — digits only, country code included, no plus
 /// (<c>8801700000001</c>). Until Release 3 every provider took that form, so nothing
-/// needed converting. The two new SMS vendors disagree with it in opposite directions:
-/// GenNet's API takes the local form (<c>01700000001</c>) while NetZero Inbox wants a
-/// leading plus (<c>+8801700000001</c>). Chithi, despite sharing GenNet's credentials
-/// and API family, takes the canonical form — so the format is a per-provider fact and
-/// cannot be inferred from the vendor's platform.
+/// needed converting. NetZero Inbox disagrees with it: it wants a leading plus
+/// (<c>+8801700000001</c>). Chithi, despite sharing GenNet's old credentials and API
+/// family before GenNet was retired, takes the canonical form — so the format is a
+/// per-provider fact and cannot be inferred from the vendor's platform.
 /// </para>
 /// <para>
 /// Only the request side is converted. Providers echo numbers back in their own shape,
@@ -32,9 +31,6 @@ public static class RecipientFormat
     /// <summary>How a provider wants a recipient written on the wire.</summary>
     public static string For(Provider provider, string canonical) => provider switch
     {
-        // 01700000001 — GenNet's documented request form.
-        Provider.GenNet => ToLocal(canonical),
-
         // +8801700000001 — NetZero Inbox follows the WhatsApp Cloud API shape.
         Provider.NetZeroInbox => ToPlus(canonical),
 
@@ -45,15 +41,6 @@ public static class RecipientFormat
 
         _ => canonical
     };
-
-    /// <summary>Drops the country code: <c>8801700000001</c> → <c>01700000001</c>.</summary>
-    public static string ToLocal(string canonical)
-    {
-        var digits = Digits(canonical);
-        return digits.StartsWith(CountryCode, StringComparison.Ordinal)
-            ? "0" + digits[CountryCode.Length..]
-            : digits;
-    }
 
     /// <summary>Prefixes a plus: <c>8801700000001</c> → <c>+8801700000001</c>.</summary>
     public static string ToPlus(string canonical) => "+" + Digits(canonical);

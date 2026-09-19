@@ -88,18 +88,9 @@ public static class ServiceCollectionExtensions
             })
             .AddStandardResilienceHandler(o => Resilience(o, retryCount, retryDelay));
 
-        // The three Release 3 providers. Their base URLs live on the channel config
-        // (ADR 0008), so the registered BaseAddress is only the fallback default for a
-        // channel that leaves the field blank.
-        services
-            .AddHttpClient<IGenNetClient, GenNetClient>(c =>
-            {
-                c.BaseAddress = new Uri(
-                    config[ConfigKeys.GenNetBaseUrl] ?? "https://isms.gennet.com.bd");
-                c.Timeout = TimeSpan.FromSeconds(timeout);
-            })
-            .AddStandardResilienceHandler(o => Resilience(o, retryCount, retryDelay));
-
+        // The Release 3 providers. Their base URLs live on the channel config (ADR 0008),
+        // so the registered BaseAddress is only the fallback default for a channel that
+        // leaves the field blank.
         services
             .AddHttpClient<IChithiClient, ChithiClient>(c =>
             {
@@ -143,8 +134,7 @@ public static class ServiceCollectionExtensions
             .AddStandardResilienceHandler(o => Resilience(o, retryCount, retryDelay));
 
         // Status lookups. REVE and Chithi reuse their send host and credentials; the
-        // voice report is on the voice host. GenNet has no status endpoint at all, so
-        // its rows stay Pending — a channel type never implies a sync exists.
+        // voice report is on the voice host — a channel type never implies a sync exists.
         services
             .AddHttpClient<IReveStatusClient, ReveStatusClient>(c =>
             {
@@ -178,7 +168,6 @@ public static class ServiceCollectionExtensions
         // Balance readers. Not every provider has one, and a channel type never implies
         // that it does — Voice and WhatsApp report no balance at all.
         services.AddScoped<IChannelBalanceProvider, ReveBalanceProvider>();
-        services.AddScoped<IChannelBalanceProvider, GenNetBalanceProvider>();
         services.AddScoped<IChannelBalanceProvider, ChithiBalanceProvider>();
 
         // Channel sender strategies. One per (ChannelType, Provider, HandlesMedia) —
@@ -188,7 +177,6 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IChannelSender, WhatsAppTextSender>();   // WP   / WaTrend
         services.AddScoped<IChannelSender, WhatsAppMediaSender>();  // WP   / WaTrend + media
         services.AddScoped<IChannelSender, VoiceSender>();          // Voice/ NetZeroVoice
-        services.AddScoped<IChannelSender, GenNetSmsSender>();      // SMS  / GenNet
         services.AddScoped<IChannelSender, ChithiSmsSender>();      // SMS  / Chithi
         services.AddScoped<IChannelSender, NetZeroInboxWhatsAppSender>();   // WP / NetZeroInbox v1
         services.AddScoped<IChannelSender, NetZeroInboxQrWhatsAppSender>(); // WP / NetZeroInbox QR
