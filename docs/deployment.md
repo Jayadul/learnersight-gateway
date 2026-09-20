@@ -61,6 +61,16 @@ contains production appsettings; see releases/1.0.0.md → Known limitations.
 
 - Files live in the `mediadata` volume (`/app/media` inside the api container) —
   losing the volume breaks all shared links.
+- **Confirmed safe against every redeploy path (hotfix batch 3, task 5).** Neither repo
+  has a CI/CD pipeline — there is no `.github/workflows/` in either, and
+  [testing.md](testing.md) already says so ("no CI"). The actual redeploy mechanism is
+  the manual flow in [release-process.md](release-process.md): `docker compose build` →
+  retag → push → client `docker compose pull && up -d`. `mediadata` is a genuine named
+  Docker volume declared in `docker-compose.yml`, entirely outside both the `api` and
+  `web` build contexts, so a rebuild or an image pull cannot touch it — only
+  `docker compose down -v` or `docker volume rm mediadata` would, and neither is part of
+  the documented ship flow. Nothing to change here; recorded so a future session doesn't
+  re-investigate a CI/CD pipeline that was never built.
 - `Media__PublicBaseUrl` (compose env on `api`) is what public links are built from;
   set it to the address message recipients can reach (the web service proxies
   `/media/` to the API, so the client's domain or `http://<server-ip>:18080`).
