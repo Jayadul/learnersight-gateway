@@ -4,11 +4,13 @@ Load this when: changing endpoints, integrating a client, or debugging request/r
 
 ## Public gateway endpoint
 
-`POST /sendtext` (`application/x-www-form-urlencoded`) and `GET /sendtext` (same fields
-as query-string params) — both live at the API **root** (not `/api/`), both routed
-through the same `SendTextOrchestratorService` call, both return the identical
-REVE-compatible response. Use GET only where the integrator's platform cannot easily do
-POST — POST keeps credentials off the URL, which GET cannot.
+`POST /sendtext` (`application/x-www-form-urlencoded` **or** `application/json`, R3.4)
+and `GET /sendtext` (same fields as query-string params) — all live at the API **root**
+(not `/api/`), all routed through the same `SendTextOrchestratorService` call, all return
+the identical REVE-compatible response. The two POST content types are both accepted
+side by side (selected by `Content-Type`) — JSON did not replace form-urlencoded, so
+existing integrators are unaffected. Use GET only where the integrator's platform cannot
+easily do POST — POST keeps credentials off the URL, which GET cannot.
 
 | Field | Required | Notes |
 |---|---|---|
@@ -19,26 +21,32 @@ POST — POST keeps credentials off the URL, which GET cannot.
 | `callerID` | yes | Recorded with the request; not part of authentication |
 
 ```
-POST /sendtext
+POST /sendtext  (application/x-www-form-urlencoded)
+apikey=…&secretkey=…&callerID=testSender&toUser=8801835414333,8801835471840&messageContent=test+message
+
+POST /sendtext  (application/json)
 { "apikey": "…", "secretkey": "…", "callerID": "testSender",
   "toUser": "8801835414333,8801835471840", "messageContent": "test message" }
 
 GET /sendtext?apikey=…&secretkey=…&callerID=testSender&toUser=8801712564810,8801835414330&messageContent=test
 ```
 
-`ApiLoggingMiddleware` masks `apikey`/`secretkey` on both verbs — in the stored form body
-for POST, in the stored query string for GET.
+`ApiLoggingMiddleware` masks `apikey`/`secretkey` on all three shapes before storing —
+the form body and query string via a `key=value` regex, the JSON body by parsing and
+redacting those two properties directly (a JSON body doesn't match the regex shape).
 
 ## Public balance endpoint
 
-`GET /balance?LABEL={labelSlug}` — also at the API root, also unauthenticated (R3.3).
-Resolves `LABEL` to any **active, balance-capable** channel (currently SMS-type only —
+`GET /balance?callerID={labelSlug}` — also at the API root, also unauthenticated (R3.3;
+param renamed from `LABEL` to `callerID` in R3.4 — same value, a channel's `labelSlug`,
+just a different query-string name to match the field integrators already send to
+`/sendtext`). Resolves `callerID` to any **active, balance-capable** channel (currently SMS-type only —
 REVE, Chithi) and reads that channel's balance **live from the provider** on every
 request (batch-2 hotfix reversed the original cached-only design). A failed live read
 falls back to the last known cached figure rather than returning an error — the same
 graceful-degradation rule the dashboard and the 15-minute refresh job already follow.
 
-**No rate limiting.** This endpoint has no authentication — `LABEL` alone triggers the
+**No rate limiting.** This endpoint has no authentication — `callerID` alone triggers the
 live provider call, so anyone who can guess or learn a label can trigger unlimited
 REVE/Chithi balance checks through it. Flagged for the record; team-lead-approved.
 
@@ -50,8 +58,8 @@ type that doesn't support balance all return the same generic shape — `404` wi
 `/sendtext` is, and never a different message per case, since there is no `apikey`
 guarding this endpoint to make that distinction safe to reveal.
 
-**No authentication.** `LABEL` alone is sufficient. This is a deliberate trade-off, not an
-oversight — flagged once, for the record: anyone who can guess or learn a channel's label
+**No authentication.** `callerID` alone is sufficient. This is a deliberate trade-off, not
+an oversight — flagged once, for the record: anyone who can guess or learn a channel's label
 can read its balance.
 
 Authentication reads the single `gateway_credentials` row. Its `username` is admin-side

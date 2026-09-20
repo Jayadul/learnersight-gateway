@@ -177,8 +177,9 @@ a provider — the dashboard shows several channels at once and one slow vendor 
 stall the page. A failed refresh keeps the last known figure and its timestamp and sets
 only `balance_error`, so the card shows a stale number with a reason instead of blanking.
 
-**`GET /balance?LABEL=…`** (R3.3, API root, unauthenticated) is a third-party
-integrator's entry point to this same balance data — a `labelSlug` resolves to an
+**`GET /balance?callerID=…`** (R3.3, API root, unauthenticated; param renamed from
+`LABEL` in R3.4) is a third-party integrator's entry point to this same balance data —
+a `labelSlug` resolves to an
 active, balance-capable channel the same way a gateway tag does — but unlike every
 other reader here it calls the provider **live** on every request (a batch-2 hotfix
 reversal of the endpoint's original cached-only design; no authentication guards it, so
