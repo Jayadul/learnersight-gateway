@@ -197,6 +197,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IChannelBalanceService, ChannelBalanceService>();
         services.AddScoped<IStatusSyncService, StatusSyncService>();
         services.AddScoped<IResendService, ResendService>();
+        services.AddScoped<IDispatchJobRecipientService, DispatchJobRecipientService>();
         services.AddScoped<IFallbackPolicyService, FallbackPolicyService>();
         services.AddScoped<IFallbackHandlerService, FallbackHandlerService>();
         services.AddScoped<IChannelDispatchService, ChannelDispatchService>();

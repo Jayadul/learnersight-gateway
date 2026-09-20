@@ -161,9 +161,12 @@ public class FallbackHandlerService(
                     DispatchJobId = fallbackJob.Id,
                     Recipient = n.Trim(),
                     ProviderReferenceId = fallbackJob.ProviderMessageId,
+                    // This row's message only arrived because the primary channel failed
+                    // and this retry got through — Fallback rather than Pending records
+                    // that immediately, without waiting on a status-sync run.
                     DeliveryStatus = fallbackJob.Status == JobStatus.Failed
                         ? DeliveryStatus.Failed
-                        : DeliveryStatus.Pending
+                        : DeliveryStatus.Fallback
                 })
                 .ToList();
 

@@ -1,4 +1,5 @@
 using NetZeroGateway.Domain.Entities;
+using NetZeroGateway.Domain.Enums;
 
 namespace NetZeroGateway.Application.Interfaces;
 
@@ -6,6 +7,17 @@ public interface IDispatchJobRecipientRepository : IRepository<DispatchJobRecipi
 {
     /// <summary>Recipient rows for one job, in the order they were dispatched.</summary>
     Task<List<DispatchJobRecipient>> GetByDispatchJobIdAsync(Guid dispatchJobId);
+
+    /// <summary>
+    /// Paged, filterable recipient rows for the merged Message Logs page (hotfix batch 3)
+    /// — the job and its channel config are eager-loaded since the page shows channel
+    /// name/type and message content per row, not just the recipient's own fields.
+    /// </summary>
+    Task<(List<DispatchJobRecipient> Items, int Total)> GetPagedAsync(
+        int page, int size,
+        DateTimeOffset? from, DateTimeOffset? to,
+        ChannelType? channelType, Guid? channelConfigId,
+        DeliveryStatus? deliveryStatus, string? recipient);
 
     /// <summary>
     /// Adds a whole job's recipients in one round trip. Jobs routinely carry hundreds of

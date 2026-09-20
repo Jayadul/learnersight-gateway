@@ -32,12 +32,11 @@
       },
       "ChannelBalance": {},
       "StatusSync": {},
-      "Resend": {},
+      "DispatchJobRecipient": {},
       "FallbackPolicy": {
         "Roles": [ "SuperAdmin" ]
       },
       "MessageRequest": {},
-      "DispatchLog": {},
       "ApiLog": {},
       "Dashboard": {},
       "ManualSend": {},

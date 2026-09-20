@@ -87,11 +87,6 @@ internal sealed class FakeDispatchJobRepository : IDispatchJobRepository
 
     public Task<List<DispatchJob>> GetByMessageRequestIdAsync(Guid id) => Unused.Fail<Task<List<DispatchJob>>>();
     public Task<List<DispatchJob>> GetFailedWithChannelAsync() => Unused.Fail<Task<List<DispatchJob>>>();
-    public Task<(List<DispatchJob> Items, int Total)> GetPagedAsync(
-        int page, int size, DateTimeOffset? from, DateTimeOffset? to,
-        ChannelType? channelType, JobStatus? status, string? toNumber,
-        DeliveryStatus? deliveryStatus = null)
-        => Unused.Fail<Task<(List<DispatchJob>, int)>>();
     public Task<DispatchJob?> GetByIdAsync(Guid id) => Unused.Fail<Task<DispatchJob?>>();
     public Task<List<DispatchJob>> GetAllAsync() => Unused.Fail<Task<List<DispatchJob>>>();
     public Task<List<DispatchJob>> FindAsync(Expression<Func<DispatchJob, bool>> p) => Unused.Fail<Task<List<DispatchJob>>>();
@@ -127,6 +122,12 @@ internal sealed class FakeDispatchJobRecipientRepository : IDispatchJobRecipient
     public Task<List<DispatchJobRecipient>> GetPendingForChannelAsync(
         Guid channelConfigId, DateTimeOffset from, DateTimeOffset to, int limit)
         => Unused.Fail<Task<List<DispatchJobRecipient>>>();
+
+    public Task<(List<DispatchJobRecipient> Items, int Total)> GetPagedAsync(
+        int page, int size, DateTimeOffset? from, DateTimeOffset? to,
+        ChannelType? channelType, Guid? channelConfigId,
+        DeliveryStatus? deliveryStatus, string? recipient)
+        => Unused.Fail<Task<(List<DispatchJobRecipient>, int)>>();
 
     public Task<DispatchJobRecipient?> GetByIdAsync(Guid id) => Unused.Fail<Task<DispatchJobRecipient?>>();
     public Task<List<DispatchJobRecipient>> GetAllAsync() => Unused.Fail<Task<List<DispatchJobRecipient>>>();

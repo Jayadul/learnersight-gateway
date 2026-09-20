@@ -23,5 +23,14 @@ public enum DeliveryStatus
     /// with a state we do not recognise — never guess Failed from an unknown state, or
     /// a working send starts reading as a broken one.
     /// </summary>
-    Unknown = 3
+    Unknown = 3,
+
+    /// <summary>
+    /// This recipient's message arrived, but only because the primary channel failed and
+    /// a fallback job carried it through (hotfix batch 3). Set at dispatch time on the
+    /// recipient rows of a job with <see cref="DispatchJob.IsFallback"/> true that
+    /// succeeded — the per-recipient mirror of <see cref="MessageStatus.Fallback"/>.
+    /// Status sync can still overwrite it later, the same way it overwrites Pending.
+    /// </summary>
+    Fallback = 4
 }

@@ -58,10 +58,6 @@ public class ResendServiceTests
         public void Update(DispatchJob e) { }
         public Task<List<DispatchJob>> GetByMessageRequestIdAsync(Guid id) => Unused.Fail<Task<List<DispatchJob>>>();
         public Task<List<DispatchJob>> GetFailedWithChannelAsync() => Unused.Fail<Task<List<DispatchJob>>>();
-        public Task<(List<DispatchJob> Items, int Total)> GetPagedAsync(
-            int p, int s, DateTimeOffset? f, DateTimeOffset? t, ChannelType? c, JobStatus? st,
-            string? n, DeliveryStatus? d = null)
-            => Unused.Fail<Task<(List<DispatchJob>, int)>>();
         public Task<List<DispatchJob>> GetAllAsync() => Unused.Fail<Task<List<DispatchJob>>>();
         public Task<List<DispatchJob>> FindAsync(Expression<Func<DispatchJob, bool>> p) => Unused.Fail<Task<List<DispatchJob>>>();
         public void Delete(DispatchJob e) => Unused.Fail<bool>();
@@ -79,6 +75,11 @@ public class ResendServiceTests
         public Task<List<DispatchJobRecipient>> GetByDispatchJobIdAsync(Guid id) => Unused.Fail<Task<List<DispatchJobRecipient>>>();
         public Task<List<DispatchJobRecipient>> GetPendingForChannelAsync(
             Guid c, DateTimeOffset f, DateTimeOffset t, int l) => Unused.Fail<Task<List<DispatchJobRecipient>>>();
+        public Task<(List<DispatchJobRecipient> Items, int Total)> GetPagedAsync(
+            int page, int size, DateTimeOffset? from, DateTimeOffset? to,
+            ChannelType? channelType, Guid? channelConfigId,
+            DeliveryStatus? deliveryStatus, string? recipient)
+            => Unused.Fail<Task<(List<DispatchJobRecipient>, int)>>();
         public Task<List<DispatchJobRecipient>> GetAllAsync() => Unused.Fail<Task<List<DispatchJobRecipient>>>();
         public Task<List<DispatchJobRecipient>> FindAsync(Expression<Func<DispatchJobRecipient, bool>> p) => Unused.Fail<Task<List<DispatchJobRecipient>>>();
         public void Delete(DispatchJobRecipient e) => Unused.Fail<bool>();
