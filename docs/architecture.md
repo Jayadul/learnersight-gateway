@@ -289,10 +289,13 @@ mid-migration. Full contract: [api.md](api.md).
 - **Secrets**: channel provider credentials AES-encrypted in `channel_configs.config_json`,
   and the gateway's own keys in `gateway_credentials.api_key_encrypted` /
   `secret_key_encrypted` (`IEncryptionService` for both); rotation via admin UI applies
-  instantly. Channel-config reads mask secrets as `***`; the gateway credentials are read
-  back decrypted for SuperAdmin, since the pair has to be handed to an integrator and
-  nothing else can read the column. Writes treat an omitted, blank or `***` field as
-  "leave it alone" so a partial save never blanks a credential.
+  instantly. Channel-config reads show secrets **partially masked** (R3.4 — `***` plus the
+  last 6 characters, e.g. `***7ced465`; `GET /{id}/reveal?field=` returns one field's real
+  value on demand, same SuperAdmin gate); the gateway credentials are read back fully
+  decrypted for SuperAdmin, since the pair has to be handed to an integrator and nothing
+  else can read the column. Writes treat an omitted or `***`-prefixed field as "leave it
+  alone" so a partial save never blanks a credential — one check covers both the old
+  full mask and the new partial one.
 - **Logging**: Serilog → Seq (compose service, port 18082).
 - **Time**: UTC storage/processing everywhere; Dhaka (UTC+6) for display and job
   schedules — see [conventions.md](conventions.md).

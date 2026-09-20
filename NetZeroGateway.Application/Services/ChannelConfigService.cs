@@ -113,7 +113,7 @@ public class ChannelConfigService(
         var merged = new Dictionary<string, string>(stored);
         foreach (var kv in incoming)
         {
-            if (kv.Value == MaskedValue) continue;
+            if (IsMaskedPlaceholder(kv.Value)) continue;
             merged[kv.Key] = kv.Value;
         }
         return JsonSerializer.Serialize(merged);
@@ -230,11 +230,26 @@ public class ChannelConfigService(
     private static string Slugify(string value) =>
         new(value.ToLowerInvariant().Where(char.IsLetterOrDigit).ToArray());
 
-    public async Task<string> GetDecryptedConfigJsonAsync(Guid id)
+    public async Task<string> RevealFieldAsync(Guid id, string field)
     {
         var entity = await repo.GetByIdAsync(id)
             ?? throw new NotFoundException($"ChannelConfig {id} not found.");
-        return enc.Decrypt(entity.ConfigJson);
+
+        Dictionary<string, string>? dict;
+        try
+        {
+            dict = JsonSerializer.Deserialize<Dictionary<string, string>>(enc.Decrypt(entity.ConfigJson));
+        }
+        catch
+        {
+            throw new InvalidOperationException(
+                "This channel's configuration could not be decrypted.");
+        }
+
+        if (dict is null || !dict.TryGetValue(field, out var value))
+            throw new NotFoundException($"Field '{field}' is not set on this channel.");
+
+        return value;
     }
 
     public async Task<List<ChannelOptionDto>> GetOptionsAsync(ChannelType? filter)
@@ -293,7 +308,7 @@ public class ChannelConfigService(
             var dict = JsonSerializer.Deserialize<Dictionary<string, string>>(plain);
             if (dict is not null)
                 foreach (var kv in dict)
-                    masked[kv.Key] = IsSecret(kv.Key) ? MaskedValue : kv.Value;
+                    masked[kv.Key] = IsSecret(kv.Key) ? PartialMask(kv.Value) : kv.Value;
         }
         catch { masked["error"] = "unable_to_decode"; }
 
@@ -314,8 +329,41 @@ public class ChannelConfigService(
         };
     }
 
-    /// <summary>Placeholder returned instead of a secret value; never persisted.</summary>
+    /// <summary>
+    /// The mask prefix — plain ASCII, deliberately, after finding during testing that a
+    /// Unicode bullet character does not survive every request path unmangled (a
+    /// PowerShell/Invoke-RestMethod round trip silently corrupted it), which would have
+    /// broken the "is this still masked" check below and let a mangled placeholder
+    /// overwrite a real stored secret. "***" is also the exact legacy full-mask value, so
+    /// old and new masked reads are recognised by the same prefix check.
+    /// </summary>
     private const string MaskedValue = "***";
+
+    /// <summary>
+    /// Partial mask (hotfix batch 3): keeps the last few characters visible so an admin
+    /// can recognise which credential a field holds at a glance, e.g. "***7ced465" — full
+    /// reveal is a separate, explicit action (<see cref="RevealFieldAsync"/>), not the
+    /// default read.
+    /// </summary>
+    private static string PartialMask(string value)
+    {
+        const int tailLength = 6;
+        // A short value shows no characters at all rather than revealing all of it — the
+        // same "***" a fully-masked field has always shown.
+        var tail = value.Length > tailLength ? value[^tailLength..] : "";
+        return MaskedValue + tail;
+    }
+
+    /// <summary>
+    /// Whether an incoming config value is a masked placeholder rather than a real,
+    /// intentionally-entered one — the signal MergeConfigJson uses to keep the stored
+    /// value instead of overwriting it with the mask itself. Every masked read, full or
+    /// partial, starts with <see cref="MaskedValue"/>; a real credential starting with
+    /// three literal asterisks is not a realistic case for any of the providers this
+    /// gateway integrates with.
+    /// </summary>
+    private static bool IsMaskedPlaceholder(string value) =>
+        value.StartsWith(MaskedValue, StringComparison.Ordinal);
 
     /// <summary>
     /// Whether a config field is a credential and must be masked on read.

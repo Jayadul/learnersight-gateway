@@ -14,7 +14,14 @@ public interface IChannelConfigService
     Task SetActiveAsync(Guid id, bool isActive);
     /// <summary>Promotes one config to be its type's default, demoting the previous one.</summary>
     Task SetDefaultAsync(Guid id);
-    Task<string> GetDecryptedConfigJsonAsync(Guid id);
+
+    /// <summary>
+    /// The real value of one config field, decrypted — for the reveal-on-click action on
+    /// an otherwise partially-masked secret. Scoped to a single named field rather than
+    /// the whole config, so revealing one credential never hands back every other one at
+    /// the same time.
+    /// </summary>
+    Task<string> RevealFieldAsync(Guid id, string field);
 
     /// <summary>
     /// The minimal, non-sensitive channel list (id/label/labelSlug/default) for pages
