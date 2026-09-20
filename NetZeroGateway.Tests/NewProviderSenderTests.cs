@@ -123,6 +123,12 @@ public class NewProviderSenderTests
                 Data = new NetZeroInboxData { Id = "wamid.TEST" }
             });
         }
+
+        public Task<NetZeroInboxTemplateResponse> SendTemplateAsync(
+            string templateToken, string sendTo, string templateName,
+            List<string> exampleArr, string? mediaUri,
+            string? baseUrl = null, CancellationToken ct = default)
+            => Unused.Fail<Task<NetZeroInboxTemplateResponse>>();
     }
 
     [Fact]

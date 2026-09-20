@@ -24,10 +24,12 @@ public class DispatchJobRecipientController(
         [FromQuery] Guid? channelConfigId,
         [FromQuery] DeliveryStatus? deliveryStatus,
         [FromQuery] string? recipient,
+        [FromQuery] string? failureReason,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 10)
         => Ok(await listService.GetPagedAsync(
-            page, pageSize, dateFrom, dateTo, channelType, channelConfigId, deliveryStatus, recipient));
+            page, pageSize, dateFrom, dateTo, channelType, channelConfigId,
+            deliveryStatus, recipient, failureReason));
 
     /// <summary>
     /// Retries the named recipients, optionally through another active channel of the

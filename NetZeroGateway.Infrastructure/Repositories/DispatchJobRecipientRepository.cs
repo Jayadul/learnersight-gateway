@@ -21,7 +21,8 @@ public class DispatchJobRecipientRepository(NetZeroGatewayDbContext db)
         int page, int size,
         DateTimeOffset? from, DateTimeOffset? to,
         ChannelType? channelType, Guid? channelConfigId,
-        DeliveryStatus? deliveryStatus, string? recipient)
+        DeliveryStatus? deliveryStatus, string? recipient,
+        string? failureReason = null)
     {
         var q = _set
             .Include(r => r.DispatchJob)
@@ -34,6 +35,7 @@ public class DispatchJobRecipientRepository(NetZeroGatewayDbContext db)
         if (channelConfigId is not null) q = q.Where(r => r.DispatchJob!.ChannelConfigId == channelConfigId);
         if (deliveryStatus is not null) q = q.Where(r => r.DeliveryStatus == deliveryStatus);
         if (!string.IsNullOrEmpty(recipient)) q = q.Where(r => r.Recipient.Contains(recipient));
+        if (!string.IsNullOrEmpty(failureReason)) q = q.Where(r => r.DispatchJob!.FailureReason == failureReason);
 
         var total = await q.CountAsync();
         var items = await q.OrderByDescending(r => r.CreatedAt)

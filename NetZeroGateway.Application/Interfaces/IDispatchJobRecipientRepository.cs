@@ -13,11 +13,18 @@ public interface IDispatchJobRecipientRepository : IRepository<DispatchJobRecipi
     /// — the job and its channel config are eager-loaded since the page shows channel
     /// name/type and message content per row, not just the recipient's own fields.
     /// </summary>
+    /// <param name="failureReason">
+    /// Exact match on the underlying job's FailureReason — the dashboard's
+    /// failure-reasons chart drill-down (hotfix batch 3, task 8) re-queries this endpoint
+    /// with the exact string a bar represents, rather than the dashboard carrying its own
+    /// copy of the matching rows.
+    /// </param>
     Task<(List<DispatchJobRecipient> Items, int Total)> GetPagedAsync(
         int page, int size,
         DateTimeOffset? from, DateTimeOffset? to,
         ChannelType? channelType, Guid? channelConfigId,
-        DeliveryStatus? deliveryStatus, string? recipient);
+        DeliveryStatus? deliveryStatus, string? recipient,
+        string? failureReason = null);
 
     /// <summary>
     /// Adds a whole job's recipients in one round trip. Jobs routinely carry hundreds of

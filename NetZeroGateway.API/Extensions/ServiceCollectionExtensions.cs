@@ -180,6 +180,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IChannelSender, ChithiSmsSender>();      // SMS  / Chithi
         services.AddScoped<IChannelSender, NetZeroInboxWhatsAppSender>();   // WP / NetZeroInbox v1
         services.AddScoped<IChannelSender, NetZeroInboxQrWhatsAppSender>(); // WP / NetZeroInbox QR
+        services.AddScoped<IWhatsAppTemplateSender, NetZeroInboxTemplateSender>();
         services.AddScoped<IChannelSenderFactory, ChannelSenderFactory>();
 
         return services;

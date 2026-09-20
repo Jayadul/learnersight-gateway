@@ -265,8 +265,26 @@ public class ChannelConfigService(
             LabelSlug = c.LabelSlug,
             ChannelType = c.ChannelType,
             IsActive = c.IsActive,
-            IsDefault = c.IsDefault
+            IsDefault = c.IsDefault,
+            HasTemplateToken = HasTemplateToken(c)
         }).ToList();
+    }
+
+    /// <summary>
+    /// Whether this channel has a usable Template API Token — decrypted just to check
+    /// presence, never returned by this endpoint (which stays credential-free for its
+    /// non-SuperAdmin callers). An undecryptable config just reads as "no token" rather
+    /// than throwing, since this list must keep rendering even if one channel's config
+    /// is unreadable.
+    /// </summary>
+    private bool HasTemplateToken(ChannelConfig c)
+    {
+        try
+        {
+            var dict = JsonSerializer.Deserialize<Dictionary<string, string>>(enc.Decrypt(c.ConfigJson));
+            return !string.IsNullOrWhiteSpace(dict?.GetValueOrDefault("templateToken"));
+        }
+        catch { return false; }
     }
 
     /// <summary>

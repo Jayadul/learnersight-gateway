@@ -103,6 +103,21 @@ with `||mediaUrl` sends `messageType=image` when the URL's extension is a known 
 type (jpg, jpeg, png, gif, webp, bmp); any other extension is refused rather than risk a
 guessed `messageType` on an unconfirmed file type (R3.3).
 
+**WhatsApp Template send (R3.4)** is a NetZero Inbox (v1)-specific capability, not a new
+`Provider` enum member and not reachable through `/sendtext`'s tag grammar — a template
+(name + ordered variables, optional media) is a structured payload that does not fit a
+free-text tag, and does not need fallback/retry semantics. It bypasses
+`IChannelSenderFactory` entirely (that resolves on `(ChannelType, Provider, HandlesMedia)`,
+which has no slot for "template vs freeform text") via its own
+`IWhatsAppTemplateSender` interface, called directly from `ManualSendService` —
+admin-triggered and synchronous, closer to `IChannelBalanceProvider` than to a dispatch
+sender. Recipients still convert to the vendor's `+8801700000001` shape via the same
+`RecipientFormat.ToPlus` the regular v1 send already uses. The channel's config carries a
+separate `templateToken` field, distinct from the regular send `token` — masked the same
+way (R3.4's partial-mask rule matches on the field-name shape, not an exact list) — and
+`GET /api/manual-send/channels` reports whether a channel has one via `hasTemplateToken`,
+without exposing the token itself.
+
 ### Recipient formats differ per provider (R3.1)
 
 Numbers are stored canonically: digits, country code, no plus (`8801700000001`). Two

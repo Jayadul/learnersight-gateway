@@ -12,6 +12,7 @@ public class NetZeroInboxClient(
     : INetZeroInboxClient
 {
     private string SendPath => config["Providers:NetZeroInbox:SendPath"] ?? "/api/v1/send-message";
+    private string TemplatePath => config["Providers:NetZeroInbox:TemplatePath"] ?? "/api/v1/send_templet";
 
     public async Task<NetZeroInboxResponse> SendTextAsync(
         string token, string to, string message,
@@ -52,6 +53,55 @@ public class NetZeroInboxClient(
         {
             logger.LogError(ex, "[NZ_INBOX] Parse error for {To}. Body={Body}", to, body);
             return new NetZeroInboxResponse { Error = ex.Message };
+        }
+    }
+
+    public async Task<NetZeroInboxTemplateResponse> SendTemplateAsync(
+        string templateToken, string sendTo, string templateName,
+        List<string> exampleArr, string? mediaUri,
+        string? baseUrl = null, CancellationToken ct = default)
+    {
+        var url = ProviderEndpoint.Resolve(baseUrl, TemplatePath);
+        logger.LogInformation(
+            "[NZ_INBOX_TEMPLATE] POST {Path} to={To} template={Template}",
+            TemplatePath, sendTo, templateName);
+
+        // Keeps the vendor's own "templet" spelling in the wire payload — it is their
+        // field name, not ours to correct. The query-string duplicates of
+        // Content-Type/Authorization shown in the vendor's example curl look like
+        // leftover Postman export noise rather than a real requirement, so this sends
+        // header + JSON body only; add them only if a real test against the endpoint
+        // proves they are actually needed.
+        var payload = new
+        {
+            sendTo,
+            templetName = templateName,
+            exampleArr,
+            token = templateToken,
+            mediaUri
+        };
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, url)
+        {
+            Content = new StringContent(
+                JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json")
+        };
+        request.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", templateToken);
+
+        var resp = await http.SendAsync(request, ct);
+        var body = await resp.Content.ReadAsStringAsync(ct);
+        logger.LogDebug("[NZ_INBOX_TEMPLATE] Response for {To}: {Body}", sendTo, body);
+
+        try
+        {
+            return JsonSerializer.Deserialize<NetZeroInboxTemplateResponse>(body)
+                ?? new NetZeroInboxTemplateResponse { Error = "unreadable_response" };
+        }
+        catch (JsonException ex)
+        {
+            logger.LogError(ex, "[NZ_INBOX_TEMPLATE] Parse error for {To}. Body={Body}", sendTo, body);
+            return new NetZeroInboxTemplateResponse { Error = ex.Message };
         }
     }
 }

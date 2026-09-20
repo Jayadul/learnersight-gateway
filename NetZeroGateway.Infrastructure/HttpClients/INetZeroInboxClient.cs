@@ -13,4 +13,17 @@ public interface INetZeroInboxClient
         string token, string to, string message,
         string? baseUrl = null,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Sends a Meta pre-approved WhatsApp template (hotfix batch 3) — a distinct v1 API
+    /// action from <see cref="SendTextAsync"/>, its own token, and a structured payload
+    /// (template name + ordered variables) rather than a free-text message. Admin-only,
+    /// triggered from Manual Send — never reachable via /sendtext's tag grammar, since a
+    /// template send does not fit a free-text tag.
+    /// </summary>
+    Task<NetZeroInboxTemplateResponse> SendTemplateAsync(
+        string templateToken, string sendTo, string templateName,
+        List<string> exampleArr, string? mediaUri,
+        string? baseUrl = null,
+        CancellationToken ct = default);
 }

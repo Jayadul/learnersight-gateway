@@ -78,7 +78,7 @@ public class ResendServiceTests
         public Task<(List<DispatchJobRecipient> Items, int Total)> GetPagedAsync(
             int page, int size, DateTimeOffset? from, DateTimeOffset? to,
             ChannelType? channelType, Guid? channelConfigId,
-            DeliveryStatus? deliveryStatus, string? recipient)
+            DeliveryStatus? deliveryStatus, string? recipient, string? failureReason = null)
             => Unused.Fail<Task<(List<DispatchJobRecipient>, int)>>();
         public Task<List<DispatchJobRecipient>> GetAllAsync() => Unused.Fail<Task<List<DispatchJobRecipient>>>();
         public Task<List<DispatchJobRecipient>> FindAsync(Expression<Func<DispatchJobRecipient, bool>> p) => Unused.Fail<Task<List<DispatchJobRecipient>>>();

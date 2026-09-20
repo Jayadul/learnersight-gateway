@@ -13,10 +13,12 @@ public class DispatchJobRecipientService(IDispatchJobRecipientRepository repo)
         int page, int pageSize,
         DateTimeOffset? dateFrom, DateTimeOffset? dateTo,
         ChannelType? channelType, Guid? channelConfigId,
-        DeliveryStatus? deliveryStatus, string? recipient)
+        DeliveryStatus? deliveryStatus, string? recipient,
+        string? failureReason = null)
     {
         var (items, total) = await repo.GetPagedAsync(
-            page, pageSize, dateFrom, dateTo, channelType, channelConfigId, deliveryStatus, recipient);
+            page, pageSize, dateFrom, dateTo, channelType, channelConfigId,
+            deliveryStatus, recipient, failureReason);
 
         return new PagedResult<DispatchJobRecipientDto>
         {

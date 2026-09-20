@@ -10,5 +10,6 @@ public interface IDispatchJobRecipientService
         int page, int pageSize,
         DateTimeOffset? dateFrom, DateTimeOffset? dateTo,
         ChannelType? channelType, Guid? channelConfigId,
-        DeliveryStatus? deliveryStatus, string? recipient);
+        DeliveryStatus? deliveryStatus, string? recipient,
+        string? failureReason = null);
 }

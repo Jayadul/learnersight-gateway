@@ -1,7 +1,11 @@
+using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using NetZeroGateway.Application.DTOs;
+using NetZeroGateway.Application.Exceptions;
 using NetZeroGateway.Application.Interfaces;
+using NetZeroGateway.Application.Strategies;
+using NetZeroGateway.Application.Utilities;
 using NetZeroGateway.Domain.Entities;
 using NetZeroGateway.Domain.Enums;
 
@@ -10,6 +14,11 @@ namespace NetZeroGateway.Application.Services;
 public class ManualSendService(
     IMessageRequestRepository msgRepo,
     IServiceScopeFactory scopeFactory,
+    IChannelConfigRepository configRepo,
+    IDispatchJobRepository jobRepo,
+    IDispatchJobRecipientRepository recipientRepo,
+    IEncryptionService enc,
+    IWhatsAppTemplateSender templateSender,
     ILogger<ManualSendService> logger
 ) : IManualSendService
 {
@@ -99,6 +108,110 @@ public class ManualSendService(
             MessageRequestId = msgRequest.Id,
             Status = "queued",
             TotalNumbers = numbers.Count
+        };
+    }
+
+    public async Task<ManualSendResponse> SendTemplateAsync(SendTemplateRequest request)
+    {
+        var toNumber = (request.ToNumber ?? "").Trim();
+        if (toNumber.Length == 0)
+            throw new InvalidOperationException("Enter a recipient number.");
+        if (string.IsNullOrWhiteSpace(request.TemplateName))
+            throw new InvalidOperationException("Enter a template name.");
+
+        var channel = await configRepo.GetActiveBySlugAsync(ChannelType.WP, request.ChannelLabelSlug)
+            ?? throw new NotFoundException(
+                $"No active WhatsApp channel with label '{request.ChannelLabelSlug}'.");
+
+        if (channel.Provider != Provider.NetZeroInbox)
+            throw new InvalidOperationException(
+                "WhatsApp templates are only supported on NetZero Inbox (v1) channels.");
+
+        var cfg = JsonSerializer.Deserialize<Dictionary<string, string>>(
+            enc.Decrypt(channel.ConfigJson)) ?? [];
+        if (!cfg.TryGetValue("templateToken", out var templateToken)
+            || string.IsNullOrWhiteSpace(templateToken))
+        {
+            throw new InvalidOperationException(
+                $"'{channel.Label}' has no Template API Token configured. "
+                + "Add one on this channel before sending a template.");
+        }
+
+        // The vendor's template API wants E.164, unlike the canonical stored form every
+        // other call on this channel uses — RecipientFormat.ToPlus is the same conversion
+        // NetZero Inbox's regular text send already applies.
+        var e164 = RecipientFormat.ToPlus(toNumber);
+
+        var msgRequest = new MessageRequest
+        {
+            CallerID = "",
+            ToUser = toNumber,
+            RawMessageContent = $"[template:{request.TemplateName}]",
+            ParsedChannels = [ChannelType.WP.ToString()],
+            IsMultiChannel = false,
+            OverallStatus = MessageStatus.Pending,
+            ReceivedAt = DateTimeOffset.UtcNow,
+            Source = MessageSource.AdminPanel
+        };
+        await msgRepo.AddAsync(msgRequest);
+        await msgRepo.SaveChangesAsync();
+
+        var job = new DispatchJob
+        {
+            MessageRequestId = msgRequest.Id,
+            ChannelType = ChannelType.WP,
+            ChannelConfigId = channel.Id,
+            MessageContent = $"Template '{request.TemplateName}' with {request.ExampleArr.Count} variable(s)",
+            MediaUrl = Blank(request.MediaUrl),
+            ToNumber = toNumber,
+            Status = JobStatus.Pending
+        };
+        await jobRepo.AddAsync(job);
+        await jobRepo.SaveChangesAsync();
+
+        var result = await templateSender.SendAsync(
+            templateToken, e164, request.TemplateName, request.ExampleArr,
+            Blank(request.MediaUrl), ProviderEndpoint.BaseUrlOf(cfg));
+
+        job.ProviderRawResponse = result.RawResponse;
+        if (result.IsSuccess)
+        {
+            job.Status = JobStatus.Sent;
+            job.SentAt = DateTimeOffset.UtcNow;
+            // No status-check endpoint exists for this yet, but stored the same way as
+            // other providers' message ids for consistency should one appear later.
+            job.ProviderMessageId = result.MessageId;
+        }
+        else
+        {
+            job.Status = JobStatus.Failed;
+            job.FailureReason = result.Error;
+        }
+        jobRepo.Update(job);
+        await jobRepo.SaveChangesAsync();
+
+        await recipientRepo.AddAsync(new DispatchJobRecipient
+        {
+            DispatchJobId = job.Id,
+            Recipient = toNumber,
+            ProviderReferenceId = result.MessageId,
+            DeliveryStatus = job.Status == JobStatus.Failed ? DeliveryStatus.Failed : DeliveryStatus.Pending
+        });
+        await recipientRepo.SaveChangesAsync();
+
+        msgRequest.OverallStatus = job.Status == JobStatus.Sent ? MessageStatus.Success : MessageStatus.Failed;
+        msgRepo.Update(msgRequest);
+        await msgRepo.SaveChangesAsync();
+
+        logger.LogInformation(
+            "[MANUAL_SEND_TEMPLATE] {To} via {Channel} template={Template} -> {Status}",
+            toNumber, channel.Label, request.TemplateName, job.Status);
+
+        return new ManualSendResponse
+        {
+            MessageRequestId = msgRequest.Id,
+            Status = job.Status == JobStatus.Sent ? "sent" : "failed",
+            TotalNumbers = 1
         };
     }
 
