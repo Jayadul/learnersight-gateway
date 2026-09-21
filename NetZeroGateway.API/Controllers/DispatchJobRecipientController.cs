@@ -39,4 +39,12 @@ public class DispatchJobRecipientController(
     [HttpPost("resend")]
     public async Task<ActionResult<ResendResultDto>> Resend([FromBody] ResendRequest request)
         => Ok(await resendService.ResendAsync(request));
+
+    /// <summary>
+    /// A recipient's resend history (hotfix batch 4) — the row itself only ever shows
+    /// the latest attempt, so this is where "what happened on try 2" is recovered.
+    /// </summary>
+    [HttpGet("{id:guid}/attempts")]
+    public async Task<IActionResult> GetAttemptHistory(Guid id)
+        => Ok(await listService.GetAttemptHistoryAsync(id));
 }

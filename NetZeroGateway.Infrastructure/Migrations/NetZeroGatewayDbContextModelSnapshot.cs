@@ -686,6 +686,60 @@ namespace NetZeroGateway.Infrastructure.Migrations
                     b.ToTable("message_requests", (string)null);
                 });
 
+            modelBuilder.Entity("NetZeroGateway.Domain.Entities.ResendAttempt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AttemptedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("attempted_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DeliveryStatus")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("delivery_status");
+
+                    b.Property<Guid>("DispatchJobId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dispatch_job_id");
+
+                    b.Property<Guid>("DispatchJobRecipientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dispatch_job_recipient_id");
+
+                    b.Property<string>("ProviderReferenceId")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("provider_reference_id");
+
+                    b.Property<string>("RawResponse")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("raw_response");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_resend_attempts");
+
+                    b.HasIndex("DispatchJobId")
+                        .HasDatabaseName("ix_resend_attempts_dispatch_job_id");
+
+                    b.HasIndex("DispatchJobRecipientId")
+                        .HasDatabaseName("ix_resend_attempts_dispatch_job_recipient_id");
+
+                    b.ToTable("resend_attempts", (string)null);
+                });
+
             modelBuilder.Entity("NetZeroGateway.Domain.Entities.DispatchJob", b =>
                 {
                     b.HasOne("NetZeroGateway.Domain.Entities.ChannelConfig", "ChannelConfig")
@@ -736,6 +790,27 @@ namespace NetZeroGateway.Infrastructure.Migrations
                     b.Navigation("FallbackChannelConfig");
 
                     b.Navigation("TriggerChannelConfig");
+                });
+
+            modelBuilder.Entity("NetZeroGateway.Domain.Entities.ResendAttempt", b =>
+                {
+                    b.HasOne("NetZeroGateway.Domain.Entities.DispatchJob", "DispatchJob")
+                        .WithMany()
+                        .HasForeignKey("DispatchJobId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_resend_attempts_dispatch_jobs_dispatch_job_id");
+
+                    b.HasOne("NetZeroGateway.Domain.Entities.DispatchJobRecipient", "DispatchJobRecipient")
+                        .WithMany()
+                        .HasForeignKey("DispatchJobRecipientId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_resend_attempts_dispatch_job_recipients_dispatch_job_recipi");
+
+                    b.Navigation("DispatchJob");
+
+                    b.Navigation("DispatchJobRecipient");
                 });
 
             modelBuilder.Entity("NetZeroGateway.Domain.Entities.DispatchJob", b =>

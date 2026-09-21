@@ -6,8 +6,10 @@ using NetZeroGateway.Domain.Enums;
 
 namespace NetZeroGateway.Application.Services;
 
-public class DispatchJobRecipientService(IDispatchJobRecipientRepository repo)
-    : IDispatchJobRecipientService
+public class DispatchJobRecipientService(
+    IDispatchJobRecipientRepository repo,
+    IResendAttemptRepository attemptRepo
+) : IDispatchJobRecipientService
 {
     public async Task<PagedResult<DispatchJobRecipientDto>> GetPagedAsync(
         int page, int pageSize,
@@ -89,5 +91,19 @@ public class DispatchJobRecipientService(IDispatchJobRecipientRepository repo)
         }
 
         return jobRaw;
+    }
+
+    public async Task<List<ResendAttemptDto>> GetAttemptHistoryAsync(Guid recipientId)
+    {
+        var attempts = await attemptRepo.GetByRecipientIdAsync(recipientId);
+        return attempts.Select(a => new ResendAttemptDto
+        {
+            Id = a.Id,
+            DeliveryStatus = a.DeliveryStatus,
+            ProviderReferenceId = a.ProviderReferenceId,
+            RawResponse = a.RawResponse,
+            ChannelLabel = a.DispatchJob?.ChannelConfig?.Label,
+            AttemptedAt = a.AttemptedAt
+        }).ToList();
     }
 }

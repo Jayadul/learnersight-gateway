@@ -12,4 +12,10 @@ public interface IDispatchJobRecipientService
         ChannelType? channelType, Guid? channelConfigId,
         DeliveryStatus? deliveryStatus, string? recipient,
         string? failureReason = null);
+
+    /// <summary>
+    /// A recipient's resend history, most recent first (hotfix batch 4, task 2a) — each
+    /// attempt's own outcome, since the main row only ever shows the latest one.
+    /// </summary>
+    Task<List<ResendAttemptDto>> GetAttemptHistoryAsync(Guid recipientId);
 }

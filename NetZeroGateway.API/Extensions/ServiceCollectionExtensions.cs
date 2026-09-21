@@ -42,6 +42,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IMessageRequestRepository, MessageRequestRepository>();
         services.AddScoped<IDispatchJobRepository, DispatchJobRepository>();
         services.AddScoped<IDispatchJobRecipientRepository, DispatchJobRecipientRepository>();
+        services.AddScoped<IResendAttemptRepository, ResendAttemptRepository>();
         services.AddScoped<IApiLogRepository, ApiLogRepository>();
         services.AddScoped<IFallbackPolicyRepository, FallbackPolicyRepository>();
         services.AddScoped<IMediaFileRepository, MediaFileRepository>();

@@ -192,11 +192,26 @@ path — see the method's own doc comment.
 ### Resend (R3.2)
 
 Operates on recipient rows, not jobs: SMS and Voice batch many numbers into one job, so
-retrying the job would send again to everyone it already reached. Every attempt creates
-a new job and new rows linked by `resent_from_recipient_id` rather than mutating the
-originals — a retry that succeeds must not erase the evidence that the first attempt
-failed. Crossing channel types is refused, the same rule fallback uses. Authorized at
-the ManualSend tier, not SuperAdmin: this is operational recovery, not configuration.
+retrying the job would send again to everyone it already reached. Crossing channel types
+is refused, the same rule fallback uses. Authorized at the ManualSend tier, not
+SuperAdmin: this is operational recovery, not configuration.
+
+**Updates the recipient row in place (hotfix batch 4) — a deliberate reversal of the
+original R3.2 design**, recorded here on purpose so it reads as a conscious change, not
+drift. Every attempt used to create a new job *and* a new `dispatch_job_recipients` row
+linked by `resent_from_recipient_id`, on the reasoning that a retry succeeding must not
+erase evidence that the first attempt failed. In practice this meant a recipient retried
+three times showed as three separate rows in Message Logs, reading as three different
+sends rather than one recipient retried three times — confusing enough that the client
+asked for it to stop. Resend now still creates a new `DispatchJob` per attempt (that job
+is the attempt's own audit record), but updates the *same* recipient row in place —
+`dispatch_job_id`, `provider_reference_id` and `delivery_status` all move to reflect the
+latest attempt, so a resend that succeeds stops looking like a failure. Each attempt's own
+outcome is preserved separately in `resend_attempts`
+(`GET /api/dispatch-jobs/recipients/{id}/attempts`) rather than lost, so "what happened on
+attempt 2 vs 3" is still recoverable — just not in the main table. `resent_from_recipient_id`
+stays on the entity for reading rows created under the old design; nothing sets it going
+forward.
 
 ### Balances
 

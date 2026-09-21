@@ -15,6 +15,7 @@ public class NetZeroGatewayDbContext(DbContextOptions<NetZeroGatewayDbContext> o
     public DbSet<MediaFile> MediaFiles => Set<MediaFile>();
     public DbSet<GatewayCredential> GatewayCredentials => Set<GatewayCredential>();
     public DbSet<DispatchJobRecipient> DispatchJobRecipients => Set<DispatchJobRecipient>();
+    public DbSet<ResendAttempt> ResendAttempts => Set<ResendAttempt>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -123,8 +124,30 @@ public class NetZeroGatewayDbContext(DbContextOptions<NetZeroGatewayDbContext> o
             e.HasIndex(x => x.ProviderReferenceId);
             e.HasIndex(x => x.Recipient);
             e.HasIndex(x => x.DeliveryStatus);
-            // Finding every retry of one recipient, and the audit trail behind a resend.
+            // Historic only since hotfix batch 4 (task 2a reversed the "new row per
+            // resend" design) — kept for rows created before this change.
             e.HasIndex(x => x.ResentFromRecipientId);
+        });
+
+        mb.Entity<ResendAttempt>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.DeliveryStatus).HasConversion<string>().HasMaxLength(50);
+            e.Property(x => x.ProviderReferenceId).HasMaxLength(500);
+            e.Property(x => x.RawResponse).HasColumnType("jsonb");
+            // Cascade: an attempt's history belongs to the recipient row, not a separate
+            // record that should outlive it.
+            e.HasOne(x => x.DispatchJobRecipient)
+             .WithMany()
+             .HasForeignKey(x => x.DispatchJobRecipientId)
+             .OnDelete(DeleteBehavior.Cascade);
+            // Restrict: the dispatch job this attempt used is its own audit record and
+            // must not silently vanish if something else ever deletes a job.
+            e.HasOne(x => x.DispatchJob)
+             .WithMany()
+             .HasForeignKey(x => x.DispatchJobId)
+             .OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => x.DispatchJobRecipientId);
         });
 
         mb.Entity<FallbackPolicy>(e =>
