@@ -169,6 +169,15 @@ and matches nothing.
 Runs nightly at 00:00 Dhaka for the previous full day (`delivery-status-sync`), and on
 demand per channel over a chosen window.
 
+**Every run was throwing before it read a row, found and fixed during the hotfix batch 3
+Seq audit.** `StatusSyncService.ResolveWindow` built the default window with
+`AppTime.ToAppTime` — a display conversion that returns the business-zone offset
+(+06:00) — and handed that straight to a query against `dispatch_job_recipients`' UTC
+`timestamptz` columns; Npgsql refuses to write a non-zero-offset `DateTimeOffset` there
+at all. The instant was always correct, only the offset needed normalizing to UTC before
+use. Fixed by calling `.ToUniversalTime()` on both the default and the explicit-window
+path — see the method's own doc comment.
+
 ### Resend (R3.2)
 
 Operates on recipient rows, not jobs: SMS and Voice batch many numbers into one job, so

@@ -20,6 +20,11 @@ public class MessageRequestRepository(NetZeroGatewayDbContext db)
                    // deliberately does not load these, since a batched job can carry
                    // hundreds of rows nobody is looking at yet.
                    .ThenInclude(j => j.Recipients)
+               // Two collection navigations (Jobs, then Recipients within each job) in one
+               // query multiplies rows in the combined SQL result — split into separate
+               // queries instead. Found via a "no QuerySplittingBehavior configured" EF
+               // warning in Seq during the hotfix batch 3 audit.
+               .AsSplitQuery()
                .FirstOrDefaultAsync(m => m.Id == id);
 
     public async Task<(List<MessageRequest> Items, int Total)> GetPagedAsync(
