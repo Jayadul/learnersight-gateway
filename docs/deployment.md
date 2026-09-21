@@ -23,7 +23,10 @@ no port) from its send endpoint and is configured per channel as `balanceBaseUrl
 These provider secrets are still seeded in `appsettings.json` in plaintext — R1 debt
 item 4, now covering six channels rather than three. Rotate the REVE session cookie, the
 shared GenNet/Chithi `api_token` and the NetZero Inbox token before they carry
-production traffic.
+production traffic. **Hotfix batch 5** added the NetZero Inbox WhatsApp Template API
+Token to the same seed block, for the same reason as the others: a value set only
+through the admin API is wiped on the next restart by the seeder's config refresh (see
+architecture.md). Same rotation caveat applies before this carries production traffic.
 
 **Environment overrides work as of R3.0.** `Providers__Voice__BaseUrl` and friends were
 silently ignored before it: `authorization.json` loaded after the environment source and
