@@ -3,35 +3,42 @@ using System.Text.Json.Serialization;
 namespace NetZeroGateway.Infrastructure.HttpClients.Models;
 
 /// <summary>
-/// NetZero Inbox's send_templet response (hotfix batch 3). The vendor's own documented
-/// shape only confirms one field worth keeping — metaResponse.message_id — so this models
-/// exactly that, plus a top-level status/error pair on the same defensive footing every
-/// other provider response here uses: an unrecognised or missing field never throws, and
-/// success is inferred rather than assumed.
+/// NetZero Inbox's send_templet response. Hotfix batch 4's real test against the vendor
+/// found the actual shape does not match what batch 3 guessed from the vendor's own
+/// documentation: a real success looks like
+/// <c>{"success":true,"metaResponse":{"messages":[{"id":"wamid...","message_status":"accepted"}]}}</c>
+/// — a boolean <c>success</c>, not a "success" status string, and the message id lives
+/// inside a <c>messages</c> array, not a flat <c>metaResponse.message_id</c>. The earlier
+/// shape silently read a genuine, delivered send as a failure.
 /// </summary>
 public class NetZeroInboxTemplateResponse
 {
-    [JsonPropertyName("status")] public string? Status { get; set; }
+    [JsonPropertyName("success")] public bool? Success { get; set; }
     [JsonPropertyName("error")] public string? Error { get; set; }
     [JsonPropertyName("message")] public string? Message { get; set; }
     [JsonPropertyName("metaResponse")] public NetZeroInboxTemplateMetaResponse? MetaResponse { get; set; }
 
     /// <summary>
-    /// No explicit success flag is documented, so this follows SendTextAsync's own rule:
-    /// an explicit error is never success, and a returned message id is treated as proof
-    /// the vendor accepted the template send.
+    /// An explicit error is never success; otherwise a real message id in the messages
+    /// array is proof the vendor accepted the template send.
     /// </summary>
     [JsonIgnore]
     public bool IsSuccess =>
         string.IsNullOrWhiteSpace(Error)
-        && (string.Equals(Status, "success", StringComparison.OrdinalIgnoreCase)
-            || !string.IsNullOrWhiteSpace(MetaResponse?.MessageId));
+        && (Success == true || !string.IsNullOrWhiteSpace(MessageId));
 
     [JsonIgnore]
-    public string? MessageId => MetaResponse?.MessageId;
+    public string? MessageId => MetaResponse?.Messages?.FirstOrDefault()?.Id;
 }
 
 public class NetZeroInboxTemplateMetaResponse
 {
-    [JsonPropertyName("message_id")] public string? MessageId { get; set; }
+    [JsonPropertyName("messaging_product")] public string? MessagingProduct { get; set; }
+    [JsonPropertyName("messages")] public List<NetZeroInboxTemplateMessage>? Messages { get; set; }
+}
+
+public class NetZeroInboxTemplateMessage
+{
+    [JsonPropertyName("id")] public string? Id { get; set; }
+    [JsonPropertyName("message_status")] public string? MessageStatus { get; set; }
 }

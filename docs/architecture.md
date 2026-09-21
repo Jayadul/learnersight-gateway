@@ -118,6 +118,17 @@ way (R3.4's partial-mask rule matches on the field-name shape, not an exact list
 `GET /api/manual-send/channels` reports whether a channel has one via `hasTemplateToken`,
 without exposing the token itself.
 
+**Verified against the real vendor in hotfix batch 4** — batch 3 shipped this untested
+against the actual API. Two real gaps surfaced: the vendor's query-string duplicates of
+`Content-Type`/`Authorization` (first assumed to be Postman export noise) turned out to
+be required, and `enableLog` (already sent by the regular text send) was missing here too
+— without both, every response field came back null. Once the request matched, a second
+real gap appeared: a genuinely successful, delivered send still read as "failed", because
+the real response shape is `{"success":true,"metaResponse":{"messages":[{"id":"wamid...",
+"message_status":"accepted"}]}}` — a boolean `success` and the message id inside a
+`messages` array — not the flat `status`/`metaResponse.message_id` shape the vendor's own
+documentation implied and batch 3 modeled from it.
+
 ### Recipient formats differ per provider (R3.1)
 
 Numbers are stored canonically: digits, country code, no plus (`8801700000001`). Two
