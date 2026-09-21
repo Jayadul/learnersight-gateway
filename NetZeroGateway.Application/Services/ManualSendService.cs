@@ -129,12 +129,20 @@ public class ManualSendService(
 
         var cfg = JsonSerializer.Deserialize<Dictionary<string, string>>(
             enc.Decrypt(channel.ConfigJson)) ?? [];
-        if (!cfg.TryGetValue("templateToken", out var templateToken)
-            || string.IsNullOrWhiteSpace(templateToken))
+
+        // Blank uses the channel's configured Template API Token; filled overrides it for
+        // this send only — same pattern as CallerId/CampaignId/LotNumber on the text/voice path.
+        var templateToken = Blank(request.Token);
+        if (templateToken == null)
         {
-            throw new InvalidOperationException(
-                $"'{channel.Label}' has no Template API Token configured. "
-                + "Add one on this channel before sending a template.");
+            if (!cfg.TryGetValue("templateToken", out var configuredToken)
+                || string.IsNullOrWhiteSpace(configuredToken))
+            {
+                throw new InvalidOperationException(
+                    $"'{channel.Label}' has no Template API Token configured. "
+                    + "Add one on this channel, or provide a token for this send.");
+            }
+            templateToken = configuredToken;
         }
 
         // The vendor's template API wants E.164, unlike the canonical stored form every
