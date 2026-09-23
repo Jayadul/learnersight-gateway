@@ -11,7 +11,10 @@ namespace NetZeroGateway.API.Controllers;
 [Route("media")]
 public class PublicMediaController(IMediaLibraryService service) : ControllerBase
 {
-    [HttpGet("{fileName}")]
+    // HEAD too: some providers probe a media URL with HEAD before fetching it, and MVC does
+    // not answer HEAD for a GET-only action (405).
+    [AcceptVerbs("GET", "HEAD")]
+    [Route("{fileName}")]
     public async Task<IActionResult> Get(string fileName, [FromQuery] bool download = false)
     {
         var (content, contentType, downloadName) = await service.OpenPublicFileAsync(fileName);

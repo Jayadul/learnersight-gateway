@@ -28,7 +28,7 @@ public class MediaLibraryService(
             : request.CustomName;
 
         var storedName = await MakeUniqueAsync(FileNameSlugger.Slugify(baseName, extension));
-        var publicBase = (config[ConfigKeys.MediaPublicBaseUrl] ?? "").TrimEnd('/');
+        WarnIfBaseUrlUnreachable();
 
         await storage.SaveAsync(storedName, request.Content, ct);
 
@@ -36,7 +36,7 @@ public class MediaLibraryService(
         {
             OriginalFileName = request.OriginalFileName,
             StoredFileName = storedName,
-            PublicUrl = $"{publicBase}/media/{storedName}",
+            PublicUrl = PublicUrlFor(storedName),
             Extension = extension.TrimStart('.').ToLowerInvariant(),
             ContentType = request.ContentType,
             SizeBytes = request.SizeBytes,
@@ -144,6 +144,23 @@ public class MediaLibraryService(
         await repo.SaveChangesAsync();
     }
 
+    /// <summary>
+    /// A WhatsApp provider fetches the link from its own network, so a localhost or empty base
+    /// produces links that upload fine and then fail at delivery. Loud in the log, not fatal:
+    /// a local dev stack legitimately runs this way.
+    /// </summary>
+    private void WarnIfBaseUrlUnreachable()
+    {
+        var baseUrl = (config[ConfigKeys.MediaPublicBaseUrl] ?? "").Trim();
+        var local = baseUrl.Length == 0
+            || baseUrl.Contains("localhost", StringComparison.OrdinalIgnoreCase)
+            || baseUrl.Contains("127.0.0.1", StringComparison.Ordinal);
+        if (local)
+            logger.LogWarning(
+                "Media:PublicBaseUrl is '{BaseUrl}'. Links to uploaded files will not be reachable by " +
+                "WhatsApp providers; set it to the public domain or server address.", baseUrl);
+    }
+
     private void Validate(UploadMediaRequest request)
     {
         if (request.SizeBytes <= 0)
@@ -180,12 +197,20 @@ public class MediaLibraryService(
         }
     }
 
-    private static MediaFileDto ToDto(MediaFile e) => new()
+    /// <summary>
+    /// Built from the CURRENT Media:PublicBaseUrl rather than read back from the row, so
+    /// correcting the base URL (the shipped default is localhost) fixes links to files
+    /// uploaded before the correction. The stored PublicUrl column is left as a historical record.
+    /// </summary>
+    private string PublicUrlFor(string storedName)
+        => $"{(config[ConfigKeys.MediaPublicBaseUrl] ?? "").TrimEnd('/')}/media/{storedName}";
+
+    private MediaFileDto ToDto(MediaFile e) => new()
     {
         Id = e.Id,
         OriginalFileName = e.OriginalFileName,
         StoredFileName = e.StoredFileName,
-        PublicUrl = e.PublicUrl,
+        PublicUrl = PublicUrlFor(e.StoredFileName),
         Extension = e.Extension,
         ContentType = e.ContentType,
         SizeBytes = e.SizeBytes,
