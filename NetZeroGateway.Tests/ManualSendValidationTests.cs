@@ -104,4 +104,36 @@ public class ManualSendValidationTests
 
         Assert.Single(repo.Added);
     }
+
+    [Fact]
+    public async Task A_voice_send_with_no_campaign_uses_the_channels_own_and_is_accepted()
+    {
+        // The Voice tab says "leave empty to use the channel's campaign"; the API used to
+        // answer that with "Enter a message to send."
+        var (service, repo) = Build();
+
+        await service.SendAsync(new ManualSendRequest
+        {
+            ChannelType = ChannelType.Voice,
+            ToNumbers = "8801748848039"
+        });
+
+        Assert.Single(repo.Added);
+    }
+
+    [Fact]
+    public async Task A_campaign_id_does_not_stand_in_for_a_message_on_sms()
+    {
+        var (service, repo) = Build();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.SendAsync(new ManualSendRequest
+            {
+                ChannelType = ChannelType.SMS,
+                ToNumbers = "8801748848039",
+                CampaignId = "due-bill-api"
+            }));
+
+        Assert.Empty(repo.Added);
+    }
 }

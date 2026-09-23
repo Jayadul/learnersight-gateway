@@ -40,10 +40,11 @@ public class ManualSendService(
                 "Enter at least one recipient number.");
         }
 
-        if (string.IsNullOrWhiteSpace(request.Message)
-            && string.IsNullOrWhiteSpace(request.CampaignId))
+        // Voice carries a campaign instead of body text, and a blank campaign means "use the
+        // channel's configured one", so a Voice send needs no message at all.
+        if (request.ChannelType != ChannelType.Voice
+            && string.IsNullOrWhiteSpace(request.Message))
         {
-            // Voice carries a campaign instead of body text, so either satisfies this.
             throw new InvalidOperationException(
                 "Enter a message to send.");
         }
