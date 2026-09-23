@@ -16,6 +16,14 @@ try
 {
     var builder = WebApplication.CreateBuilder(args);
 
+    // A GET /sendtext carrying several hundred recipients is a 15 KB+ request line; Kestrel's
+    // 8 KB default answered it with 414 before the request reached any controller.
+    builder.WebHost.ConfigureKestrel(o =>
+    {
+        o.Limits.MaxRequestLineSize = 128 * 1024;
+        o.Limits.MaxRequestHeadersTotalSize = 256 * 1024;
+    });
+
     // ── Load authorization.json into config ────────────────────────────────
     builder.Configuration.AddJsonFile("authorization.json", optional: false, reloadOnChange: true);
 

@@ -24,9 +24,11 @@ These provider secrets are still seeded in `appsettings.json` in plaintext — R
 item 4, now covering six channels rather than three. Rotate the REVE session cookie, the
 shared GenNet/Chithi `api_token` and the NetZero Inbox token before they carry
 production traffic. **Hotfix batch 5** added the NetZero Inbox WhatsApp Template API
-Token to the same seed block, for the same reason as the others: a value set only
-through the admin API is wiped on the next restart by the seeder's config refresh (see
-architecture.md). Same rotation caveat applies before this carries production traffic.
+Token to the same seed block so a fresh database starts with it. (Before the deep QA
+pass a value set only through the admin API was also wiped on the next restart; the
+seeder now leaves fields it does not carry alone, see database.md. A seeded credential
+still refreshes from the config on every boot.) Same rotation caveat applies before this
+carries production traffic.
 
 **Environment overrides work as of R3.0.** `Providers__Voice__BaseUrl` and friends were
 silently ignored before it: `authorization.json` loaded after the environment source and
@@ -77,7 +79,28 @@ contains production appsettings; see releases/1.0.0.md → Known limitations.
 - `Media__PublicBaseUrl` (compose env on `api`) is what public links are built from;
   set it to the address message recipients can reach (the web service proxies
   `/media/` to the API, so the client's domain or `http://<server-ip>:18080`).
-  Changing it only affects files uploaded afterwards.
+  **The shipped `deploy/docker-compose.yml` defaults to `http://localhost:18080`**, which
+  uploads fine and then hands WhatsApp providers a link only the host itself can open —
+  edit it before the first upload on a hosted server. The API logs a warning at every
+  upload while the value is empty or names localhost. Links are built from the current
+  value each time they are read (deep QA pass), so correcting it later fixes links to
+  files uploaded earlier too; the `public_url` column is kept only as a record.
+- **Hosted-server checklist** (deep QA pass; the local half is verified, the outside half
+  needs the real host):
+  1. `docker exec <api> id` shows `app`, and `ls -ld /app/media` shows `app app` — the
+     Dockerfile creates and `chown`s the folder, and a new named volume inherits that
+     ownership. A volume created earlier as root (or a bind mount) does not: fix with
+     `docker exec -u root <api> chown -R app:app /app/media`.
+  2. Inbound TCP 18080 is open on the host (e.g. `ufw allow 18080/tcp`) and any cloud
+     firewall or security group.
+  3. From a machine **outside** the host: upload a file in Media Library, then
+     `curl -I <publicUrl>` returns `200` and the right `Content-Type` (HEAD works;
+     it returned 405 before the QA pass), with no login.
+  4. Send a WhatsApp media message to a test number using that exact link and confirm
+     it arrives with the file. Inbox v1 has no media contract; use WaTrend or Inbox QR.
+- The web proxy allows request lines up to 128k (`large_client_header_buffers`) so a
+  `GET /sendtext` carrying hundreds of recipients is not answered with 414; Kestrel's
+  limit is raised to match in `Program.cs`.
 - Expired files are removed by the `media-cleanup` Hangfire job (Fridays 00:00
   container-local time).
 

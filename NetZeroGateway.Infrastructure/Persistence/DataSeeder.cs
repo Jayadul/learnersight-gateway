@@ -260,13 +260,15 @@ public static class DataSeeder
                 try { existingPlain = enc.Decrypt(existing.ConfigJson); }
                 catch { existingPlain = ""; }
 
-                // Normalize both sides before comparing
-                var normalizedNew = NormalizeJson(plainJson);
+                // Credentials refresh from the seed; every other field stays as the admin
+                // left it (see MergeSeededConfig). Normalize both sides before comparing.
+                var mergedJson = ChannelConfigService.MergeSeededConfig(existingPlain, item.Config);
+                var normalizedNew = NormalizeJson(mergedJson);
                 var normalizedExisting = NormalizeJson(existingPlain);
 
                 if (normalizedExisting != normalizedNew)
                 {
-                    existing.ConfigJson = enc.Encrypt(plainJson);
+                    existing.ConfigJson = enc.Encrypt(mergedJson);
                     changed = true;
                 }
 

@@ -409,6 +409,29 @@ public class ChannelConfigService(
             key.Contains(marker, StringComparison.OrdinalIgnoreCase));
     }
 
+    /// <summary>
+    /// Applies a seeded config to an existing channel's stored one. Only credential fields
+    /// (and fields the channel does not have yet) come from the seed; everything else stays
+    /// as the admin left it, including fields the seed never carried. Replacing the whole
+    /// config reverted every admin edit, and dropped added fields, on each restart.
+    /// A stored config that cannot be read is replaced by the seed outright.
+    /// </summary>
+    public static string MergeSeededConfig(string? existingPlain, IReadOnlyDictionary<string, string> seed)
+    {
+        Dictionary<string, string>? merged = null;
+        try { merged = JsonSerializer.Deserialize<Dictionary<string, string>>(existingPlain ?? ""); }
+        catch (JsonException) { }
+
+        if (merged is null) return JsonSerializer.Serialize(seed);
+
+        foreach (var (key, value) in seed)
+        {
+            if (IsSecret(key) || !merged.ContainsKey(key))
+                merged[key] = value;
+        }
+        return JsonSerializer.Serialize(merged);
+    }
+
     private static readonly string[] SecretMarkers =
         ["secret", "token", "password", "cookie", "apikey"];
 }
