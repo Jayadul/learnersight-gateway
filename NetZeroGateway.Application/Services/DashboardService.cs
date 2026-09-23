@@ -1,17 +1,24 @@
+using Microsoft.Extensions.Configuration;
 using NetZeroGateway.Application.DTOs;
 using NetZeroGateway.Application.Interfaces;
+using NetZeroGateway.Application.Utilities;
 using NetZeroGateway.Domain.Enums;
 
 namespace NetZeroGateway.Application.Services;
 
 public class DashboardService(
     IMessageRequestRepository msgRepo,
-    IDispatchJobRepository jobRepo
+    IDispatchJobRepository jobRepo,
+    IConfiguration config
 ) : IDashboardService
 {
+    // "Today" is the business day (Dhaka), not the UTC day: on the UTC day the dashboard's
+    // counters reset at 06:00 local time.
+    private TimeZoneInfo Zone => AppTime.Resolve(config);
+
     public async Task<DashboardSummaryDto> GetSummaryAsync()
     {
-        var todayStart = DateTimeOffset.UtcNow.Date;
+        var todayStart = AppTime.StartOfDayUtc(DateTimeOffset.UtcNow, Zone);
         var weekStart = todayStart.AddDays(-6);
 
         var allRequests = await msgRepo.GetAllAsync();
@@ -43,11 +50,12 @@ public class DashboardService(
 
     public async Task<List<TimelinePointDto>> GetTimelineAsync(int days)
     {
-        var from = DateTimeOffset.UtcNow.Date.AddDays(-(days - 1));
+        var zone = Zone;
+        var from = AppTime.StartOfDayUtc(DateTimeOffset.UtcNow, zone).AddDays(-(days - 1));
         var items = await msgRepo.FindAsync(m => m.ReceivedAt >= from);
 
         return items
-            .GroupBy(m => DateOnly.FromDateTime(m.ReceivedAt.LocalDateTime))
+            .GroupBy(m => DateOnly.FromDateTime(AppTime.ToAppTime(m.ReceivedAt, zone).DateTime))
             .Select(g => new TimelinePointDto { Date = g.Key, Count = g.Count() })
             .OrderBy(p => p.Date)
             .ToList();
