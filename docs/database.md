@@ -55,7 +55,12 @@ gateway starting. A seeded fallback rule crossing channel types needs
 never fire.
 
 **The seed creates; it never re-asserts.** An existing channel config has only its
-credentials and provider name refreshed, and an existing fallback policy is left
+credentials (fields matching the secret-key rule in `ChannelConfigService.IsSecret`),
+fields it does not have yet, and its provider name refreshed. Every other field stays as
+the admin left it, including fields the seed never carried — before the deep QA pass the
+whole config was replaced on each boot, silently reverting admin edits at every restart
+(`ChannelConfigService.MergeSeededConfig`). A stored config that cannot be decrypted is
+replaced by the seed outright. An existing fallback policy is left
 untouched — so switching a rule off, or renaming a channel, survives a restart. The
 gateway credentials are create-only in the strictest sense: once a row exists the seeder
 does not touch it at all, so a key rotated in the admin panel is never rolled back to the
