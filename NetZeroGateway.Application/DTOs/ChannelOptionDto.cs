@@ -17,4 +17,10 @@ public class ChannelOptionDto
     public ChannelType ChannelType { get; set; }
     public bool IsActive { get; set; }
     public bool IsDefault { get; set; }
+    /// <summary>
+    /// Whether this channel has a Template API Token configured (hotfix batch 3) — lets
+    /// the Manual Send page offer "Send Template" mode only for channels that can
+    /// actually serve it, without exposing the token itself through this endpoint.
+    /// </summary>
+    public bool HasTemplateToken { get; set; }
 }

@@ -13,6 +13,20 @@ public class SendTextController(ISendTextOrchestratorService orchestrator) : Con
     [Consumes("application/x-www-form-urlencoded")]
     public Task<ContentResult> SendText([FromForm] SendTextRequest request) => Dispatch(request);
 
+    // JSON variant of the same POST endpoint (R3.4). Existing form-urlencoded integrators
+    // are unaffected — this is additive, selected by Content-Type alongside the action
+    // above, not a replacement.
+    [HttpPost]
+    [Consumes("application/json")]
+    public Task<ContentResult> SendTextJson([FromBody] SendTextJsonRequest request) => Dispatch(new SendTextRequest
+    {
+        ApiKey = request.ApiKey,
+        SecretKey = request.SecretKey,
+        CallerID = request.CallerID,
+        ToUser = request.ToUser,
+        MessageContent = request.MessageContent,
+    });
+
     // GET variant of the same endpoint, for integrators whose platform cannot easily do
     // POST. Same fields as query-string params, same orchestrator call, same response
     // shape — no duplicated logic. POST stays the documented default: it keeps

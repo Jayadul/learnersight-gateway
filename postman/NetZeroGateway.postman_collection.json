@@ -712,25 +712,42 @@
       ]
     },
     {
-      "name": "Dispatch Logs",
+      "name": "Message Logs (Recipients)",
       "item": [
         {
-          "name": "Get All (paged)",
+          "name": "Get All (paged, per recipient)",
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{baseUrl}}/api/dispatch-logs?page=1&pageSize=10",
+              "raw": "{{baseUrl}}/api/dispatch-jobs/recipients?page=1&pageSize=10",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "dispatch-logs"],
+              "path": ["api", "dispatch-jobs", "recipients"],
               "query": [
                 { "key": "page", "value": "1" },
                 { "key": "pageSize", "value": "10" },
                 { "key": "dateFrom", "value": "", "disabled": true },
                 { "key": "dateTo", "value": "", "disabled": true },
-                { "key": "channelType", "value": "SMS", "disabled": true },
-                { "key": "status", "value": "Sent", "disabled": true },
-                { "key": "toNumber", "value": "", "disabled": true }
+                { "key": "channelType", "value": "0", "disabled": true },
+                { "key": "channelConfigId", "value": "", "disabled": true },
+                { "key": "deliveryStatus", "value": "2", "disabled": true },
+                { "key": "recipient", "value": "", "disabled": true }
               ]
+            }
+          }
+        },
+        {
+          "name": "Resend",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/dispatch-jobs/recipients/resend",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "dispatch-jobs", "recipients", "resend"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"recipientIds\": [\"00000000-0000-0000-0000-000000000000\"],\n  \"channelConfigId\": null\n}"
             }
           }
         }

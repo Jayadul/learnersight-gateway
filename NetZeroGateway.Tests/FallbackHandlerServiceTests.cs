@@ -48,14 +48,16 @@ public class FallbackHandlerServiceTests
         IsGlobal = true,
     };
 
-    private static (FallbackHandlerService Service, FakeJobRepositoryWithExisting Jobs) Build(
+    private static (FallbackHandlerService Service, FakeJobRepositoryWithExisting Jobs,
+        FakeDispatchJobRecipientRepository Recipients) Build(
         MessageRequest request, params FallbackPolicy[] policies)
     {
         var jobs = new FakeJobRepositoryWithExisting([FailedPrimary()]);
+        var recipients = new FakeDispatchJobRecipientRepository();
 
         var service = new FallbackHandlerService(
             jobs,
-            new FakeDispatchJobRecipientRepository(),
+            recipients,
             new FakeMessageRequestRepository(request),
             new FakeFallbackPolicyRepository(policies),
             new FakeChannelConfigRepository(Backup()),
@@ -63,7 +65,7 @@ public class FallbackHandlerServiceTests
             new FakeSenderFactory(new CapturingSender(ChannelType.WP)),
             NullLogger<FallbackHandlerService>.Instance);
 
-        return (service, jobs);
+        return (service, jobs, recipients);
     }
 
     private static MessageRequest Request(bool isMultiChannel) => new()
@@ -76,13 +78,19 @@ public class FallbackHandlerServiceTests
     [Fact]
     public async Task A_single_channel_send_still_gets_its_fallback()
     {
-        var (service, jobs) = Build(Request(isMultiChannel: false), SameTypePolicy());
+        var (service, jobs, recipients) = Build(Request(isMultiChannel: false), SameTypePolicy());
 
         await service.HandleAsync(RequestId);
 
         var fallback = Assert.Single(jobs.Added);
         Assert.True(fallback.IsFallback);
         Assert.Equal(BackupConfigId, fallback.ChannelConfigId);
+
+        // Hotfix batch 3: a recipient rescued by a fallback job reads Fallback, not
+        // Pending — the per-recipient mirror of MessageStatus.Fallback at the request
+        // level, visible immediately rather than waiting on a status-sync run.
+        var recipient = Assert.Single(recipients.Added);
+        Assert.Equal(DeliveryStatus.Fallback, recipient.DeliveryStatus);
     }
 
     [Fact]
@@ -90,7 +98,7 @@ public class FallbackHandlerServiceTests
     {
         // The sender asked for two deliveries, so a third would be charged for a message
         // they never requested.
-        var (service, jobs) = Build(Request(isMultiChannel: true), SameTypePolicy());
+        var (service, jobs, _) = Build(Request(isMultiChannel: true), SameTypePolicy());
 
         await service.HandleAsync(RequestId);
 
@@ -105,7 +113,7 @@ public class FallbackHandlerServiceTests
         crossType.FallbackChannelConfigId = null;
         crossType.AllowCrossChannel = false;
 
-        var (service, jobs) = Build(Request(isMultiChannel: false), crossType);
+        var (service, jobs, _) = Build(Request(isMultiChannel: false), crossType);
 
         await service.HandleAsync(RequestId);
 

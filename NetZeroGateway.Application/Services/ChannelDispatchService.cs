@@ -247,11 +247,17 @@ public class ChannelDispatchService(
         // No jobs at all means nothing could be dispatched — every channel tag failed to
         // resolve. Without this it scores as Success (failedCount == 0), so a typo'd
         // channel label would look like a delivered message.
+        //
+        // PartialSuccess (hotfix batch 3): no longer produced. Every recipient already
+        // carries its own DeliveryStatus on the per-recipient log, so a mixed batch is no
+        // longer ambiguous at that level — this coarse, request-level status only needs to
+        // say whether the message got through at all. A batch with at least one successful
+        // primary job now reads Success even if another tag's job failed; the enum member
+        // itself stays, only for reading rows written before this change.
         request.OverallStatus = primaryJobs.Count == 0 ? MessageStatus.Failed
-                              : failedCount == 0 ? MessageStatus.Success
                               : rescuedByFallback ? MessageStatus.Fallback
-                              : sentCount == 0 ? MessageStatus.Failed
-                              : MessageStatus.PartialSuccess;
+                              : sentCount > 0 ? MessageStatus.Success
+                              : MessageStatus.Failed;
         msgRepo.Update(request);
         await msgRepo.SaveChangesAsync();
 

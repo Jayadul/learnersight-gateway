@@ -23,7 +23,10 @@ no port) from its send endpoint and is configured per channel as `balanceBaseUrl
 These provider secrets are still seeded in `appsettings.json` in plaintext — R1 debt
 item 4, now covering six channels rather than three. Rotate the REVE session cookie, the
 shared GenNet/Chithi `api_token` and the NetZero Inbox token before they carry
-production traffic.
+production traffic. **Hotfix batch 5** added the NetZero Inbox WhatsApp Template API
+Token to the same seed block, for the same reason as the others: a value set only
+through the admin API is wiped on the next restart by the seeder's config refresh (see
+architecture.md). Same rotation caveat applies before this carries production traffic.
 
 **Environment overrides work as of R3.0.** `Providers__Voice__BaseUrl` and friends were
 silently ignored before it: `authorization.json` loaded after the environment source and
@@ -61,6 +64,16 @@ contains production appsettings; see releases/1.0.0.md → Known limitations.
 
 - Files live in the `mediadata` volume (`/app/media` inside the api container) —
   losing the volume breaks all shared links.
+- **Confirmed safe against every redeploy path (hotfix batch 3, task 5).** Neither repo
+  has a CI/CD pipeline — there is no `.github/workflows/` in either, and
+  [testing.md](testing.md) already says so ("no CI"). The actual redeploy mechanism is
+  the manual flow in [release-process.md](release-process.md): `docker compose build` →
+  retag → push → client `docker compose pull && up -d`. `mediadata` is a genuine named
+  Docker volume declared in `docker-compose.yml`, entirely outside both the `api` and
+  `web` build contexts, so a rebuild or an image pull cannot touch it — only
+  `docker compose down -v` or `docker volume rm mediadata` would, and neither is part of
+  the documented ship flow. Nothing to change here; recorded so a future session doesn't
+  re-investigate a CI/CD pipeline that was never built.
 - `Media__PublicBaseUrl` (compose env on `api`) is what public links are built from;
   set it to the address message recipients can reach (the web service proxies
   `/media/` to the API, so the client's domain or `http://<server-ip>:18080`).

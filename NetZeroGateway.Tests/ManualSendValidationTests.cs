@@ -37,9 +37,12 @@ public class ManualSendValidationTests
     private static (ManualSendService Service, NoWriteMessageRepo Repo) Build()
     {
         var repo = new NoWriteMessageRepo();
+        // These tests only exercise SendAsync's early validation, which throws before
+        // touching any of the template-send dependencies below — never constructed here.
         var service = new ManualSendService(
             repo,
             new ServiceCollection().BuildServiceProvider().GetRequiredService<IServiceScopeFactory>(),
+            null!, null!, null!, null!, null!,
             NullLogger<ManualSendService>.Instance);
         return (service, repo);
     }

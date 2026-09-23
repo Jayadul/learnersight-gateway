@@ -103,6 +103,32 @@ with `||mediaUrl` sends `messageType=image` when the URL's extension is a known 
 type (jpg, jpeg, png, gif, webp, bmp); any other extension is refused rather than risk a
 guessed `messageType` on an unconfirmed file type (R3.3).
 
+**WhatsApp Template send (R3.4)** is a NetZero Inbox (v1)-specific capability, not a new
+`Provider` enum member and not reachable through `/sendtext`'s tag grammar — a template
+(name + ordered variables, optional media) is a structured payload that does not fit a
+free-text tag, and does not need fallback/retry semantics. It bypasses
+`IChannelSenderFactory` entirely (that resolves on `(ChannelType, Provider, HandlesMedia)`,
+which has no slot for "template vs freeform text") via its own
+`IWhatsAppTemplateSender` interface, called directly from `ManualSendService` —
+admin-triggered and synchronous, closer to `IChannelBalanceProvider` than to a dispatch
+sender. Recipients still convert to the vendor's `+8801700000001` shape via the same
+`RecipientFormat.ToPlus` the regular v1 send already uses. The channel's config carries a
+separate `templateToken` field, distinct from the regular send `token` — masked the same
+way (R3.4's partial-mask rule matches on the field-name shape, not an exact list) — and
+`GET /api/manual-send/channels` reports whether a channel has one via `hasTemplateToken`,
+without exposing the token itself.
+
+**Verified against the real vendor in hotfix batch 4** — batch 3 shipped this untested
+against the actual API. Two real gaps surfaced: the vendor's query-string duplicates of
+`Content-Type`/`Authorization` (first assumed to be Postman export noise) turned out to
+be required, and `enableLog` (already sent by the regular text send) was missing here too
+— without both, every response field came back null. Once the request matched, a second
+real gap appeared: a genuinely successful, delivered send still read as "failed", because
+the real response shape is `{"success":true,"metaResponse":{"messages":[{"id":"wamid...",
+"message_status":"accepted"}]}}` — a boolean `success` and the message id inside a
+`messages` array — not the flat `status`/`metaResponse.message_id` shape the vendor's own
+documentation implied and batch 3 modeled from it.
+
 ### Recipient formats differ per provider (R3.1)
 
 Numbers are stored canonically: digits, country code, no plus (`8801700000001`). Two
@@ -154,14 +180,38 @@ and matches nothing.
 Runs nightly at 00:00 Dhaka for the previous full day (`delivery-status-sync`), and on
 demand per channel over a chosen window.
 
+**Every run was throwing before it read a row, found and fixed during the hotfix batch 3
+Seq audit.** `StatusSyncService.ResolveWindow` built the default window with
+`AppTime.ToAppTime` — a display conversion that returns the business-zone offset
+(+06:00) — and handed that straight to a query against `dispatch_job_recipients`' UTC
+`timestamptz` columns; Npgsql refuses to write a non-zero-offset `DateTimeOffset` there
+at all. The instant was always correct, only the offset needed normalizing to UTC before
+use. Fixed by calling `.ToUniversalTime()` on both the default and the explicit-window
+path — see the method's own doc comment.
+
 ### Resend (R3.2)
 
 Operates on recipient rows, not jobs: SMS and Voice batch many numbers into one job, so
-retrying the job would send again to everyone it already reached. Every attempt creates
-a new job and new rows linked by `resent_from_recipient_id` rather than mutating the
-originals — a retry that succeeds must not erase the evidence that the first attempt
-failed. Crossing channel types is refused, the same rule fallback uses. Authorized at
-the ManualSend tier, not SuperAdmin: this is operational recovery, not configuration.
+retrying the job would send again to everyone it already reached. Crossing channel types
+is refused, the same rule fallback uses. Authorized at the ManualSend tier, not
+SuperAdmin: this is operational recovery, not configuration.
+
+**Updates the recipient row in place (hotfix batch 4) — a deliberate reversal of the
+original R3.2 design**, recorded here on purpose so it reads as a conscious change, not
+drift. Every attempt used to create a new job *and* a new `dispatch_job_recipients` row
+linked by `resent_from_recipient_id`, on the reasoning that a retry succeeding must not
+erase evidence that the first attempt failed. In practice this meant a recipient retried
+three times showed as three separate rows in Message Logs, reading as three different
+sends rather than one recipient retried three times — confusing enough that the client
+asked for it to stop. Resend now still creates a new `DispatchJob` per attempt (that job
+is the attempt's own audit record), but updates the *same* recipient row in place —
+`dispatch_job_id`, `provider_reference_id` and `delivery_status` all move to reflect the
+latest attempt, so a resend that succeeds stops looking like a failure. Each attempt's own
+outcome is preserved separately in `resend_attempts`
+(`GET /api/dispatch-jobs/recipients/{id}/attempts`) rather than lost, so "what happened on
+attempt 2 vs 3" is still recoverable — just not in the main table. `resent_from_recipient_id`
+stays on the entity for reading rows created under the old design; nothing sets it going
+forward.
 
 ### Balances
 
@@ -177,8 +227,9 @@ a provider — the dashboard shows several channels at once and one slow vendor 
 stall the page. A failed refresh keeps the last known figure and its timestamp and sets
 only `balance_error`, so the card shows a stale number with a reason instead of blanking.
 
-**`GET /balance?LABEL=…`** (R3.3, API root, unauthenticated) is a third-party
-integrator's entry point to this same balance data — a `labelSlug` resolves to an
+**`GET /balance?callerID=…`** (R3.3, API root, unauthenticated; param renamed from
+`LABEL` in R3.4) is a third-party integrator's entry point to this same balance data —
+a `labelSlug` resolves to an
 active, balance-capable channel the same way a gateway tag does — but unlike every
 other reader here it calls the provider **live** on every request (a batch-2 hotfix
 reversal of the endpoint's original cached-only design; no authentication guards it, so
@@ -288,10 +339,13 @@ mid-migration. Full contract: [api.md](api.md).
 - **Secrets**: channel provider credentials AES-encrypted in `channel_configs.config_json`,
   and the gateway's own keys in `gateway_credentials.api_key_encrypted` /
   `secret_key_encrypted` (`IEncryptionService` for both); rotation via admin UI applies
-  instantly. Channel-config reads mask secrets as `***`; the gateway credentials are read
-  back decrypted for SuperAdmin, since the pair has to be handed to an integrator and
-  nothing else can read the column. Writes treat an omitted, blank or `***` field as
-  "leave it alone" so a partial save never blanks a credential.
+  instantly. Channel-config reads show secrets **partially masked** (R3.4 — `***` plus the
+  last 6 characters, e.g. `***7ced465`; `GET /{id}/reveal?field=` returns one field's real
+  value on demand, same SuperAdmin gate); the gateway credentials are read back fully
+  decrypted for SuperAdmin, since the pair has to be handed to an integrator and nothing
+  else can read the column. Writes treat an omitted or `***`-prefixed field as "leave it
+  alone" so a partial save never blanks a credential — one check covers both the old
+  full mask and the new partial one.
 - **Logging**: Serilog → Seq (compose service, port 18082).
 - **Time**: UTC storage/processing everywhere; Dhaka (UTC+6) for display and job
   schedules — see [conventions.md](conventions.md).

@@ -42,6 +42,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IMessageRequestRepository, MessageRequestRepository>();
         services.AddScoped<IDispatchJobRepository, DispatchJobRepository>();
         services.AddScoped<IDispatchJobRecipientRepository, DispatchJobRecipientRepository>();
+        services.AddScoped<IResendAttemptRepository, ResendAttemptRepository>();
         services.AddScoped<IApiLogRepository, ApiLogRepository>();
         services.AddScoped<IFallbackPolicyRepository, FallbackPolicyRepository>();
         services.AddScoped<IMediaFileRepository, MediaFileRepository>();
@@ -180,6 +181,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IChannelSender, ChithiSmsSender>();      // SMS  / Chithi
         services.AddScoped<IChannelSender, NetZeroInboxWhatsAppSender>();   // WP / NetZeroInbox v1
         services.AddScoped<IChannelSender, NetZeroInboxQrWhatsAppSender>(); // WP / NetZeroInbox QR
+        services.AddScoped<IWhatsAppTemplateSender, NetZeroInboxTemplateSender>();
         services.AddScoped<IChannelSenderFactory, ChannelSenderFactory>();
 
         return services;
@@ -197,6 +199,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IChannelBalanceService, ChannelBalanceService>();
         services.AddScoped<IStatusSyncService, StatusSyncService>();
         services.AddScoped<IResendService, ResendService>();
+        services.AddScoped<IDispatchJobRecipientService, DispatchJobRecipientService>();
         services.AddScoped<IFallbackPolicyService, FallbackPolicyService>();
         services.AddScoped<IFallbackHandlerService, FallbackHandlerService>();
         services.AddScoped<IChannelDispatchService, ChannelDispatchService>();

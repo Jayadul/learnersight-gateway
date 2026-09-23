@@ -4,6 +4,7 @@ using NetZeroGateway.Application.Utilities;
 using NetZeroGateway.Domain.Entities;
 using System.Diagnostics;
 using System.Text;
+using System.Text.Json.Nodes;
 
 namespace NetZeroGateway.API.Middleware;
 
@@ -37,7 +38,10 @@ public class ApiLoggingMiddleware(RequestDelegate next, ILogger<ApiLoggingMiddle
         else
         {
             ctx.Request.EnableBuffering();
-            reqBody = MaskSecrets(await ReadBodyAsync(ctx.Request));
+            var rawBody = await ReadBodyAsync(ctx.Request);
+            // The JSON POST variant (R3.4) isn't "key=value&..." shaped, so the
+            // form/query regex below would silently pass real credentials through.
+            reqBody = ctx.Request.HasJsonContentType() ? MaskJsonSecrets(rawBody) : MaskSecrets(rawBody);
             ctx.Request.Body.Position = 0;
         }
 
@@ -73,6 +77,15 @@ public class ApiLoggingMiddleware(RequestDelegate next, ILogger<ApiLoggingMiddle
                 toUserVal = form["toUser"].FirstOrDefault();
                 requestedChannels = DescribeChannels(
                     ctx.RequestServices, form["messageContent"].FirstOrDefault());
+            }
+            else if (ctx.Request.HasJsonContentType())
+            {
+                ctx.Request.Body.Position = 0;
+                using var jdoc = await System.Text.Json.JsonDocument.ParseAsync(ctx.Request.Body);
+                ctx.Request.Body.Position = 0;
+                toUserVal = jdoc.RootElement.TryGetProperty("toUser", out var tu) ? tu.GetString() : null;
+                var mc = jdoc.RootElement.TryGetProperty("messageContent", out var mcEl) ? mcEl.GetString() : null;
+                requestedChannels = DescribeChannels(ctx.RequestServices, mc);
             }
         }
         catch { /* never break pipeline */ }
@@ -149,6 +162,30 @@ public class ApiLoggingMiddleware(RequestDelegate next, ILogger<ApiLoggingMiddle
     private static string MaskSecrets(string formBody) =>
         System.Text.RegularExpressions.Regex.Replace(
             formBody, "(apikey|secretkey)=[^&]*", "$1=***", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+    /// <summary>
+    /// Same masking as <see cref="MaskSecrets"/>, for a JSON body — the "key=value" regex
+    /// doesn't match JSON syntax, so a JSON /sendtext POST would otherwise persist real
+    /// credentials into api_logs unmasked. Falls back to the raw body on malformed JSON
+    /// rather than throwing, matching MaskSecrets' never-break-logging behavior.
+    /// </summary>
+    private static string MaskJsonSecrets(string jsonBody)
+    {
+        try
+        {
+            if (JsonNode.Parse(jsonBody) is not JsonObject obj) return jsonBody;
+            foreach (var key in obj.Select(kv => kv.Key).ToList())
+            {
+                if (key.Equals("apikey", StringComparison.OrdinalIgnoreCase) ||
+                    key.Equals("secretkey", StringComparison.OrdinalIgnoreCase))
+                {
+                    obj[key] = "***";
+                }
+            }
+            return obj.ToJsonString();
+        }
+        catch { return jsonBody; }
+    }
 
     private static async Task<string> ReadBodyAsync(HttpRequest req)
     {

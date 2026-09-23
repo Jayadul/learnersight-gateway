@@ -140,16 +140,25 @@ public class StatusSyncService(
     /// The window to sync. Defaults to the previous full day in business time, matching
     /// when the nightly job runs — a UTC day would straddle two local ones and leave a
     /// six-hour gap that nothing ever revisits.
+    /// <para>
+    /// Found broken while auditing Seq for hotfix batch 3: <see cref="AppTime.ToAppTime"/>
+    /// is meant for display and returns a DateTimeOffset carrying the business-zone
+    /// offset (+06:00), not UTC. That value was flowing straight into a query against
+    /// dispatch_job_recipients' UTC timestamptz columns, and Npgsql refuses to write a
+    /// non-zero-offset DateTimeOffset there at all — every sync run, nightly and on
+    /// demand, for every provider, was throwing before it read a single row. The instant
+    /// was always correct; only its offset needed normalizing back to UTC before use.
+    /// </para>
     /// </summary>
     private (DateTimeOffset From, DateTimeOffset To) ResolveWindow(StatusSyncRequest request)
     {
         if (request.From is { } explicitFrom)
-            return (explicitFrom, request.To ?? DateTimeOffset.UtcNow);
+            return (explicitFrom.ToUniversalTime(), (request.To ?? DateTimeOffset.UtcNow).ToUniversalTime());
 
         var tz = AppTime.Resolve(config);
         var nowLocal = AppTime.ToAppTime(DateTimeOffset.UtcNow, tz);
-        var startOfToday = new DateTimeOffset(nowLocal.Date, nowLocal.Offset);
+        var startOfToday = new DateTimeOffset(nowLocal.Date, nowLocal.Offset).ToUniversalTime();
 
-        return (startOfToday.AddDays(-1), request.To ?? startOfToday);
+        return (startOfToday.AddDays(-1), (request.To ?? startOfToday).ToUniversalTime());
     }
 }

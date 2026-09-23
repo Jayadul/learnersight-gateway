@@ -13,15 +13,23 @@ namespace NetZeroGateway.Application.Services;
 /// Retries individual recipients that failed.
 /// <para>
 /// Recipient-level rather than job-level: SMS and Voice batch many numbers into one
-/// job, so resending the job would send again to everyone it already reached. Every
-/// attempt creates a new job and new rows linked back to the originals rather than
-/// mutating them, keeping the delivery log append-only — a resend that succeeds must
-/// not erase the evidence that the first attempt failed.
+/// job, so resending the job would send again to everyone it already reached.
+/// </para>
+/// <para>
+/// Hotfix batch 4, task 2a reverses the earlier "every attempt is a new linked row"
+/// design: three retries of one recipient used to leave three separate rows in Message
+/// Logs, which read as three different sends rather than one recipient retried three
+/// times. The recipient row is now updated in place on every attempt — same id, latest
+/// job, latest status — while each attempt's own outcome is kept in
+/// <see cref="Interfaces.IResendAttemptRepository"/> so "what happened on attempt 2 vs 3"
+/// stays recoverable in the row's history even though the main table only ever shows one
+/// current row per recipient.
 /// </para>
 /// </summary>
 public class ResendService(
     IDispatchJobRepository jobRepo,
     IDispatchJobRecipientRepository recipientRepo,
+    IResendAttemptRepository attemptRepo,
     IChannelConfigRepository configRepo,
     IEncryptionService enc,
     IChannelSenderFactory senderFactory,
@@ -55,7 +63,7 @@ public class ResendService(
             result.Outcomes.Add(outcome);
 
             if (outcome.Sent) result.Resent++;
-            else if (outcome.NewRecipientId is not null) result.Failed++;
+            else if (outcome.Attempted) result.Failed++;
             else result.Skipped++;
         }
 
@@ -115,25 +123,35 @@ public class ResendService(
         await jobRepo.AddAsync(job);
         await jobRepo.SaveChangesAsync();
 
+        outcome.Attempted = true;
         var sender = senderFactory.GetSender(
             channel.ChannelType, channel.Provider, job.MediaUrl is not null);
         await sender.SendAsync(job, cfg);
         await jobRepo.SaveChangesAsync();
 
-        var retryRow = new DispatchJobRecipient
-        {
-            DispatchJobId = job.Id,
-            Recipient = original.Recipient,
-            ProviderReferenceId = job.ProviderMessageId,
-            DeliveryStatus = job.Status == JobStatus.Failed
-                ? DeliveryStatus.Failed
-                : DeliveryStatus.Pending,
-            ResentFromRecipientId = original.Id
-        };
-        await recipientRepo.AddAsync(retryRow);
+        // Updated in place, not a new row — see the class remark. The row now reflects
+        // this latest attempt; the sync fields reset because they describe the new job,
+        // not the one that just got replaced.
+        original.DispatchJobId = job.Id;
+        original.ProviderReferenceId = job.ProviderMessageId;
+        original.DeliveryStatus = job.Status == JobStatus.Failed
+            ? DeliveryStatus.Failed
+            : DeliveryStatus.Pending;
+        original.LastCheckedAt = null;
+        original.RawStatusResponse = null;
+        recipientRepo.Update(original);
         await recipientRepo.SaveChangesAsync();
 
-        outcome.NewRecipientId = retryRow.Id;
+        await attemptRepo.AddAsync(new ResendAttempt
+        {
+            DispatchJobRecipientId = original.Id,
+            DispatchJobId = job.Id,
+            DeliveryStatus = original.DeliveryStatus,
+            ProviderReferenceId = job.ProviderMessageId,
+            RawResponse = job.ProviderRawResponse,
+        });
+        await attemptRepo.SaveChangesAsync();
+
         outcome.Sent = job.Status == JobStatus.Sent;
         outcome.Reason = job.FailureReason;
 

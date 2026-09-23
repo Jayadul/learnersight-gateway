@@ -16,6 +16,15 @@ public class ManualSendController(
         => Accepted(await service.SendAsync(request));
 
     /// <summary>
+    /// Sends a Meta pre-approved WhatsApp template — a structured payload (template name
+    /// + ordered variables), never reachable through /sendtext's tag grammar. Same auth
+    /// tier as the rest of this controller, not SuperAdmin.
+    /// </summary>
+    [HttpPost("template")]
+    public async Task<IActionResult> SendTemplate([FromBody] SendTemplateRequest request)
+        => Ok(await service.SendTemplateAsync(request));
+
+    /// <summary>
     /// Which gateways exist, for a "Send Through" picker or a gateway filter — id, label,
     /// labelSlug, default flag only, no credentials. Deliberately not on
     /// ChannelConfigController: that whole controller is SuperAdmin-only (it also holds

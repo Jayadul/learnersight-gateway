@@ -4,11 +4,13 @@ Load this when: changing endpoints, integrating a client, or debugging request/r
 
 ## Public gateway endpoint
 
-`POST /sendtext` (`application/x-www-form-urlencoded`) and `GET /sendtext` (same fields
-as query-string params) — both live at the API **root** (not `/api/`), both routed
-through the same `SendTextOrchestratorService` call, both return the identical
-REVE-compatible response. Use GET only where the integrator's platform cannot easily do
-POST — POST keeps credentials off the URL, which GET cannot.
+`POST /sendtext` (`application/x-www-form-urlencoded` **or** `application/json`, R3.4)
+and `GET /sendtext` (same fields as query-string params) — all live at the API **root**
+(not `/api/`), all routed through the same `SendTextOrchestratorService` call, all return
+the identical REVE-compatible response. The two POST content types are both accepted
+side by side (selected by `Content-Type`) — JSON did not replace form-urlencoded, so
+existing integrators are unaffected. Use GET only where the integrator's platform cannot
+easily do POST — POST keeps credentials off the URL, which GET cannot.
 
 | Field | Required | Notes |
 |---|---|---|
@@ -19,26 +21,32 @@ POST — POST keeps credentials off the URL, which GET cannot.
 | `callerID` | yes | Recorded with the request; not part of authentication |
 
 ```
-POST /sendtext
+POST /sendtext  (application/x-www-form-urlencoded)
+apikey=…&secretkey=…&callerID=testSender&toUser=8801835414333,8801835471840&messageContent=test+message
+
+POST /sendtext  (application/json)
 { "apikey": "…", "secretkey": "…", "callerID": "testSender",
   "toUser": "8801835414333,8801835471840", "messageContent": "test message" }
 
 GET /sendtext?apikey=…&secretkey=…&callerID=testSender&toUser=8801712564810,8801835414330&messageContent=test
 ```
 
-`ApiLoggingMiddleware` masks `apikey`/`secretkey` on both verbs — in the stored form body
-for POST, in the stored query string for GET.
+`ApiLoggingMiddleware` masks `apikey`/`secretkey` on all three shapes before storing —
+the form body and query string via a `key=value` regex, the JSON body by parsing and
+redacting those two properties directly (a JSON body doesn't match the regex shape).
 
 ## Public balance endpoint
 
-`GET /balance?LABEL={labelSlug}` — also at the API root, also unauthenticated (R3.3).
-Resolves `LABEL` to any **active, balance-capable** channel (currently SMS-type only —
+`GET /balance?callerID={labelSlug}` — also at the API root, also unauthenticated (R3.3;
+param renamed from `LABEL` to `callerID` in R3.4 — same value, a channel's `labelSlug`,
+just a different query-string name to match the field integrators already send to
+`/sendtext`). Resolves `callerID` to any **active, balance-capable** channel (currently SMS-type only —
 REVE, Chithi) and reads that channel's balance **live from the provider** on every
 request (batch-2 hotfix reversed the original cached-only design). A failed live read
 falls back to the last known cached figure rather than returning an error — the same
 graceful-degradation rule the dashboard and the 15-minute refresh job already follow.
 
-**No rate limiting.** This endpoint has no authentication — `LABEL` alone triggers the
+**No rate limiting.** This endpoint has no authentication — `callerID` alone triggers the
 live provider call, so anyone who can guess or learn a label can trigger unlimited
 REVE/Chithi balance checks through it. Flagged for the record; team-lead-approved.
 
@@ -50,8 +58,8 @@ type that doesn't support balance all return the same generic shape — `404` wi
 `/sendtext` is, and never a different message per case, since there is no `apikey`
 guarding this endpoint to make that distinction safe to reveal.
 
-**No authentication.** `LABEL` alone is sufficient. This is a deliberate trade-off, not an
-oversight — flagged once, for the record: anyone who can guess or learn a channel's label
+**No authentication.** `callerID` alone is sufficient. This is a deliberate trade-off, not
+an oversight — flagged once, for the record: anyone who can guess or learn a channel's label
 can read its balance.
 
 Authentication reads the single `gateway_credentials` row. Its `username` is admin-side
@@ -120,10 +128,15 @@ Simulator (SuperAdmin only). Postman collection: `postman/`.
 ## Admin API (`/api/*`, JWT Bearer)
 
 - Wire format: **enums as integers** (ChannelType SMS=0, WP=1, Voice=3 — **2 is retired**,
-  see below; MessageStatus Pending=0, PartialSuccess=1, Success=2, Failed=3, **Fallback=4**
+  see below; MessageStatus Pending=0, PartialSuccess=1 (**historic only since hotfix batch
+  3** — every recipient now carries its own `DeliveryStatus` on the per-recipient log, so
+  a mixed batch reads `Success` if anything got through; the member is kept only for rows
+  written before this change), Success=2, Failed=3, **Fallback=4**
   — every primary delivery failed but a retry got through, so the message arrived by a
   route the sender did not ask for; JobStatus
-  Pending=0, Sent=1, Failed=2; AdminRole SuperAdmin=0, Admin=1; MediaStatus Active=0,
+  Pending=0, Sent=1, Failed=2; DeliveryStatus Pending=0, Delivered=1, Failed=2, Unknown=3,
+  **Fallback=4** (R3.4 — this recipient's own message only arrived via a fallback job, set
+  at dispatch time, not synced); AdminRole SuperAdmin=0, Admin=1; MediaStatus Active=0,
   Deleted=1).
 - **ChannelType 2 (`WP_Media`) no longer exists.** WhatsApp text and media were unified
   into `WP=1`; a message is media when it carries a `mediaUrl`, not by channel type.
@@ -144,14 +157,12 @@ Simulator (SuperAdmin only). Postman collection: `postman/`.
 | Auth | `/api/auth` | login / refresh |
 | Dashboard | `/api/dashboard` | summary, timeline, breakdown, failure reasons. Each failure reason carries `byChannel` — the same failures split by channel type and gateway, so a one-provider outage is distinguishable from a general problem |
 | MessageRequest | `/api/message-requests` | paged logs + detail with job tree. `isMultiChannel` marks a request whose tags asked for more than one delivery — fallback is skipped for it. `?channelConfigId=` filters on the **gateway** that delivered (matching the jobs, since a request records only channel types) |
-| DispatchLog | `/api/dispatch-logs` | paged delivery jobs. Each job carries `channelLabel` — the name of the channel that actually sent it, since several gateways of a type may be active — and `campaignId` on voice jobs |
-| ApiLog | `/api/api-logs` | gateway request audit (secrets masked). `requestedChannels` snapshots the channel types the tags asked for ("SMS, WhatsApp") and `?channel=` filters on it; `messageRequestId` links to the deliveries the request produced |
-| ManualSend | `/api/manual-send` | admin-initiated sends. Credentials come from the channel config; every override is optional and a blank one keeps the configured value — `channelLabelSlug` (which gateway; default when omitted), `callerId` (SMS), `campaignId` and `lotNumber` (Voice), `mediaUrl` (WhatsApp — its presence is what makes the send a media send). `GET channels?channelType=` (R3.3) returns minimal, non-sensitive channel identity (id/label/labelSlug/default) — deliberately not on ChannelConfig, which is SuperAdmin-only end to end; this lets an Admin-role page read the gateway list (a "Send Through" picker, a log filter) without 403ing |
+| ApiLog | `/api/api-logs` | gateway request audit (secrets masked). `requestedChannels` snapshots the channel types the tags asked for ("SMS, WhatsApp") and `?channel=` filters on it; `messageRequestId` links to the deliveries the request produced. **R3.4**: the admin UI's detail view reconstructs `rawBody` as a full curl command (method/content-type inferred from its shape, since the method itself is not a stored column) for copy-paste debugging — `apikey`/`secretkey` stay masked, since `rawBody` was already masked before storage; there is no unmasked version to show even for a SuperAdmin |
+| ManualSend | `/api/manual-send` | admin-initiated sends. Credentials come from the channel config; every override is optional and a blank one keeps the configured value — `channelLabelSlug` (which gateway; default when omitted), `callerId` (SMS), `campaignId` and `lotNumber` (Voice), `mediaUrl` (WhatsApp — its presence is what makes the send a media send). `GET channels?channelType=` (R3.3) returns minimal, non-sensitive channel identity (id/label/labelSlug/default, plus **R3.4** `hasTemplateToken`) — deliberately not on ChannelConfig, which is SuperAdmin-only end to end; this lets an Admin-role page read the gateway list (a "Send Through" picker, a log filter) without 403ing. **`POST template`** (R3.4, verified against the real vendor in hotfix batch 4) sends a Meta pre-approved WhatsApp template — `{ channelLabelSlug, toNumber, templateName, exampleArr, mediaUrl?, token? }` — through a NetZero Inbox (v1) channel with a Template API Token configured; synchronous (unlike the fire-and-forget `POST` above), so the response's `status` is a definite `sent`/`failed`, not `queued`. The vendor's query-string duplicates of `Content-Type`/`Authorization` (alongside the real headers) turned out to be required, not Postman export noise as first assumed — a real call without them failed. The real success shape is `{"success":true,"metaResponse":{"messages":[{"id":"wamid...","message_status":"accepted"}]}}`, not the flat `status`/`message_id` shape the vendor's own docs implied. **Hotfix batch 5**: `token` is optional and overrides the channel's configured Template API Token for this send only (same "blank keeps the configured value" pattern as every other override here); the Template API Token itself is now seeded in `appsettings.json` (`Seed:ChannelConfigs`) so it survives a container restart instead of being wiped by the seeder's config refresh. Not reachable via `/sendtext`'s tag grammar — a template's structured payload does not fit a free-text tag |
 | StatusSync | `/api/status-sync` | `GET /channels` lists channels whose provider offers a delivery status lookup (REVE, Chithi, NetZero Voice). `POST /channels/{id}` runs one now; omitting the window uses the previous full day, as the nightly job does. A failed run reports `success:false` and changes nothing, so the window can be retried |
-| Resend | `/api/dispatch-jobs/recipients/resend` | Retries specific `dispatch_job_recipients` rows, optionally through another **active channel of the same type** — crossing types is refused. Creates new jobs and rows rather than mutating the originals. Capped at 200 recipients per request; duplicates in the selection are sent once. ManualSend tier, not SuperAdmin |
-| DispatchLog | `/api/dispatch-logs` | Adds a `deliveryStatus` filter (R3.2) matching jobs with **any** recipient in that state — a Sent job can hold a mix, so it sits alongside the job-level `status` rather than replacing it |
+| DispatchJobRecipient | `/api/dispatch-jobs/recipients` | **R3.4 — replaces the old `DispatchLog` controller.** `GET` returns paged, per-recipient rows (Message Logs) — one row per `dispatch_job_recipients` entry, each carrying its own `channelType`/`channelLabel`/`messageContent`/`deliveryStatus` rather than the old per-job rollup. Filters: `dateFrom`/`dateTo`, `channelType`, `channelConfigId`, `deliveryStatus` (now including `Fallback`), `recipient`, `failureReason` (exact match — the dashboard's failure-reasons chart drill-down uses this to show the records behind a bar). `rawProviderResponse` is the recipient's own synced response once available, falling back to the job-level response written at dispatch time so it's never blank before the next status-sync run. `POST resend` — retries specific rows, optionally through another **active channel of the same type** (`channelConfigId` in the request body); crossing types is refused; capped at 200 recipients per request; ManualSend tier, not SuperAdmin. **Hotfix batch 4**: updates the row in place instead of creating a new one (a deliberate reversal of the earlier append-only design — see architecture.md) so a recipient retried more than once still shows as exactly one row; each attempt's own outcome is kept in `resend_attempts`, read via `GET {id}/attempts` |
 | ChannelBalance | `/api/channel-balances` | `GET` returns cached balances for every channel whose provider reports one (REVE, Chithi) — it never calls a provider. `POST /{id}/refresh` reads one channel's balance now. A failed read keeps the last known figure and sets `error`, so `isStale` is true and the caller shows the old number with a marker rather than a blank. `creditLimit` is null where the provider has no such concept |
-| ChannelConfig | `/api/channel-configs` | CRUD + `PATCH /{id}/activate`, `/deactivate`, `/set-default`. `provider` (R3.0) names the vendor and is validated against the channel type on save — a provider that cannot serve the type is rejected there rather than at dispatch; `providerName` is display text. A `baseUrl` config field points that channel at its own host, blank meaning the configured default. Several configs per type may be active; exactly one is the **default**. The default cannot be deactivated or deleted — promote another first; a channel named by a fallback rule cannot be deleted until that rule is changed. Reads mask secret fields as `***` — on `PUT`, a config field sent as `***` or omitted keeps its stored value, so saving back a masked read never overwrites credentials |
+| ChannelConfig | `/api/channel-configs` | CRUD + `PATCH /{id}/activate`, `/deactivate`, `/set-default`. `provider` (R3.0) names the vendor and is validated against the channel type on save — a provider that cannot serve the type is rejected there rather than at dispatch; `providerName` is display text. A `baseUrl` config field points that channel at its own host, blank meaning the configured default. Several configs per type may be active; exactly one is the **default**. The default cannot be deactivated or deleted — promote another first; a channel named by a fallback rule cannot be deleted until that rule is changed. **R3.4**: reads show secret fields **partially masked** (`***` plus the value's last 6 characters, e.g. `***7ced465` — a short value under 6 characters shows none of it, the same as the old all-or-nothing `***`); `GET /{id}/reveal?field={key}` (same SuperAdmin gate) returns that one field's real value on demand. Deliberately ASCII (not a Unicode mask character — one was tried and did not survive every request path unmangled). On `PUT`, a config field is kept at its stored value whenever it is omitted or starts with `***` — covering the old full mask and the new partial one with the same check — so saving back a masked read never overwrites a credential |
 | FallbackPolicy | `/api/fallback-policies` | CRUD + `PATCH /{id}/toggle-active`. Each side carries a channel **type** and an optional `triggerChannelConfigId` / `fallbackChannelConfigId` naming one channel (null = any/default of that type). Same-type rules must name **both** channels and they must differ; differing types are rejected unless `allowCrossChannel` is true. Reads also return `triggerChannelLabel` / `fallbackChannelLabel` |
 | AdminUser | `/api/admin-users` | user CRUD |
 | GatewayCredential | `/api/gateway-credentials` | `GET` + `PUT` on the collection path — one row, so no id in the route. **Reads return both keys decrypted** (SuperAdmin-only; the pair has to be readable to be handed to an integrator, and the column is ciphertext). `isReadable` is false when the stored ciphertext will not decrypt. On `PUT` every field is optional: an omitted, blank, or `***` field keeps its stored value, so changing the username alone cannot blank the keys. `username` (shown as "Username (Balance Client ID)", R3.3) auto-syncs to the default SMS channel's own Balance Client ID whenever that channel's Balance Client ID changes or the default SMS channel itself changes — still admin-editable in between syncs |

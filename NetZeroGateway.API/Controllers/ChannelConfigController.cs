@@ -17,6 +17,15 @@ public class ChannelConfigController(IChannelConfigService service) : Controller
     public async Task<IActionResult> GetById(Guid id)
         => Ok(await service.GetByIdAsync(id));
 
+    /// <summary>
+    /// Reveals one field's real value on demand — the config list/read otherwise shows
+    /// only a partial mask. Same SuperAdmin gate as the rest of this controller; this
+    /// changes how much of a secret is visible by default, not who can see it.
+    /// </summary>
+    [HttpGet("{id:guid}/reveal")]
+    public async Task<IActionResult> RevealField(Guid id, [FromQuery] string field)
+        => Ok(new RevealChannelSecretDto { Value = await service.RevealFieldAsync(id, field) });
+
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateChannelConfigRequest request)
     {
