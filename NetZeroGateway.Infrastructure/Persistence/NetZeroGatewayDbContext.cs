@@ -59,7 +59,7 @@ public class NetZeroGatewayDbContext(DbContextOptions<NetZeroGatewayDbContext> o
         {
             e.HasKey(x => x.Id);
             e.Property(x => x.CallerID).HasMaxLength(100);
-            e.Property(x => x.ToUser).HasMaxLength(2000).IsRequired();
+            e.Property(x => x.ToUser).IsRequired();
             e.Property(x => x.RawMessageContent).HasColumnType("text").IsRequired();
             e.Property(x => x.OverallStatus).HasConversion<string>().HasMaxLength(50);
             e.Property(x => x.Source).HasConversion<string>().HasMaxLength(50);
@@ -90,7 +90,7 @@ public class NetZeroGatewayDbContext(DbContextOptions<NetZeroGatewayDbContext> o
             e.Property(x => x.MessageContent).HasColumnType("text").IsRequired();
             e.Property(x => x.MediaUrl).HasMaxLength(1000);
             e.Property(x => x.CampaignId).HasMaxLength(200);
-            e.Property(x => x.ToNumber).HasMaxLength(2000).IsRequired();
+            e.Property(x => x.ToNumber).IsRequired();
             e.Property(x => x.Status).HasConversion<string>().HasMaxLength(50);
             e.Property(x => x.ProviderMessageId).HasMaxLength(500);
             e.Property(x => x.ProviderRawResponse).HasColumnType("text");
@@ -172,7 +172,7 @@ public class NetZeroGatewayDbContext(DbContextOptions<NetZeroGatewayDbContext> o
         mb.Entity<ApiLog>(e =>
         {
             e.HasKey(x => x.Id);
-            e.Property(x => x.ToUser).HasMaxLength(2000);
+            e.Property(x => x.ToUser);
             e.Property(x => x.RawBody).HasColumnType("text").IsRequired();
             e.Property(x => x.ResponseBody).HasColumnType("text").IsRequired();
             e.Property(x => x.CallerIp).HasMaxLength(50).IsRequired();

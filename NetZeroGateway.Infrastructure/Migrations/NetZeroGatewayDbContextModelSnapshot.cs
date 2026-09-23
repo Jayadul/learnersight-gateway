@@ -128,8 +128,7 @@ namespace NetZeroGateway.Infrastructure.Migrations
                         .HasColumnName("response_status");
 
                     b.Property<string>("ToUser")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
+                        .HasColumnType("text")
                         .HasColumnName("to_user");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
@@ -318,8 +317,7 @@ namespace NetZeroGateway.Infrastructure.Migrations
 
                     b.Property<string>("ToNumber")
                         .IsRequired()
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
+                        .HasColumnType("text")
                         .HasColumnName("to_number");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
@@ -666,8 +664,7 @@ namespace NetZeroGateway.Infrastructure.Migrations
 
                     b.Property<string>("ToUser")
                         .IsRequired()
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
+                        .HasColumnType("text")
                         .HasColumnName("to_user");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
