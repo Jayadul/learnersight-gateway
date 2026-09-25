@@ -45,5 +45,13 @@ public enum Provider
     /// without the leading plus that v1 requires. Only the token is shared.
     /// </para>
     /// </summary>
-    NetZeroInboxQr = 6
+    NetZeroInboxQr = 6,
+
+    /// <summary>
+    /// NetZero Inbox WhatsApp Template API (<c>send_templet</c>), on its own channel so it is
+    /// named, listed and picked as a template channel rather than hidden as an extra field on
+    /// a regular one (hotfix batch 6). It only ever sends Meta pre-approved templates, through
+    /// Manual Send; a text or media tag pointed at it fails with a message saying so.
+    /// </summary>
+    NetZeroInboxTemplate = 7
 }

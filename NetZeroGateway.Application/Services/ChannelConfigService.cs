@@ -42,7 +42,7 @@ public class ChannelConfigService(
             // The first config of a type becomes its default; otherwise the operator
             // promotes one explicitly, so creating a channel never silently reroutes
             // live traffic away from the current default.
-            IsDefault = siblings.Count == 0
+            IsDefault = siblings.Count == 0 && req.Provider != Provider.NetZeroInboxTemplate
         };
         if (entity.IsDefault) entity.IsActive = true;
 
@@ -161,6 +161,11 @@ public class ChannelConfigService(
     {
         var entity = await repo.GetByIdAsync(id)
             ?? throw new NotFoundException($"ChannelConfig {id} not found.");
+        // Untagged and fallback sends of a type go to its default, and a template channel
+        // cannot carry those.
+        if (entity.Provider == Provider.NetZeroInboxTemplate)
+            throw new InvalidOperationException(
+                "A WhatsApp Template channel cannot be the default: it only sends templates.");
         await repo.SetDefaultAsync(id, entity.ChannelType);
 
         if (entity.ChannelType == ChannelType.SMS)
@@ -266,7 +271,10 @@ public class ChannelConfigService(
             ChannelType = c.ChannelType,
             IsActive = c.IsActive,
             IsDefault = c.IsDefault,
-            HasTemplateToken = HasTemplateToken(c)
+            // Only a dedicated Template channel counts: a templateToken left on a regular
+            // channel from before batch 6 is no longer offered for template sends.
+            HasTemplateToken = c.Provider == Provider.NetZeroInboxTemplate && HasTemplateToken(c),
+            IsTemplateOnly = c.Provider == Provider.NetZeroInboxTemplate
         }).ToList();
     }
 
@@ -312,7 +320,7 @@ public class ChannelConfigService(
     private static Provider[] ProvidersFor(ChannelType channelType) => channelType switch
     {
         ChannelType.SMS => [Provider.Reve, Provider.Chithi],
-        ChannelType.WP => [Provider.WaTrend, Provider.NetZeroInbox, Provider.NetZeroInboxQr],
+        ChannelType.WP => [Provider.WaTrend, Provider.NetZeroInbox, Provider.NetZeroInboxQr, Provider.NetZeroInboxTemplate],
         ChannelType.Voice => [Provider.NetZeroVoice],
         _ => []
     };

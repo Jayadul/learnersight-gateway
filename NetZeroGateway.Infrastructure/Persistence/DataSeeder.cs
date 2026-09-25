@@ -128,6 +128,7 @@ public static class DataSeeder
             "chithi" => Provider.Chithi,
             "netzeroinbox" or "inbox" => Provider.NetZeroInbox,
             "netzeroinboxqr" or "inboxqr" => Provider.NetZeroInboxQr,
+            "netzeroinboxtemplate" or "inboxtemplate" or "watemplate" => Provider.NetZeroInboxTemplate,
             "netzerovoice" => Provider.NetZeroVoice,
             // Bare "netzero" is ambiguous — it is the voice vendor, the WhatsApp vendor
             // and the product name. Fall through to the channel type rather than guess.
@@ -245,7 +246,8 @@ public static class DataSeeder
                     // First config of a type becomes its default; later ones are added
                     // non-default so they never silently steal live traffic. An inactive
                     // channel is never the default — the default must be dispatchable.
-                    IsDefault = item.IsActive && !siblings.Any(c => c.IsDefault),
+                    IsDefault = item.IsActive && !siblings.Any(c => c.IsDefault)
+                        && resolvedProvider != Provider.NetZeroInboxTemplate,
                     ConfigJson = enc.Encrypt(plainJson)
                 });
                 logger.LogInformation("[SEED] ChannelConfig ADD: {Type} / {Label}",
