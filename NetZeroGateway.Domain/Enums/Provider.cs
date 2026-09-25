@@ -18,7 +18,8 @@ public enum Provider
     WaTrend = 1,
 
     /// <summary>
-    /// NetZero voice campaigns (api.sms.netzero.com.bd). Named in full to keep it
+    /// NetZero voice campaigns (obd.netzero.com.bd, formerly api.sms.netzero.com.bd; same server,
+    /// and the host is a per-channel Base URL an admin can change). Named in full to keep it
     /// distinct from <see cref="NetZeroInbox"/>, which is an unrelated NetZero-branded
     /// service — see ADR 0008.
     /// </summary>
