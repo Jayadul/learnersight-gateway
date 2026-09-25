@@ -219,6 +219,7 @@ public class MediaLibraryService(
         Status = e.Status,
         CreatedBy = e.CreatedBy,
         DeletedAt = e.DeletedAt,
-        DeletedBy = e.DeletedBy
+        DeletedBy = e.DeletedBy,
+        IsAvailable = e.Status == MediaStatus.Active && e.ExpiresAt > DateTimeOffset.UtcNow
     };
 }
