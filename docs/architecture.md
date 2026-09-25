@@ -210,8 +210,14 @@ accepts `from`/`to` (snapped to whole Dhaka days) but nothing in the UI uses it.
 the nightly job takes 500 per channel. Voice fetches its report in windows built around the waiting
 calls themselves, split where two are over a day apart, so old calls are not lost to a page cap.
 Before batch 6 only the previous day was ever queried, so a message a provider first reported as
-`SENT` was never revisited (one REVE row stayed In Progress for 19 days). A row with no clear answer after a day
-(`StatusSync:GiveUpAfterHours`, default 24) becomes `Unknown` instead of staying In Progress: REVE
+`SENT` was never revisited (one REVE row stayed In Progress for 19 days). **The result counts what
+actually resolved:** `updated` is rows that became Delivered or Failed, `stillWaiting` is rows the
+provider still calls in flight, `markedUnknown` is rows given up on this run; it used to count every
+row the provider touched, so a sync that changed nothing said "Resolved 27". A row with no clear answer
+after 6 hours (`StatusSync:GiveUpAfterHours`, default 6, was 24) becomes `Unknown` instead of staying In
+Progress, and Unknown rows sent in the last 72 hours are asked about again so a late delivery report
+is not lost (verified live: a fresh SMS stayed `SENT` for three syncs and became `DELIVRD` on the
+fourth). REVE
 can hold `SENT` indefinitely when the carrier returns no delivery report, and a Voice call the report
 never lists cannot be resolved. It is not called Delivered, because nothing said so.
 
