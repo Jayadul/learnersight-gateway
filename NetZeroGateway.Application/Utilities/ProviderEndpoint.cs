@@ -30,10 +30,22 @@ public static class ProviderEndpoint
     {
         if (string.IsNullOrWhiteSpace(baseUrl)) return path;
 
-        return Uri.TryCreate(baseUrl.Trim(), UriKind.Absolute, out var baseUri)
+        return Uri.TryCreate(Normalize(baseUrl), UriKind.Absolute, out var baseUri)
             && Uri.TryCreate(baseUri, path, out var absolute)
                 ? absolute.ToString()
                 : path;
+    }
+
+    /// <summary>
+    /// Accepts a bare host such as <c>obd.netzero.com.bd</c> as well as a full URL, assuming
+    /// <c>http://</c> when no scheme is given. Without this a host typed without a scheme was not a
+    /// valid absolute URL, so a channel silently fell back to the default host, and the same value in
+    /// the registered default would have stopped the API starting.
+    /// </summary>
+    public static string Normalize(string baseUrl)
+    {
+        var trimmed = baseUrl.Trim();
+        return trimmed.Contains("://", StringComparison.Ordinal) ? trimmed : "http://" + trimmed;
     }
 
     /// <summary>Reads the channel's own base URL out of its decrypted config, if it set one.</summary>
