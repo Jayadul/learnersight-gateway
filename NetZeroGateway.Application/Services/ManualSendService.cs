@@ -204,7 +204,7 @@ public class ManualSendService(
             DispatchJobId = job.Id,
             Recipient = toNumber,
             ProviderReferenceId = result.MessageId,
-            DeliveryStatus = job.Status == JobStatus.Failed ? DeliveryStatus.Failed : DeliveryStatus.Pending
+            DeliveryStatus = DeliveryStatusRules.InitialFor(ChannelType.WP, job.Status)
         });
         await recipientRepo.SaveChangesAsync();
 

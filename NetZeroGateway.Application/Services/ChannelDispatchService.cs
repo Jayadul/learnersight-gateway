@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using NetZeroGateway.Application.DTOs;
 using NetZeroGateway.Application.Interfaces;
 using NetZeroGateway.Application.Strategies;
+using NetZeroGateway.Application.Utilities;
 using NetZeroGateway.Domain.Entities;
 using NetZeroGateway.Domain.Enums;
 
@@ -192,12 +193,10 @@ public class ChannelDispatchService(
                 ProviderReferenceId =
                     dispatchJob.RecipientReferences?.GetValueOrDefault(number)
                     ?? dispatchJob.ProviderMessageId,
-                // Pending means "accepted, nothing synced back yet". A job that failed
-                // outright never reached the recipient, so it starts Failed rather than
-                // waiting on a status that will never arrive.
-                DeliveryStatus = dispatchJob.Status == JobStatus.Failed
-                    ? DeliveryStatus.Failed
-                    : DeliveryStatus.Pending
+                // Pending means "accepted, nothing synced back yet" and only applies to the
+                // channels that sync later; a failed job starts Failed and WhatsApp resolves
+                // from the send response (see DeliveryStatusRules).
+                DeliveryStatus = DeliveryStatusRules.InitialFor(dispatchJob.ChannelType, dispatchJob.Status)
             }).ToList();
 
             await recipientRepo.AddRangeAsync(rows);
