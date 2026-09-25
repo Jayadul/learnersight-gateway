@@ -19,6 +19,13 @@ public class StatusSyncResultDto
     /// <summary>Why the whole run failed. When set, no row was touched.</summary>
     public string? Error { get; set; }
 
+    /// <summary>
+    /// Sync Now took the maximum for one run and more recipients are still waiting; running it
+    /// again continues. False means everything waiting was asked about.
+    /// </summary>
+    public bool MoreWaiting { get; set; }
+
+    /// <summary>The span the recipients asked about were sent in (oldest to newest).</summary>
     public DateTimeOffset From { get; set; }
     public DateTimeOffset To { get; set; }
 }

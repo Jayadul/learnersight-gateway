@@ -116,6 +116,38 @@ public class VoiceStatusMatchingTests
         Assert.Equal(DeliveryStatus.Failed, second.DeliveryStatus);
     }
 
+    private sealed class RecordingReport : INetZeroVoiceReportClient
+    {
+        public List<(DateTimeOffset From, DateTimeOffset To)> Windows { get; } = [];
+        public Task<NetZeroVoiceReportResponse> GetCombinedReportAsync(
+            string owner, string password, DateTimeOffset from, DateTimeOffset to,
+            int offset, int limit, string? baseUrl = null, CancellationToken ct = default)
+        {
+            Windows.Add((from, to));
+            return Task.FromResult(new NetZeroVoiceReportResponse { Status = "success", Data = [] });
+        }
+    }
+
+    [Fact]
+    public async Task Rows_weeks_apart_are_fetched_in_separate_small_windows_not_one_huge_span()
+    {
+        var report = new RecordingReport();
+        var provider = new NetZeroVoiceStatusSyncProvider(
+            report,
+            new ConfigurationBuilder().AddInMemoryCollection(
+                new Dictionary<string, string?> { ["App:TimeZone"] = "Asia/Dhaka" }).Build(),
+            NullLogger<NetZeroVoiceStatusSyncProvider>.Instance);
+        var rows = new List<DispatchJobRecipient>
+        {
+            Row(Dispatched.AddDays(-40)), Row(Dispatched.AddDays(-40).AddHours(2)), Row(Dispatched),
+        };
+
+        await provider.SyncAsync(Cfg(), rows, Dispatched.AddDays(-40), Dispatched);
+
+        Assert.Equal(2, report.Windows.Count);
+        Assert.All(report.Windows, w => Assert.True(w.To - w.From < TimeSpan.FromDays(1)));
+    }
+
     [Fact]
     public async Task A_different_number_never_matches()
     {

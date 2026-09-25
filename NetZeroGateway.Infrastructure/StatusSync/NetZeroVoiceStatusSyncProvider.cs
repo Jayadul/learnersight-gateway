@@ -57,29 +57,34 @@ public class NetZeroVoiceStatusSyncProvider(
         var baseUrl = ProviderEndpoint.BaseUrlOf(cfg);
         var tz = AppTime.Resolve(config);
 
-        // Widen the pull by the tolerance at both ends: a call dispatched just inside
-        // the window can be reported just outside it.
+        // The report is pulled in small windows around the waiting rows themselves, widened by
+        // the tolerance at both ends (a call dispatched just inside can be reported just outside).
+        // One span from the oldest row to the newest would be months wide once Sync Now covers
+        // every waiting row, hit the page cap, and leave the oldest calls unmatched.
         var records = new List<HttpClients.Models.NetZeroVoiceCallRecord>();
-        for (var page = 0; page < MaxPages; page++)
+        foreach (var (windowFrom, windowTo) in WindowsAround(rows, from, to))
         {
-            var r = await client.GetCombinedReportAsync(
-                owner, password, from - MatchTolerance, to + MatchTolerance,
-                page * PageSize, PageSize, baseUrl, ct);
-
-            // A rejected request says nothing about any call. Return without touching a
-            // single row — including LastCheckedAt — so the next run retries the same
-            // window once the credentials are fixed.
-            if (r.IsRequestFailure)
+            for (var page = 0; page < MaxPages; page++)
             {
-                var reason = r.Error ?? r.Message ?? "The voice provider rejected the report request.";
-                logger.LogError("[VOICE_SYNC] Report request failed: {Reason}", reason);
-                return StatusSyncResult.Failed(reason);
+                var r = await client.GetCombinedReportAsync(
+                    owner, password, windowFrom - MatchTolerance, windowTo + MatchTolerance,
+                    page * PageSize, PageSize, baseUrl, ct);
+
+                // A rejected request says nothing about any call. Return without touching a
+                // single row — including LastCheckedAt — so the next run retries the same
+                // window once the credentials are fixed.
+                if (r.IsRequestFailure)
+                {
+                    var reason = r.Error ?? r.Message ?? "The voice provider rejected the report request.";
+                    logger.LogError("[VOICE_SYNC] Report request failed: {Reason}", reason);
+                    return StatusSyncResult.Failed(reason);
+                }
+
+                records.AddRange(r.Rows);
+
+                if (r.Rows.Count < PageSize) break;
+                if (r.TotalRecords is { } total && r.Rows.Count + page * PageSize >= total) break;
             }
-
-            records.AddRange(r.Rows);
-
-            if (r.Rows.Count < PageSize) break;
-            if (r.TotalRecords is { } total && records.Count >= total) break;
         }
 
         logger.LogInformation("[VOICE_SYNC] Pulled {Count} call records", records.Count);
@@ -139,6 +144,26 @@ public class NetZeroVoiceStatusSyncProvider(
         }
 
         return StatusSyncResult.Ok(updated, unmatched);
+    }
+
+    /// <summary>
+    /// Time spans that cover the rows' dispatch times, split wherever two rows are more than a day
+    /// apart, so each report request stays small. No rows (nothing to ask about) falls back to the
+    /// window the caller gave.
+    /// </summary>
+    private static List<(DateTimeOffset From, DateTimeOffset To)> WindowsAround(
+        List<DispatchJobRecipient> rows, DateTimeOffset from, DateTimeOffset to)
+    {
+        var windows = new List<(DateTimeOffset From, DateTimeOffset To)>();
+        foreach (var t in rows.Select(r => r.DispatchJob?.SentAt ?? r.CreatedAt).OrderBy(t => t))
+        {
+            if (windows.Count > 0 && t - windows[^1].To <= TimeSpan.FromDays(1))
+                windows[^1] = (windows[^1].From, t);
+            else
+                windows.Add((t, t));
+        }
+        if (windows.Count == 0) windows.Add((from, to));
+        return windows;
     }
 
     private static readonly Regex HasOffset = new(
