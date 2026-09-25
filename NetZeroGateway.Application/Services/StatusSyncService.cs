@@ -7,6 +7,7 @@ using NetZeroGateway.Application.Interfaces;
 using NetZeroGateway.Application.Strategies;
 using NetZeroGateway.Application.Utilities;
 using NetZeroGateway.Domain.Entities;
+using NetZeroGateway.Domain.Enums;
 
 namespace NetZeroGateway.Application.Services;
 
@@ -133,10 +134,10 @@ public class StatusSyncService(
             ? (rows.Min(r => r.CreatedAt), rows.Max(r => r.CreatedAt))
             : (from, to);
         if (allWaiting) { dto.From = providerFrom; dto.To = providerTo; }
+        var before = rows.ToDictionary(r => r.Id, r => r.DeliveryStatus);
         var result = await _providers[config.Provider].SyncAsync(cfg, rows, providerFrom, providerTo);
 
         dto.Success = result.Success;
-        dto.Updated = result.Updated;
         dto.Unmatched = result.Unmatched;
         dto.Error = result.Error;
 
@@ -144,12 +145,20 @@ public class StatusSyncService(
         // the next run retries the same window. Only a successful run has changes.
         if (result.Success)
         {
-            var gaveUp = GiveUpOnStale(rows);
-            if (gaveUp > 0)
+            GiveUpOnStale(rows);
+            foreach (var row in rows) recipientRepo.Update(row);
+
+            // Counted from what actually happened to each row, not from how many the provider
+            // touched: a row it answered "still in flight" for is not resolved.
+            dto.Updated = rows.Count(r => r.DeliveryStatus is DeliveryStatus.Delivered or DeliveryStatus.Failed
+                && before[r.Id] != r.DeliveryStatus);
+            dto.MarkedUnknown = rows.Count(r => r.DeliveryStatus == DeliveryStatus.Unknown
+                && before[r.Id] == DeliveryStatus.Pending);
+            dto.StillWaiting = rows.Count(r => r.DeliveryStatus == DeliveryStatus.Pending);
+            if (dto.MarkedUnknown > 0)
                 logger.LogInformation(
                     "[STATUS_SYNC] {Label}: {Count} rows had no clear answer after {Hours}h, marked Unknown",
-                    config.Label, gaveUp, GiveUpAfterHours);
-            foreach (var row in rows) recipientRepo.Update(row);
+                    config.Label, dto.MarkedUnknown, GiveUpAfterHours);
         }
 
         return dto;
@@ -210,5 +219,11 @@ public class StatusSyncService(
 
     /// <summary>Rows one manual Sync Now takes per channel; if more wait, the result says so.</summary>
     private int ManualLimit => config.GetValue("StatusSync:ManualMaxRows", 2000);
-    private int GiveUpAfterHours => config.GetValue("StatusSync:GiveUpAfterHours", 24);
+    /// <summary>
+    /// How long a message may stay in flight before it is called Status Unknown. A delivery report
+    /// normally arrives within minutes, so a day (the old value) left an unanswered message In
+    /// Progress long after a sync had asked about it. A late report is still picked up: Unknown rows
+    /// from the last 72 hours are asked about again (see the recipient repository).
+    /// </summary>
+    private int GiveUpAfterHours => config.GetValue("StatusSync:GiveUpAfterHours", 6);
 }

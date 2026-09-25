@@ -46,7 +46,12 @@ public class DispatchJobRecipientRepository(NetZeroGatewayDbContext db)
     public Task<List<DispatchJobRecipient>> GetPendingForChannelAsync(
         Guid channelConfigId, DateTimeOffset from, DateTimeOffset to, int limit)
         => _set.Include(r => r.DispatchJob)
-               .Where(r => r.DeliveryStatus == DeliveryStatus.Pending
+               // Waiting rows, plus rows given up on as Unknown within the last 72 hours: a delivery
+               // report can arrive late (phone off, carrier delay), and an Unknown row that was never
+               // asked about again would miss it for good.
+               .Where(r => (r.DeliveryStatus == DeliveryStatus.Pending
+                            || (r.DeliveryStatus == DeliveryStatus.Unknown
+                                && r.DispatchJob!.SentAt >= DateTimeOffset.UtcNow.AddHours(-72)))
                         && r.DispatchJob!.ChannelConfigId == channelConfigId
                         && r.CreatedAt >= from
                         && r.CreatedAt <= to)

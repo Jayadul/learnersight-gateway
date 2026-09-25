@@ -7,8 +7,18 @@ public class StatusSyncResultDto
     public string Label { get; set; } = string.Empty;
     public bool Success { get; set; }
 
-    /// <summary>Rows whose delivery status was resolved.</summary>
+    /// <summary>
+    /// Rows the provider gave a final answer for in this run: Delivered or Failed. Not rows it
+    /// merely reported as still in flight, which used to be counted here and made a sync that
+    /// changed nothing read as "Resolved 27".
+    /// </summary>
     public int Updated { get; set; }
+
+    /// <summary>Rows the provider says are still in flight (for example REVE "sent", no delivery report yet).</summary>
+    public int StillWaiting { get; set; }
+
+    /// <summary>Rows that had no clear answer for too long and became Status Unknown in this run.</summary>
+    public int MarkedUnknown { get; set; }
 
     /// <summary>
     /// Rows the provider had nothing to say about. Normal for a message still in
