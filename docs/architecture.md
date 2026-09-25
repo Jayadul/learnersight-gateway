@@ -200,13 +200,17 @@ sit 6 to 9 minutes away from our dispatch times (measured on real calls from 202
 2026-09-25), outside the old 5 minute tolerance. Times with an offset are now read as stated; a
 time with none is business-zone wall clock.
 
-**Windows and carry-over (hotfix batch 6).** Every sync covers whole Dhaka calendar days, 00:00:00
-to 23:59:59.999: the nightly job (`delivery-status-sync`, 00:00 Dhaka) covers the previous day, a
-manual "Sync today" covers today, and a custom range is snapped outward to whole days. Rows still
-`Pending` from the previous 30 days (`StatusSync:CarryOverDays`) are asked about again, except on a
-custom range. Before this, only the previous day was ever queried, so a message a provider first
-reported as `SENT` was never revisited (one REVE row stayed In Progress for 19 days) and a night the
-job missed was never backfilled. A row with no clear answer after a day
+**One sync, no dates (hotfix batch 7, replacing the batch 6 windows).** Sync Now and the nightly job
+(`delivery-status-sync`, 00:00 Dhaka) ask about **every recipient still waiting for a status**,
+whenever it was sent; the manual dialog is a single button with no date inputs. A date-bounded sync
+is what left older rows In Progress: proven on live data, a sync of today returned `updated: 0` while
+29 waiting rows (up to 60 days old) sat outside it, and Sync Now resolved all 29. The API still
+accepts `from`/`to` (snapped to whole Dhaka days) but nothing in the UI uses it. A run takes at most
+`StatusSync:ManualMaxRows` (2000) per channel and the result's `moreWaiting` says when to run again;
+the nightly job takes 500 per channel. Voice fetches its report in windows built around the waiting
+calls themselves, split where two are over a day apart, so old calls are not lost to a page cap.
+Before batch 6 only the previous day was ever queried, so a message a provider first reported as
+`SENT` was never revisited (one REVE row stayed In Progress for 19 days). A row with no clear answer after a day
 (`StatusSync:GiveUpAfterHours`, default 24) becomes `Unknown` instead of staying In Progress: REVE
 can hold `SENT` indefinitely when the carrier returns no delivery report, and a Voice call the report
 never lists cannot be resolved. It is not called Delivered, because nothing said so.
