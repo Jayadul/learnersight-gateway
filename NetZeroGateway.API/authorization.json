@@ -96,7 +96,7 @@
       "CampaignPath": "/api/v1/run-campaign",
       "ReportPath": "/api/v1/combined-report",
       "ReportPageSize": 100,
-      "StatusMatchToleranceMinutes": 5,
+      "StatusMatchToleranceMinutes": 30,
       "ActionId": "runCampaign",
       "Service": "campaign",
       "LotNumber": "1"

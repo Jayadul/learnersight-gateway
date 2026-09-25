@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using NetZeroGateway.Application.Strategies;
@@ -31,11 +32,12 @@ public class NetZeroVoiceStatusSyncProvider(
 
     /// <summary>
     /// How far a report record's start time may sit from our dispatch time and still be
-    /// the same call. Wide enough for provider queueing, narrow enough that two
-    /// campaigns to one number in an hour do not collide.
+    /// the same call. The provider's call times were measured 6 to 9 minutes away from our
+    /// dispatch times (real calls, 2026-07-04 and 2026-09-25), so the old 5 minutes never
+    /// matched a real call. Two calls to one number closer than this are paired in order.
     /// </summary>
     private TimeSpan MatchTolerance => TimeSpan.FromMinutes(
-        config.GetValue("Providers:Voice:StatusMatchToleranceMinutes", 5));
+        config.GetValue("Providers:Voice:StatusMatchToleranceMinutes", 30));
 
     /// <summary>Report pages; the vendor's own example uses 100.</summary>
     private int PageSize => config.GetValue("Providers:Voice:ReportPageSize", 100);
@@ -85,68 +87,80 @@ public class NetZeroVoiceStatusSyncProvider(
         var updated = 0;
         var unmatched = 0;
 
-        foreach (var row in rows)
+        // Records and rows are paired per number. The report has no reference to anything we
+        // sent, so a number's records are matched to that number's rows by time: one to one
+        // when the counts agree (in chronological order), otherwise left alone.
+        var byNumber = records
+            .Where(rec => !string.IsNullOrWhiteSpace(rec.Destination))
+            .Select(rec => (Rec: rec, Start: ParseReportTime(rec.StartTime, tz)))
+            .Where(x => x.Start is not null)
+            .GroupBy(x => RecipientFormat.ToCanonical(x.Rec.Destination!))
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        foreach (var group in rows.GroupBy(r => RecipientFormat.ToCanonical(r.Recipient)))
         {
-            var dispatchedAt = row.DispatchJob?.SentAt ?? row.CreatedAt;
-            var candidates = records
-                .Where(rec => Matches(rec, row, dispatchedAt, tz))
+            var groupRows = group
+                .OrderBy(r => r.DispatchJob?.SentAt ?? r.CreatedAt)
                 .ToList();
+
+            var candidates = byNumber.TryGetValue(group.Key, out var recs)
+                ? recs.Where(x => groupRows.Any(r =>
+                        (x.Start!.Value - (r.DispatchJob?.SentAt ?? r.CreatedAt)).Duration() <= MatchTolerance))
+                      .OrderBy(x => x.Start)
+                      .ToList()
+                : [];
 
             if (candidates.Count == 0)
             {
                 // Normal for a call still in progress; also what a wrong matching rule
                 // looks like, which is why the count is reported.
-                unmatched++;
+                unmatched += groupRows.Count;
                 continue;
             }
 
-            if (candidates.Count > 1)
+            if (candidates.Count != groupRows.Count)
             {
                 logger.LogWarning(
-                    "[VOICE_SYNC] {Count} report records match {Recipient} around {At} — "
+                    "[VOICE_SYNC] {Records} report records for {Recipient} but {Rows} rows to place — "
                     + "left unresolved for manual review rather than guessing.",
-                    candidates.Count, row.Recipient, dispatchedAt);
-                unmatched++;
+                    candidates.Count, group.Key, groupRows.Count);
+                unmatched += groupRows.Count;
                 continue;
             }
 
-            var match = candidates[0];
-            row.DeliveryStatus = MapState(match.CallState);
-            row.RawStatusResponse = JsonSerializer.Serialize(match);
-            row.LastCheckedAt = DateTimeOffset.UtcNow;
-            updated++;
+            for (var i = 0; i < groupRows.Count; i++)
+            {
+                var match = candidates[i].Rec;
+                groupRows[i].DeliveryStatus = MapState(match.CallState);
+                groupRows[i].RawStatusResponse = JsonSerializer.Serialize(match);
+                groupRows[i].LastCheckedAt = DateTimeOffset.UtcNow;
+                updated++;
+            }
         }
 
         return StatusSyncResult.Ok(updated, unmatched);
     }
 
-    /// <summary>
-    /// Number plus time window. The report writes destinations in whatever shape the
-    /// provider uses, so both sides are normalised before comparing.
-    /// </summary>
-    private bool Matches(
-        HttpClients.Models.NetZeroVoiceCallRecord record,
-        DispatchJobRecipient row,
-        DateTimeOffset dispatchedAt,
-        TimeZoneInfo tz)
-    {
-        if (string.IsNullOrWhiteSpace(record.Destination)) return false;
-        if (RecipientFormat.ToCanonical(record.Destination)
-            != RecipientFormat.ToCanonical(row.Recipient)) return false;
-
-        if (ParseReportTime(record.StartTime, tz) is not { } startedAt) return false;
-
-        return (startedAt - dispatchedAt).Duration() <= MatchTolerance;
-    }
+    private static readonly Regex HasOffset = new(
+        @"\d{2}:\d{2}(:\d{2}(\.\d+)?)?\s*[+-]\d{2}(:?\d{2})?$", RegexOptions.Compiled);
 
     /// <summary>
-    /// Report times are business-zone wall clock with no offset, so they are read in
-    /// that zone and converted to UTC before comparison — parsing them as UTC would
-    /// shift every call by six hours and match nothing.
+    /// The real report writes times as <c>2026-09-25 08:45:51.629+06</c> — with an offset. Those are
+    /// read as the instant they state; the earlier code dropped the offset and re-read the
+    /// clock in the server's zone, which put every call six hours out and matched nothing.
+    /// A value with no offset is business-zone wall clock and is read in that zone.
     /// </summary>
     private static DateTimeOffset? ParseReportTime(string? value, TimeZoneInfo tz)
     {
         if (string.IsNullOrWhiteSpace(value)) return null;
+
+        if (HasOffset.IsMatch(value.Trim()))
+        {
+            return DateTimeOffset.TryParse(
+                value, CultureInfo.InvariantCulture, DateTimeStyles.None, out var stated)
+                ? stated.ToUniversalTime()
+                : null;
+        }
 
         if (!DateTime.TryParse(
                 value, CultureInfo.InvariantCulture, DateTimeStyles.None, out var local))
@@ -154,7 +168,7 @@ public class NetZeroVoiceStatusSyncProvider(
 
         return new DateTimeOffset(
             DateTime.SpecifyKind(local, DateTimeKind.Unspecified),
-            tz.GetUtcOffset(local));
+            tz.GetUtcOffset(local)).ToUniversalTime();
     }
 
     /// <summary>
