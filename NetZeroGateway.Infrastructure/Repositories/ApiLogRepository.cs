@@ -11,7 +11,7 @@ public class ApiLogRepository(NetZeroGatewayDbContext db)
     public async Task<(List<ApiLog> Items, int Total)> GetPagedAsync(
         int page, int size,
         DateTimeOffset? from, DateTimeOffset? to,
-        int? responseStatus, string? channel)
+        int? responseStatus, string? channel, string? callerIp = null)
     {
         var q = _set.AsQueryable();
         if (from is not null) q = q.Where(l => l.RequestedAt >= from);
@@ -21,6 +21,14 @@ public class ApiLogRepository(NetZeroGatewayDbContext db)
         // filtering on WhatsApp must also match "SMS, WhatsApp".
         if (!string.IsNullOrEmpty(channel))
             q = q.Where(l => l.RequestedChannels != null && l.RequestedChannels.Contains(channel));
+        // The caller's IP address (the "Caller IP" column). Contains, so a partial address such as
+        // "192.168" finds the whole range; the filter box existed but the backend never received or
+        // applied it (hotfix batch 8). This is NOT the callerID an integrator sends in the request.
+        if (!string.IsNullOrWhiteSpace(callerIp))
+        {
+            var ip = callerIp.Trim();
+            q = q.Where(l => l.CallerIp.Contains(ip));
+        }
 
         var total = await q.CountAsync();
         var items = await q.OrderByDescending(l => l.RequestedAt)
