@@ -9,6 +9,7 @@ namespace NetZeroGateway.Application.Services;
 public class DashboardService(
     IMessageRequestRepository msgRepo,
     IDispatchJobRepository jobRepo,
+    IDispatchJobRecipientRepository recipientRepo,
     IConfiguration config
 ) : IDashboardService
 {
@@ -74,29 +75,33 @@ public class DashboardService(
             }).ToList();
     }
 
+    /// <summary>
+    /// Counts failed recipient rows, the same rows the chart's drill-down lists. See
+    /// <see cref="IDispatchJobRecipientRepository.GetFailureReasonCountsAsync"/>.
+    /// </summary>
     public async Task<List<FailureReasonDto>> GetTopFailureReasonsAsync(int top = 5)
-    {
-        var failedJobs = await jobRepo.GetFailedWithChannelAsync();
+        => BuildFailureReasons(await recipientRepo.GetFailureReasonCountsAsync(), top);
 
-        return failedJobs
-            .GroupBy(j => j.FailureReason!)
-            .OrderByDescending(g => g.Count())
+    public static List<FailureReasonDto> BuildFailureReasons(IEnumerable<FailureReasonRow> rows, int top)
+        => rows
+            .GroupBy(r => r.Reason)
+            .OrderByDescending(g => g.Sum(r => r.Count))
             .Take(top)
             .Select(g => new FailureReasonDto
             {
                 Reason = g.Key,
-                Count = g.Count(),
+                Count = g.Sum(r => r.Count),
                 ByChannel = g
-                    .GroupBy(j => (Type: j.ChannelType, Label: j.ChannelConfig?.Label))
-                    .OrderByDescending(c => c.Count())
+                    .GroupBy(r => (r.ChannelType, r.ChannelConfigId, r.ChannelLabel))
                     .Select(c => new ChannelFailureCountDto
                     {
-                        ChannelType = c.Key.Type.ToString(),
-                        ChannelLabel = c.Key.Label,
-                        Count = c.Count()
+                        ChannelType = c.Key.ChannelType.ToString(),
+                        ChannelConfigId = c.Key.ChannelConfigId,
+                        ChannelLabel = c.Key.ChannelLabel,
+                        Count = c.Sum(r => r.Count)
                     })
+                    .OrderByDescending(c => c.Count)
                     .ToList()
             })
             .ToList();
-    }
 }

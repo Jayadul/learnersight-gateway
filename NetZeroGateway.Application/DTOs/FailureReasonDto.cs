@@ -18,5 +18,7 @@ public class ChannelFailureCountDto
     public string ChannelType { get; set; } = string.Empty;
     /// <summary>Which gateway, when the job still has one. Several may be live per type.</summary>
     public string? ChannelLabel { get; set; }
+    /// <summary>The gateway's id, so a click on this pill lists exactly this gateway's failures, not every channel of the type.</summary>
+    public Guid ChannelConfigId { get; set; }
     public int Count { get; set; }
 }

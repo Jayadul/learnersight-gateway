@@ -40,4 +40,19 @@ public interface IDispatchJobRecipientRepository : IRepository<DispatchJobRecipi
     /// </summary>
     Task<List<DispatchJobRecipient>> GetPendingForChannelAsync(
         Guid channelConfigId, DateTimeOffset from, DateTimeOffset to, int limit);
+
+    /// <summary>
+    /// Failed recipient rows grouped by the reason on their current job, channel and gateway —
+    /// the dashboard's failure-reasons chart (hotfix batch 8). It counts the SAME rows the chart's
+    /// drill-down lists (a recipient whose delivery status is Failed, filtered by its job's
+    /// failure reason), so the number on a bar and the rows behind it always agree. It used to
+    /// count failed jobs, which is a different unit: one failed batch of 900 was one on the chart
+    /// and 900 in the drill-down, and a failed job whose recipient was since resent was counted
+    /// with no row left to show.
+    /// </summary>
+    Task<List<FailureReasonRow>> GetFailureReasonCountsAsync()
+        => throw new NotSupportedException();
 }
+
+/// <summary>One group of failed recipient rows: a reason on one channel of one gateway.</summary>
+public record FailureReasonRow(string Reason, ChannelType ChannelType, Guid ChannelConfigId, string? ChannelLabel, int Count);
