@@ -124,9 +124,9 @@ public class ManualSendService(
             ?? throw new NotFoundException(
                 $"No active WhatsApp channel with label '{request.ChannelLabelSlug}'.");
 
-        if (channel.Provider != Provider.NetZeroInbox)
+        if (channel.Provider != Provider.NetZeroInboxTemplate)
             throw new InvalidOperationException(
-                "WhatsApp templates are only supported on NetZero Inbox (v1) channels.");
+                $"'{channel.Label}' is not a WhatsApp Template channel. Pick the channel named Template.");
 
         var cfg = JsonSerializer.Deserialize<Dictionary<string, string>>(
             enc.Decrypt(channel.ConfigJson)) ?? [];
@@ -204,7 +204,7 @@ public class ManualSendService(
             DispatchJobId = job.Id,
             Recipient = toNumber,
             ProviderReferenceId = result.MessageId,
-            DeliveryStatus = job.Status == JobStatus.Failed ? DeliveryStatus.Failed : DeliveryStatus.Pending
+            DeliveryStatus = DeliveryStatusRules.InitialFor(ChannelType.WP, job.Status)
         });
         await recipientRepo.SaveChangesAsync();
 

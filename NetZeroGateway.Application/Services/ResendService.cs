@@ -4,6 +4,7 @@ using NetZeroGateway.Application.DTOs;
 using NetZeroGateway.Application.Exceptions;
 using NetZeroGateway.Application.Interfaces;
 using NetZeroGateway.Application.Strategies;
+using NetZeroGateway.Application.Utilities;
 using NetZeroGateway.Domain.Entities;
 using NetZeroGateway.Domain.Enums;
 
@@ -134,9 +135,7 @@ public class ResendService(
         // not the one that just got replaced.
         original.DispatchJobId = job.Id;
         original.ProviderReferenceId = job.ProviderMessageId;
-        original.DeliveryStatus = job.Status == JobStatus.Failed
-            ? DeliveryStatus.Failed
-            : DeliveryStatus.Pending;
+        original.DeliveryStatus = DeliveryStatusRules.InitialFor(channel.ChannelType, job.Status);
         original.LastCheckedAt = null;
         original.RawStatusResponse = null;
         recipientRepo.Update(original);

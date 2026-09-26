@@ -64,6 +64,24 @@ public class MediaPublicUrlTests
     }
 
     [Fact]
+    public async Task Availability_is_judged_on_the_servers_clock()
+    {
+        var live = StoredWithLocalhostUrl();
+        live.Status = NetZeroGateway.Domain.Enums.MediaStatus.Active;
+        live.ExpiresAt = DateTimeOffset.UtcNow.AddDays(3);
+        var expired = StoredWithLocalhostUrl();
+        expired.Status = NetZeroGateway.Domain.Enums.MediaStatus.Active;
+        expired.ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(-1);
+        var deleted = StoredWithLocalhostUrl();
+        deleted.Status = NetZeroGateway.Domain.Enums.MediaStatus.Deleted;
+        deleted.ExpiresAt = DateTimeOffset.UtcNow.AddDays(3);
+
+        Assert.True((await Build("https://m.example.com", live).GetByIdAsync(Guid.NewGuid())).IsAvailable);
+        Assert.False((await Build("https://m.example.com", expired).GetByIdAsync(Guid.NewGuid())).IsAvailable);
+        Assert.False((await Build("https://m.example.com", deleted).GetByIdAsync(Guid.NewGuid())).IsAvailable);
+    }
+
+    [Fact]
     public async Task A_trailing_slash_on_the_base_url_does_not_double_up()
     {
         var service = Build("https://media.example.com/", StoredWithLocalhostUrl());

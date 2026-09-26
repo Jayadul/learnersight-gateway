@@ -103,6 +103,19 @@ with `||mediaUrl` sends `messageType=image` when the URL's extension is a known 
 type (jpg, jpeg, png, gif, webp, bmp); any other extension is refused rather than risk a
 guessed `messageType` on an unconfirmed file type (R3.3).
 
+**Hotfix batch 6 changed the modelling below:** a template send is now a **dedicated channel**
+with its own provider, `Provider.NetZeroInboxTemplate` (7), seeded as "WA Template" (label
+`watemplate`) and carrying only `templateToken` and `baseUrl`. The token used to be an extra
+field on the regular v1 channel, so nothing in the channel list or the Send Template dropdown
+was named Template. `ManualSendService` accepts a template send only on that provider;
+`hasTemplateToken` is true only for it, and `isTemplateOnly` lets ordinary send pickers, fallback
+rule pickers and the Simulator label table leave it out. It registers a `NetZeroInboxTemplateOnlySender`
+in the dispatch pipeline whose only job is to fail a text or media tag with a plain reason, it
+cannot be the default channel, and Meta's own refusals (for example error 131030, recipient not on
+the WhatsApp Business test list) are surfaced instead of a bare `unknown_error`. The v1 and QR
+channels are unchanged. What follows describes the original design; where it says "not a new
+Provider member" or "a field on the v1 channel", read it with this note.
+
 **WhatsApp Template send (R3.4)** is a NetZero Inbox (v1)-specific capability, not a new
 `Provider` enum member and not reachable through `/sendtext`'s tag grammar — a template
 (name + ordered variables, optional media) is a structured payload that does not fit a
@@ -153,9 +166,14 @@ different number.
 ### Delivery status sync (R3.2)
 
 A third provider capability, independent of the other two. REVE, Chithi and NetZero
-Voice answer what became of a message. A provider with no status endpoint at all leaves
-its recipient rows `Pending` until it offers one — a channel type never implies a sync
-exists.
+Voice answer what became of a message. A channel type never implies a sync exists.
+
+**WhatsApp resolves at send time (hotfix batch 6).** No WhatsApp provider (WaTrend, Inbox v1,
+Inbox QR, Templates) has a status lookup, so a row left `Pending` would wait forever for a sync
+that never runs for it. `DeliveryStatusRules.InitialFor` sets WhatsApp rows from the provider's
+immediate send response: accepted is `Delivered`, refused is `Failed`. Dispatch, resend and
+template sends all use it. SMS and Voice still start `Pending` and wait for the sync below. A
+data migration resolved existing Pending WhatsApp rows whose job was accepted.
 
 The distinction the design turns on: a recipient the provider says failed is a delivery
 failure and belongs on the row, while a request the provider rejected — expired session,
@@ -171,14 +189,27 @@ REVE returns one id per batched job, so its lookups are grouped by that id — a
 500-recipient batch is one call, not 500 identical ones.
 
 **Voice has no correlation id.** The combined report gives a destination, a start time
-and a call state. Records match a recipient row by number plus a tolerance window around
-dispatch (`Providers:Voice:StatusMatchToleranceMinutes`, default 5). A row matching more
-than one record is left alone and logged rather than guessed. Report times are
-business-zone wall clock with no offset; reading them as UTC shifts every call six hours
-and matches nothing.
+and a call state. Records are paired with a number's recipient rows by time
+(`Providers:Voice:StatusMatchToleranceMinutes`, default 30; it was 5). One to one when the counts
+agree, in chronological order; otherwise left alone and logged rather than guessed.
 
-Runs nightly at 00:00 Dhaka for the previous full day (`delivery-status-sync`), and on
-demand per channel over a chosen window.
+**Voice never matched a real call until hotfix batch 6.** Proven against the live report: it writes
+times as `2026-09-25 08:45:51.629+06`, with an offset. The parser dropped the offset and re-read
+the clock in the server's zone, which put every call six hours out; and the provider's call times
+sit 6 to 9 minutes away from our dispatch times (measured on real calls from 2026-07-04 and
+2026-09-25), outside the old 5 minute tolerance. Times with an offset are now read as stated; a
+time with none is business-zone wall clock.
+
+**Windows and carry-over (hotfix batch 6).** Every sync covers whole Dhaka calendar days, 00:00:00
+to 23:59:59.999: the nightly job (`delivery-status-sync`, 00:00 Dhaka) covers the previous day, a
+manual "Sync today" covers today, and a custom range is snapped outward to whole days. Rows still
+`Pending` from the previous 30 days (`StatusSync:CarryOverDays`) are asked about again, except on a
+custom range. Before this, only the previous day was ever queried, so a message a provider first
+reported as `SENT` was never revisited (one REVE row stayed In Progress for 19 days) and a night the
+job missed was never backfilled. A row with no clear answer after a day
+(`StatusSync:GiveUpAfterHours`, default 24) becomes `Unknown` instead of staying In Progress: REVE
+can hold `SENT` indefinitely when the carrier returns no delivery report, and a Voice call the report
+never lists cannot be resolved. It is not called Delivered, because nothing said so.
 
 **Every run was throwing before it read a row, found and fixed during the hotfix batch 3
 Seq audit.** `StatusSyncService.ResolveWindow` built the default window with

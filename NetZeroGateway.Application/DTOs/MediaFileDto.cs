@@ -17,4 +17,10 @@ public class MediaFileDto
     public string CreatedBy { get; set; } = string.Empty;
     public DateTimeOffset? DeletedAt { get; set; }
     public string? DeletedBy { get; set; }
+    /// <summary>
+    /// Active and not yet expired, judged on the SERVER's clock. The admin page used to work
+    /// this out from the browser's clock, so a phone with the wrong date refused to preview a
+    /// perfectly good file.
+    /// </summary>
+    public bool IsAvailable { get; set; }
 }

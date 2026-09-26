@@ -23,4 +23,9 @@ public class ChannelOptionDto
     /// actually serve it, without exposing the token itself through this endpoint.
     /// </summary>
     public bool HasTemplateToken { get; set; }
+    /// <summary>
+    /// A Template channel (hotfix batch 6): sends WhatsApp templates only, so pickers for
+    /// ordinary text or media sends leave it out.
+    /// </summary>
+    public bool IsTemplateOnly { get; set; }
 }

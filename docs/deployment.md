@@ -24,7 +24,9 @@ These provider secrets are still seeded in `appsettings.json` in plaintext — R
 item 4, now covering six channels rather than three. Rotate the REVE session cookie, the
 shared GenNet/Chithi `api_token` and the NetZero Inbox token before they carry
 production traffic. **Hotfix batch 5** added the NetZero Inbox WhatsApp Template API
-Token to the same seed block so a fresh database starts with it. (Before the deep QA
+Token to the same seed block so a fresh database starts with it; **batch 6** moved it to its own
+seeded channel, "WA Template" (`NetZeroInboxTemplate`), instead of a field on the v1 channel. A
+`templateToken` already stored on the v1 channel stays there unused (the admin API cannot remove a field). (Before the deep QA
 pass a value set only through the admin API was also wiped on the next restart; the
 seeder now leaves fields it does not carry alone, see database.md. A seeded credential
 still refreshes from the config on every boot.) Same rotation caveat applies before this

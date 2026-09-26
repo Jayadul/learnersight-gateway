@@ -32,7 +32,7 @@ public static class RecipientFormat
     public static string For(Provider provider, string canonical) => provider switch
     {
         // +8801700000001 — NetZero Inbox follows the WhatsApp Cloud API shape.
-        Provider.NetZeroInbox => ToPlus(canonical),
+        Provider.NetZeroInbox or Provider.NetZeroInboxTemplate => ToPlus(canonical),
 
         // REVE, WaTrend, Voice, Chithi and NetZero Inbox's QR API all take the stored
         // form unchanged. The QR case is listed explicitly because the same vendor's v1

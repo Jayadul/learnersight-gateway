@@ -29,12 +29,44 @@ public class NetZeroInboxTemplateResponse
 
     [JsonIgnore]
     public string? MessageId => MetaResponse?.Messages?.FirstOrDefault()?.Id;
+
+    /// <summary>
+    /// The most specific reason a send failed. Meta's own refusal (for example error 131030,
+    /// "Recipient phone number not in allowed list") arrives nested in
+    /// <c>metaResponse.error</c> with <c>success:false</c> and nothing else, which used to read
+    /// as a bare "unknown_error" and hid the fix.
+    /// </summary>
+    [JsonIgnore]
+    public string? FailureReason =>
+        Error
+        ?? MetaResponse?.MetaError?.Describe()
+        ?? Message;
 }
 
 public class NetZeroInboxTemplateMetaResponse
 {
     [JsonPropertyName("messaging_product")] public string? MessagingProduct { get; set; }
     [JsonPropertyName("messages")] public List<NetZeroInboxTemplateMessage>? Messages { get; set; }
+    [JsonPropertyName("error")] public NetZeroInboxTemplateMetaError? MetaError { get; set; }
+}
+
+public class NetZeroInboxTemplateMetaError
+{
+    [JsonPropertyName("message")] public string? Message { get; set; }
+    [JsonPropertyName("code")] public int? Code { get; set; }
+    [JsonPropertyName("error_data")] public NetZeroInboxTemplateMetaErrorData? ErrorData { get; set; }
+
+    /// <summary>Meta's detail sentence when it gave one (it says what to do), else the short message.</summary>
+    public string? Describe()
+    {
+        var text = string.IsNullOrWhiteSpace(ErrorData?.Details) ? Message : ErrorData!.Details;
+        return string.IsNullOrWhiteSpace(text) ? null : (Code is { } c ? $"{text} (Meta error {c})" : text);
+    }
+}
+
+public class NetZeroInboxTemplateMetaErrorData
+{
+    [JsonPropertyName("details")] public string? Details { get; set; }
 }
 
 public class NetZeroInboxTemplateMessage
