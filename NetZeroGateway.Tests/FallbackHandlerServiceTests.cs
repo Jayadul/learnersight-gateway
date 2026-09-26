@@ -148,6 +148,74 @@ public class FallbackHandlerServiceTests
     }
 
     [Fact]
+    public async Task A_policy_scoped_to_the_failed_channel_wins_over_a_catch_all_for_its_type()
+    {
+        // Listed first on purpose: the choice used to fall to whichever row came back first,
+        // so a catch-all policy added later could override a rule written for this channel.
+        var catchAll = SameTypePolicy();
+        catchAll.Name = "catch-all wp-to-sms";
+        catchAll.TriggerChannelConfigId = null;
+        catchAll.FallbackChannel = ChannelType.SMS;
+        catchAll.FallbackChannelConfigId = null;
+        catchAll.AllowCrossChannel = true;
+
+        var (service, jobs, _) = Build(Request(isMultiChannel: false), catchAll, SameTypePolicy());
+
+        await service.HandleAsync(RequestId);
+
+        var fallback = Assert.Single(jobs.Added);
+        Assert.Equal(ChannelType.WP, fallback.ChannelType);
+    }
+
+    [Fact]
+    public async Task A_catch_all_policy_still_covers_a_channel_with_no_policy_of_its_own()
+    {
+        var catchAll = SameTypePolicy();
+        catchAll.TriggerChannelConfigId = null;
+
+        var (service, jobs, _) = Build(Request(isMultiChannel: false), catchAll);
+
+        await service.HandleAsync(RequestId);
+
+        Assert.Single(jobs.Added);
+    }
+
+    [Fact]
+    public async Task A_policy_scoped_to_another_channel_does_not_cover_this_failure()
+    {
+        var elsewhere = SameTypePolicy();
+        elsewhere.TriggerChannelConfigId = Guid.NewGuid();
+
+        var (service, jobs, _) = Build(Request(isMultiChannel: false), elsewhere);
+
+        await service.HandleAsync(RequestId);
+
+        Assert.Empty(jobs.Added);
+    }
+
+    [Fact]
+    public async Task An_inactive_fallback_channel_is_skipped_not_used()
+    {
+        var inactive = Backup();
+        inactive.IsActive = false;
+
+        var jobs = new FakeJobRepositoryWithExisting([FailedPrimary()]);
+        var service = new FallbackHandlerService(
+            jobs,
+            new FakeDispatchJobRecipientRepository(),
+            new FakeMessageRequestRepository(Request(isMultiChannel: false)),
+            new FakeFallbackPolicyRepository(SameTypePolicy()),
+            new FakeChannelConfigRepository(inactive),
+            new PlainTextEncryption(),
+            new FakeSenderFactory(new CapturingSender(ChannelType.WP)),
+            NullLogger<FallbackHandlerService>.Instance);
+
+        await service.HandleAsync(RequestId);
+
+        Assert.Empty(jobs.Added);
+    }
+
+    [Fact]
     public async Task Nothing_happens_when_no_primary_job_failed()
     {
         var jobs = new FakeJobRepositoryWithExisting([]);
