@@ -25,7 +25,7 @@ public class NetZeroInboxTemplateSender(INetZeroInboxClient client) : IWhatsAppT
             IsSuccess = r.IsSuccess,
             MessageId = r.MessageId,
             Error = r.IsSuccess ? null : (r.FailureReason ?? "unknown_error"),
-            RawResponse = JsonSerializer.Serialize(r)
+            RawResponse = r.RawBody ?? JsonSerializer.Serialize(r)
         };
     }
 }

@@ -18,6 +18,9 @@ public class NetZeroInboxTemplateResponse
     [JsonPropertyName("message")] public string? Message { get; set; }
     [JsonPropertyName("metaResponse")] public NetZeroInboxTemplateMetaResponse? MetaResponse { get; set; }
 
+    /// <summary>The provider's reply exactly as received. Stored and shown as the raw response, instead of re-serialising this model, which added null fields for everything the model knows and dropped anything it does not.</summary>
+    [JsonIgnore] public string? RawBody { get; set; }
+
     /// <summary>
     /// An explicit error is never success; otherwise a real message id in the messages
     /// array is proof the vendor accepted the template send.

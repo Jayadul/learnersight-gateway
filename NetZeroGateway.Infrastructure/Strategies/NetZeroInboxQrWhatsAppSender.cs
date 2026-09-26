@@ -96,7 +96,7 @@ public class NetZeroInboxQrWhatsAppSender(
                 return;
             }
 
-            job.ProviderRawResponse = JsonSerializer.Serialize(r);
+            job.ProviderRawResponse = r.RawBody ?? JsonSerializer.Serialize(r);
 
             if (r.IsSuccess)
             {

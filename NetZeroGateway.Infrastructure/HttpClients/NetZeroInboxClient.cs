@@ -47,13 +47,15 @@ public class NetZeroInboxClient(
 
         try
         {
-            return JsonSerializer.Deserialize<NetZeroInboxResponse>(body)
+            var parsed = JsonSerializer.Deserialize<NetZeroInboxResponse>(body)
                 ?? new NetZeroInboxResponse { Error = "unreadable_response" };
+            parsed.RawBody = body;
+            return parsed;
         }
         catch (JsonException ex)
         {
             logger.LogError(ex, "[NZ_INBOX] Parse error for {To}. Body={Body}", to, body);
-            return new NetZeroInboxResponse { Error = ex.Message };
+            return new NetZeroInboxResponse { Error = ex.Message, RawBody = body };
         }
     }
 
@@ -109,18 +111,20 @@ public class NetZeroInboxClient(
 
         if (!resp.IsSuccessStatusCode)
         {
-            return new NetZeroInboxTemplateResponse { Error = $"HTTP {(int)resp.StatusCode}: {body}" };
+            return new NetZeroInboxTemplateResponse { Error = $"HTTP {(int)resp.StatusCode}: {body}", RawBody = body };
         }
 
         try
         {
-            return JsonSerializer.Deserialize<NetZeroInboxTemplateResponse>(body)
+            var parsed = JsonSerializer.Deserialize<NetZeroInboxTemplateResponse>(body)
                 ?? new NetZeroInboxTemplateResponse { Error = "unreadable_response" };
+            parsed.RawBody = body;
+            return parsed;
         }
         catch (JsonException ex)
         {
             logger.LogError(ex, "[NZ_INBOX_TEMPLATE] Parse error for {To}. Body={Body}", sendTo, body);
-            return new NetZeroInboxTemplateResponse { Error = ex.Message };
+            return new NetZeroInboxTemplateResponse { Error = ex.Message, RawBody = body };
         }
     }
 }

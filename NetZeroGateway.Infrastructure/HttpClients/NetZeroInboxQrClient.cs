@@ -68,13 +68,15 @@ public class NetZeroInboxQrClient(
 
         try
         {
-            return JsonSerializer.Deserialize<NetZeroInboxQrResponse>(body)
+            var parsed = JsonSerializer.Deserialize<NetZeroInboxQrResponse>(body)
                 ?? new NetZeroInboxQrResponse { Error = "unreadable_response" };
+            parsed.RawBody = body;
+            return parsed;
         }
         catch (JsonException ex)
         {
             logger.LogError(ex, "[NZ_INBOX_QR] Parse error for {To}. Body={Body}", to, body);
-            return new NetZeroInboxQrResponse { Error = ex.Message };
+            return new NetZeroInboxQrResponse { Error = ex.Message, RawBody = body };
         }
     }
 }
