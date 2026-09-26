@@ -92,7 +92,7 @@
       "SendPath": "/api/qr/rest/send_message"
     },
     "Voice": {
-      "BaseUrl": "http://api.sms.netzero.com.bd:8000",
+      "BaseUrl": "obd.netzero.com.bd",
       "CampaignPath": "/api/v1/run-campaign",
       "ReportPath": "/api/v1/combined-report",
       "ReportPageSize": 100,

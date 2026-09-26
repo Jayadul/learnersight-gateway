@@ -7,6 +7,7 @@ using NetZeroGateway.Application.Interfaces;
 using NetZeroGateway.Application.Strategies;
 using NetZeroGateway.Application.Utilities;
 using NetZeroGateway.Domain.Entities;
+using NetZeroGateway.Domain.Enums;
 
 namespace NetZeroGateway.Application.Services;
 
@@ -60,33 +61,33 @@ public class StatusSyncService(
                 + "Status sync is available for REVE, Chithi and NetZero Voice channels.");
         }
 
-        var (from, to, carryOver) = ResolveWindow(request);
-        var result = await SyncOneAsync(config, from, to, carryOver, request.Limit ?? DefaultLimit);
+        var (from, to, allWaiting) = ResolveWindow(request);
+        var result = await SyncOneAsync(
+            config, from, to, allWaiting, request.Limit ?? (allWaiting ? ManualLimit : DefaultLimit));
         await recipientRepo.SaveChangesAsync();
         return result;
     }
 
     public async Task SyncAllAsync()
     {
-        // The nightly run covers the whole previous business day, plus any older row still
-        // waiting on an answer — which also backfills a night the job missed.
-        var yesterday = DayBounds(DateTimeOffset.UtcNow.AddDays(-1));
-        var (from, to) = yesterday;
+        // The nightly run asks about every row still waiting, whenever it was sent: rows leave the
+        // waiting set once answered or given up on, so it stays small, and a night the job missed
+        // is picked up by the next one.
+        var (from, to) = (DateTimeOffset.UnixEpoch, DateTimeOffset.UtcNow.AddMinutes(1));
 
         var configs = (await configRepo.GetAllAsync())
             .Where(c => c.IsActive && _providers.ContainsKey(c.Provider))
             .ToList();
 
         logger.LogInformation(
-            "[STATUS_SYNC] Starting for {Count} channels, window {From:u}..{To:u} plus carry-over",
-            configs.Count, from, to);
+            "[STATUS_SYNC] Starting for {Count} channels, every waiting recipient", configs.Count);
 
         foreach (var config in configs)
         {
             // One unreachable provider must not stop the rest.
             try
             {
-                var result = await SyncOneAsync(config, from, to, carryOver: true, DefaultLimit);
+                var result = await SyncOneAsync(config, from, to, allWaiting: true, DefaultLimit);
                 logger.LogInformation(
                     "[STATUS_SYNC] {Label}: updated={Updated} unmatched={Unmatched} {Error}",
                     config.Label, result.Updated, result.Unmatched, result.Error ?? "");
@@ -102,7 +103,7 @@ public class StatusSyncService(
     }
 
     private async Task<StatusSyncResultDto> SyncOneAsync(
-        ChannelConfig config, DateTimeOffset from, DateTimeOffset to, bool carryOver, int limit)
+        ChannelConfig config, DateTimeOffset from, DateTimeOffset to, bool allWaiting, int limit)
     {
         var dto = new StatusSyncResultDto
         {
@@ -112,26 +113,31 @@ public class StatusSyncService(
             To = to
         };
 
-        // Rows still waiting on an answer from earlier days are asked about again. Without
-        // this a message a provider first reports as "sent" (REVE, Chithi) is never looked at
-        // once its own day has passed, and stays In Progress forever.
-        var queryFrom = carryOver ? from.AddDays(-CarryOverDays) : from;
-        var rows = await recipientRepo.GetPendingForChannelAsync(config.Id, queryFrom, to, limit);
+        // Every waiting row, whenever it was sent (from is the epoch), so nothing awaiting a status
+        // is ever outside the query. A custom range (API only) keeps to its own days.
+        var rows = await recipientRepo.GetPendingForChannelAsync(config.Id, from, to, limit);
         if (rows.Count == 0)
         {
             dto.Success = true;
+            if (allWaiting) { dto.From = DateTimeOffset.UtcNow; dto.To = DateTimeOffset.UtcNow; }
             return dto;
         }
+        // There may be more than one run can take; say so instead of implying it is all done.
+        dto.MoreWaiting = allWaiting && rows.Count >= limit;
 
         var cfg = JsonSerializer.Deserialize<Dictionary<string, string>>(
             enc.Decrypt(config.ConfigJson)) ?? [];
 
-        // A provider that reads a report window (Voice) has to cover the carried-over rows too.
-        var providerFrom = rows.Min(r => r.CreatedAt) is var oldest && oldest < from ? oldest : from;
-        var result = await _providers[config.Provider].SyncAsync(cfg, rows, providerFrom, to);
+        // A provider that reads a report window (Voice) is given the span the waiting rows
+        // actually cover, not the whole epoch and not just today.
+        var (providerFrom, providerTo) = allWaiting
+            ? (rows.Min(r => r.CreatedAt), rows.Max(r => r.CreatedAt))
+            : (from, to);
+        if (allWaiting) { dto.From = providerFrom; dto.To = providerTo; }
+        var before = rows.ToDictionary(r => r.Id, r => r.DeliveryStatus);
+        var result = await _providers[config.Provider].SyncAsync(cfg, rows, providerFrom, providerTo);
 
         dto.Success = result.Success;
-        dto.Updated = result.Updated;
         dto.Unmatched = result.Unmatched;
         dto.Error = result.Error;
 
@@ -139,12 +145,20 @@ public class StatusSyncService(
         // the next run retries the same window. Only a successful run has changes.
         if (result.Success)
         {
-            var gaveUp = GiveUpOnStale(rows);
-            if (gaveUp > 0)
+            GiveUpOnStale(rows);
+            foreach (var row in rows) recipientRepo.Update(row);
+
+            // Counted from what actually happened to each row, not from how many the provider
+            // touched: a row it answered "still in flight" for is not resolved.
+            dto.Updated = rows.Count(r => r.DeliveryStatus is DeliveryStatus.Delivered or DeliveryStatus.Failed
+                && before[r.Id] != r.DeliveryStatus);
+            dto.MarkedUnknown = rows.Count(r => r.DeliveryStatus == DeliveryStatus.Unknown
+                && before[r.Id] == DeliveryStatus.Pending);
+            dto.StillWaiting = rows.Count(r => r.DeliveryStatus == DeliveryStatus.Pending);
+            if (dto.MarkedUnknown > 0)
                 logger.LogInformation(
                     "[STATUS_SYNC] {Label}: {Count} rows had no clear answer after {Hours}h, marked Unknown",
-                    config.Label, gaveUp, GiveUpAfterHours);
-            foreach (var row in rows) recipientRepo.Update(row);
+                    config.Label, dto.MarkedUnknown, GiveUpAfterHours);
         }
 
         return dto;
@@ -171,12 +185,12 @@ public class StatusSyncService(
     }
 
     /// <summary>
-    /// Every window is a complete business-zone calendar day, 00:00:00 to 23:59:59, so the
-    /// nightly job and a manual sync can never disagree about what a day covers.
+    /// Hotfix batch 7: the admin-facing sync is one action with no dates. It asks about every
+    /// recipient currently waiting for a status, whenever it was sent. A date-bounded window
+    /// never selected older waiting rows, which is what left them In Progress forever.
     /// <list type="bullet">
-    /// <item>No dates: today, plus carry-over of older rows still waiting (the "sync today" action).</item>
-    /// <item>Dates given: exactly those days, snapped outward to whole days, with no carry-over
-    /// (a deliberate historical backfill).</item>
+    /// <item>No dates: every waiting row (the "Sync Now" button and the nightly job).</item>
+    /// <item>Dates given (API only, no UI): exactly those Dhaka days, snapped outward to whole days.</item>
     /// </list>
     /// <para>
     /// The bounds are UTC instants (see <see cref="AppTime.StartOfDayUtc"/>): a
@@ -184,7 +198,7 @@ public class StatusSyncService(
     /// which Npgsql refuses to write (the batch 3 crash that stopped every sync run).
     /// </para>
     /// </summary>
-    private (DateTimeOffset From, DateTimeOffset To, bool CarryOver) ResolveWindow(StatusSyncRequest request)
+    private (DateTimeOffset From, DateTimeOffset To, bool AllWaiting) ResolveWindow(StatusSyncRequest request)
     {
         if (request.From is { } explicitFrom)
         {
@@ -193,8 +207,7 @@ public class StatusSyncService(
             return (start, end < start ? DayBounds(explicitFrom).To : end, false);
         }
 
-        var today = DayBounds(DateTimeOffset.UtcNow);
-        return (today.From, today.To, true);
+        return (DateTimeOffset.UnixEpoch, DateTimeOffset.UtcNow.AddMinutes(1), true);
     }
 
     /// <summary>The business-zone calendar day containing the instant, as UTC bounds (last millisecond inclusive).</summary>
@@ -204,6 +217,13 @@ public class StatusSyncService(
         return (start, start.AddDays(1).AddMilliseconds(-1));
     }
 
-    private int CarryOverDays => config.GetValue("StatusSync:CarryOverDays", 30);
-    private int GiveUpAfterHours => config.GetValue("StatusSync:GiveUpAfterHours", 24);
+    /// <summary>Rows one manual Sync Now takes per channel; if more wait, the result says so.</summary>
+    private int ManualLimit => config.GetValue("StatusSync:ManualMaxRows", 2000);
+    /// <summary>
+    /// How long a message may stay in flight before it is called Status Unknown. A delivery report
+    /// normally arrives within minutes, so a day (the old value) left an unanswered message In
+    /// Progress long after a sync had asked about it. A late report is still picked up: Unknown rows
+    /// from the last 72 hours are asked about again (see the recipient repository).
+    /// </summary>
+    private int GiveUpAfterHours => config.GetValue("StatusSync:GiveUpAfterHours", 6);
 }

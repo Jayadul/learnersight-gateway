@@ -79,3 +79,21 @@ send reaches the real voice provider and it will queue a campaign.
 - Frontend: `ng test` (Karma/Jasmine already wired); priority — auth interceptor
   refresh flow, validators, ListState.
 - Run before every commit that touches the tested area; CI on PR (see release-2-plan.md).
+
+## Testing without real sends, and UI tests in a real browser (hotfix batches 6 and 7)
+
+- **Frontend specs run in headless Chrome.** `ng test --watch=false --browsers=ChromeHeadless`
+  (set `CHROME_BIN` to Chrome or Edge if it is not found). Existing specs cover the Edit Channel
+  dialog for every provider, the Sync Now dialog, and a measurement of the gap between fields in every
+  form dialog. Write a spec for any dialog or form logic you change; a spot check on one provider is
+  how the Voice-only Edit Channel fix got through.
+- **Scale, fallback and dispatch tests without cost.** Create extra channels whose Base URL points at a
+  local stub server (from a container: `http://host.docker.internal:<port>`), tag sends at those
+  labels, then delete the channels and their rows. Every provider, Voice included, honours a channel's
+  own Base URL, and a Voice channel with fake credentials cannot place a real call. An omitted label
+  goes to the REAL default channel, so always name the stub label.
+- **Prove sync bugs with real rows.** The status sync was fixed only after looking at real recipient
+  rows and the providers' actual replies (REVE `SENT`, the Voice report's `+06` times). Back-date a
+  real row's `created_at` to test an old row rather than guessing.
+- Real test number for live sends: `8801748848039`. It cannot receive WhatsApp templates (Meta's test
+  list); `8801749090963` can.

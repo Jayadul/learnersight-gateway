@@ -135,3 +135,21 @@ On-demand xlsx: admin UI toolbar (cloud icon) or `GET /api/backup/export?from=&t
 2 vCPU / 4 GB RAM / 40 GB SSD Linux VPS with Docker (2 GB works without Seq).
 Needs outbound HTTPS to providers, inbound 18080 (+18081 only for direct API integrations).
 No TLS in-stack — put a reverse proxy with HTTPS in front for production.
+
+## Voice host (hotfix batch 7)
+
+The Voice provider moved from `api.sms.netzero.com.bd` to `obd.netzero.com.bd` (same server and
+address, port 8000, `http`, paths unchanged; verified with a real call and the report). The code
+default (`Providers:Voice:BaseUrl`) and the seeded channel now point at the new host. The host is
+also the **Base URL** field on the Voice channel, so a future change is an admin edit in
+Channels, not a deploy. **An existing channel keeps the Base URL it already stores**, because the
+seed refreshes credentials only: on an installed system, open Channels, Voice, and set Base URL to
+`http://obd.netzero.com.bd:8000`. Until then it keeps working, as both names reach the same server.
+
+**The seed and code default are the bare host `obd.netzero.com.bd`, with no port** (as requested). A
+base URL may be a bare host: it is read as `http://` (`ProviderEndpoint.Normalize`). **That does not
+work against the live service today:** it answers only on port 8000 (a gunicorn server); ports 80
+and 443 accept a connection and return nothing (TLS handshake fails), tested 2026-09-25. So a **new**
+database seeded with the bare host cannot place or sync calls until the provider serves the Voice API
+on the default port, or the channel's Base URL is set to `http://obd.netzero.com.bd:8000`. The
+development stack's channel keeps the explicit port for that reason.

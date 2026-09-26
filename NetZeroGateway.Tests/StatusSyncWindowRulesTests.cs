@@ -94,31 +94,43 @@ public class StatusSyncWindowRulesTests
     }
 
     [Fact]
-    public async Task Sync_today_covers_the_whole_business_day_and_looks_back_for_waiting_rows()
+    public async Task Sync_now_asks_about_every_waiting_row_whenever_it_was_sent()
     {
         var (service, repo, _) = Build();
-        var (start, end) = TodayInDhaka();
 
-        var result = await service.SyncChannelAsync(ConfigId, new StatusSyncRequest());
+        await service.SyncChannelAsync(ConfigId, new StatusSyncRequest());
 
-        Assert.Equal(start, result.From);
-        Assert.Equal(end, result.To);
-        Assert.Equal(start.AddDays(-30), repo.From);
-        Assert.Equal(end, repo.To);
+        // No lower bound at all: a row from months ago is inside the query.
+        Assert.True(repo.From <= new DateTimeOffset(2000, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        Assert.True(repo.To >= DateTimeOffset.UtcNow);
+        Assert.Equal(TimeSpan.Zero, repo.From!.Value.Offset);
     }
 
     [Fact]
-    public async Task The_window_runs_from_midnight_to_the_last_second_of_the_day()
+    public async Task A_row_from_two_months_ago_is_handed_to_the_provider_and_resolved()
     {
-        var (service, _, _) = Build();
+        var old = Pending(DateTimeOffset.UtcNow.AddDays(-60));
+        var (service, _, provider) = Build([old]);
 
         var result = await service.SyncChannelAsync(ConfigId, new StatusSyncRequest());
 
-        var from = TimeZoneInfo.ConvertTime(result.From, Dhaka);
-        var to = TimeZoneInfo.ConvertTime(result.To, Dhaka);
-        Assert.Equal(TimeSpan.Zero, from.TimeOfDay);
-        Assert.Equal(new TimeSpan(0, 23, 59, 59, 999), to.TimeOfDay);
-        Assert.Equal(from.Date, to.Date);
+        Assert.Equal(old.CreatedAt, provider.SawFrom);
+        // Sixty days with no clear answer: resolved to Unknown, no longer In Progress.
+        Assert.Equal(DeliveryStatus.Unknown, old.DeliveryStatus);
+        Assert.Equal(1, result.Unmatched);
+    }
+
+    [Fact]
+    public async Task The_result_says_when_more_rows_are_waiting_than_one_run_takes()
+    {
+        var rows = Enumerable.Range(0, 3).Select(_ => Pending(DateTimeOffset.UtcNow.AddHours(-1))).ToList();
+        var (service, _, _) = Build(rows);
+
+        var partial = await service.SyncChannelAsync(ConfigId, new StatusSyncRequest { Limit = 3 });
+        var complete = await service.SyncChannelAsync(ConfigId, new StatusSyncRequest { Limit = 10 });
+
+        Assert.True(partial.MoreWaiting);
+        Assert.False(complete.MoreWaiting);
     }
 
     [Fact]
@@ -135,16 +147,13 @@ public class StatusSyncWindowRulesTests
     }
 
     [Fact]
-    public async Task The_nightly_run_covers_yesterday_and_looks_back_for_missed_nights()
+    public async Task The_nightly_run_also_asks_about_every_waiting_row()
     {
         var (service, repo, _) = Build();
-        var (todayStart, _) = TodayInDhaka();
-        var yesterdayStart = todayStart.AddDays(-1);
 
         await service.SyncAllAsync();
 
-        Assert.Equal(yesterdayStart.AddDays(-30), repo.From);
-        Assert.Equal(todayStart.AddMilliseconds(-1), repo.To);
+        Assert.True(repo.From <= new DateTimeOffset(2000, 1, 1, 0, 0, 0, TimeSpan.Zero));
     }
 
     [Fact]

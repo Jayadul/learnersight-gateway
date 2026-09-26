@@ -84,7 +84,7 @@ public static class ServiceCollectionExtensions
         services
             .AddHttpClient<INetZeroVoiceClient, NetZeroVoiceClient>(c =>
             {
-                c.BaseAddress = new Uri(config[ConfigKeys.VoiceBaseUrl]!);
+                c.BaseAddress = new Uri(ProviderEndpoint.Normalize(config[ConfigKeys.VoiceBaseUrl]!));
                 c.Timeout = TimeSpan.FromSeconds(timeout);
             })
             .AddStandardResilienceHandler(o => Resilience(o, retryCount, retryDelay));
@@ -156,7 +156,7 @@ public static class ServiceCollectionExtensions
         services
             .AddHttpClient<INetZeroVoiceReportClient, NetZeroVoiceReportClient>(c =>
             {
-                c.BaseAddress = new Uri(config[ConfigKeys.VoiceBaseUrl]!);
+                c.BaseAddress = new Uri(ProviderEndpoint.Normalize(config[ConfigKeys.VoiceBaseUrl]!));
                 // The report pages over a whole day and is slower than a send.
                 c.Timeout = TimeSpan.FromSeconds(timeout * 2);
             })
