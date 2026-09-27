@@ -15,6 +15,9 @@ public class NetZeroInboxResponse
     [JsonPropertyName("error")] public string? Error { get; set; }
     [JsonPropertyName("data")] public NetZeroInboxData? Data { get; set; }
 
+    /// <summary>The provider's reply exactly as received. Stored and shown as the raw response, instead of re-serialising this model, which added null fields for everything the model knows and dropped anything it does not.</summary>
+    [JsonIgnore] public string? RawBody { get; set; }
+
     /// <summary>
     /// The vendor's success signal is not pinned down by the one sample we have, so
     /// treat any of the three plausible markers as success: an explicit success flag, a

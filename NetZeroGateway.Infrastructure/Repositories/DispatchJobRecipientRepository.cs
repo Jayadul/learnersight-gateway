@@ -35,13 +35,31 @@ public class DispatchJobRecipientRepository(NetZeroGatewayDbContext db)
         if (channelConfigId is not null) q = q.Where(r => r.DispatchJob!.ChannelConfigId == channelConfigId);
         if (deliveryStatus is not null) q = q.Where(r => r.DeliveryStatus == deliveryStatus);
         if (!string.IsNullOrEmpty(recipient)) q = q.Where(r => r.Recipient.Contains(recipient));
-        if (!string.IsNullOrEmpty(failureReason)) q = q.Where(r => r.DispatchJob!.FailureReason == failureReason);
+        // A failure-reason filter means "the rows behind this bar of the failure chart": Failed rows
+        // whose job carries exactly this reason. The status condition is part of it, so the count on
+        // the chart and the rows listed here can never diverge.
+        if (!string.IsNullOrEmpty(failureReason))
+            q = q.Where(r => r.DeliveryStatus == DeliveryStatus.Failed
+                          && r.DispatchJob!.FailureReason == failureReason);
 
         var total = await q.CountAsync();
         var items = await q.OrderByDescending(r => r.CreatedAt)
             .Skip((page - 1) * size).Take(size).ToListAsync();
         return (items, total);
     }
+
+    public Task<List<FailureReasonRow>> GetFailureReasonCountsAsync()
+        => _set.Where(r => r.DeliveryStatus == DeliveryStatus.Failed
+                        && r.DispatchJob!.FailureReason != null)
+               .GroupBy(r => new
+               {
+                   Reason = r.DispatchJob!.FailureReason!,
+                   r.DispatchJob.ChannelType,
+                   r.DispatchJob.ChannelConfigId,
+                   Label = r.DispatchJob.ChannelConfig!.Label
+               })
+               .Select(g => new FailureReasonRow(g.Key.Reason, g.Key.ChannelType, g.Key.ChannelConfigId, g.Key.Label, g.Count()))
+               .ToListAsync();
 
     public Task<List<DispatchJobRecipient>> GetPendingForChannelAsync(
         Guid channelConfigId, DateTimeOffset from, DateTimeOffset to, int limit)

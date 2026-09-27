@@ -47,12 +47,27 @@ public class FallbackHandlerService(
         foreach (var job in failedPrimary)
         {
             // A policy scoped to one channel only covers failures on that channel;
-            // an unscoped policy still covers every channel of its type.
-            var policy = policies.FirstOrDefault(p =>
-                p.TriggerChannel == job.ChannelType
-                && (p.TriggerChannelConfigId is null
-                    || p.TriggerChannelConfigId == job.ChannelConfigId));
-            if (policy is null) continue;
+            // an unscoped policy still covers every channel of its type. When both apply the
+            // scoped one is the more specific rule and wins: without the ordering the choice
+            // fell to whichever row the database returned first, so adding a catch-all policy
+            // could silently override a rule written for exactly this channel.
+            var policy = policies
+                .Where(p => p.TriggerChannel == job.ChannelType
+                    && (p.TriggerChannelConfigId is null
+                        || p.TriggerChannelConfigId == job.ChannelConfigId))
+                .OrderBy(p => p.TriggerChannelConfigId is null ? 1 : 0)
+                .FirstOrDefault();
+            if (policy is null)
+            {
+                // Say so: a failure that gets no retry looks the same in the logs as a
+                // fallback that was never configured, and that is exactly the question
+                // someone asks when a message is lost.
+                logger.LogInformation(
+                    "[FALLBACK] No active policy covers a {Channel} failure on channel {ConfigId} — "
+                    + "no retry. Number={Number} | Job={JobId}",
+                    job.ChannelType, job.ChannelConfigId, job.ToNumber, job.Id);
+                continue;
+            }
 
             // Enforced here as well as at save time: a policy created before the rule
             // existed, or edited directly in the database, must not quietly cross types.

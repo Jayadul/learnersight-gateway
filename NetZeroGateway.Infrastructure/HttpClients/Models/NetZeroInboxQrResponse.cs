@@ -22,6 +22,9 @@ public class NetZeroInboxQrResponse
     /// </summary>
     [JsonPropertyName("solution")] public string? Solution { get; set; }
 
+    /// <summary>The provider's reply exactly as received. Stored and shown as the raw response, instead of re-serialising this model, which added null fields for everything the model knows and dropped anything it does not.</summary>
+    [JsonIgnore] public string? RawBody { get; set; }
+
     /// <summary>
     /// Success is not pinned down by any sample, so accept the plausible markers and
     /// treat an error field as decisive against. Erring toward "failed" is the safer

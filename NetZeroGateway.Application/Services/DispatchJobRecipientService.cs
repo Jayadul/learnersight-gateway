@@ -44,7 +44,7 @@ public class DispatchJobRecipientService(
         ChannelLabel = r.DispatchJob.ChannelConfig?.Label,
         MessageContent = r.DispatchJob.MessageContent,
         CampaignId = r.DispatchJob.CampaignId,
-        SentAt = r.DispatchJob.SentAt,
+        SentAt = AttemptTime(r.DispatchJob),
         IsFallback = r.DispatchJob.IsFallback,
         ResentFromRecipientId = r.ResentFromRecipientId,
         RawProviderResponse = ResolveRawResponse(r)
@@ -57,7 +57,37 @@ public class DispatchJobRecipientService(
     /// immediately at dispatch time. Falling back to the job avoids a blank tooltip while
     /// still showing genuine provider data, not a placeholder.
     /// </summary>
-    private static string? ResolveRawResponse(DispatchJobRecipient r)
+    /// <summary>
+    /// When this recipient's send was attempted. A job's SentAt is only set when the provider
+    /// ACCEPTED it, so every failed row showed a blank Sent At. The job is created immediately before
+    /// its send, and a resend creates a fresh job, so its creation time is the attempt time and moves
+    /// forward on every resend.
+    /// </summary>
+    public static DateTimeOffset AttemptTime(DispatchJob job) => job.SentAt ?? job.CreatedAt;
+
+    /// <summary>
+    /// A failed row always has something to show. When the provider never replied (the send was
+    /// refused before it was made, or the call threw) there is no provider text to display, so the
+    /// row says so and gives the reason instead of an empty field.
+    /// </summary>
+    public static string? ResolveRawResponse(DispatchJobRecipient r)
+    {
+        var raw = ResolveProviderReply(r);
+        if (raw is not null) return raw;
+
+        var job = r.DispatchJob;
+        var failed = r.DeliveryStatus == DeliveryStatus.Failed || job?.Status == JobStatus.Failed;
+        if (!failed) return null;
+
+        return JsonSerializer.Serialize(new
+        {
+            providerReplied = false,
+            note = "The provider gave no reply for this send, so there is no raw response to show.",
+            failureReason = string.IsNullOrWhiteSpace(job?.FailureReason) ? "No reason was recorded." : job!.FailureReason
+        });
+    }
+
+    private static string? ResolveProviderReply(DispatchJobRecipient r)
     {
         if (!string.IsNullOrWhiteSpace(r.RawStatusResponse)) return r.RawStatusResponse;
 

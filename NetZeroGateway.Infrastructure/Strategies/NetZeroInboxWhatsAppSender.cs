@@ -47,7 +47,7 @@ public class NetZeroInboxWhatsAppSender(
                 cfg["token"], to, job.MessageContent,
                 ProviderEndpoint.BaseUrlOf(cfg), ct);
 
-            job.ProviderRawResponse = JsonSerializer.Serialize(r);
+            job.ProviderRawResponse = r.RawBody ?? JsonSerializer.Serialize(r);
 
             if (r.IsSuccess)
             {

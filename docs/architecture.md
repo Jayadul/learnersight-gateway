@@ -315,6 +315,16 @@ at Warning, so it never looks like a missing policy.
 - its fallback channel is inactive, or
 - no config resolves for the fallback type at all.
 
+When several active policies cover the same failure, the one scoped to the failed
+channel wins over a catch-all for its type (hotfix batch 8; before that the winner was
+whichever row the database returned first). Only that one policy is tried: if it is
+skipped for one of the reasons above, the failure is not passed on to another policy.
+A failure no active policy covers is logged at Information ("No active policy covers a
+… failure … no retry"), so a lost message can be told apart from a skipped rule.
+A fallback that fails too ends the chain: fallback jobs never trigger another fallback.
+Fallback runs from the send pipeline only. A recipient resend goes to the channel the
+operator picked and has no fallback of its own.
+
 The pacing delay of the fallback channel applies to the retry too, so a burst of
 failures cannot outrun the rate limit the delay exists to respect.
 
