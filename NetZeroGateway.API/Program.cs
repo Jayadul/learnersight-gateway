@@ -107,14 +107,15 @@ try
             Cron.Weekly(DayOfWeek.Friday, 0, 0),
             new RecurringJobOptions { TimeZone = AppTime.Resolve(app.Configuration) });
 
-        // Delivery status: pulled once a day at 00:00 Dhaka for the previous full day,
-        // matching the media-cleanup convention. Providers report a final status well
-        // after a send, so a daily pass is the right granularity — and a per-row
-        // lookup on two of the three providers makes anything tighter expensive.
+        // Delivery status: pulled every hour (hotfix batch 9, Task 2 — was once a day at
+        // 00:00 Dhaka). A daily pass left a message's status unresolved for up to 24
+        // hours after it actually landed with the provider; the scope stays "everything
+        // still waiting for a status" (hotfix batch 7's simplification), so this is only
+        // a frequency change, not new date-window logic to maintain.
         scope.ServiceProvider.GetRequiredService<IRecurringJobManager>().AddOrUpdate<IStatusSyncService>(
             "delivery-status-sync",
             s => s.SyncAllAsync(),
-            Cron.Daily(0, 0),
+            Cron.Hourly(),
             new RecurringJobOptions { TimeZone = AppTime.Resolve(app.Configuration) });
 
         // Provider balances: refreshed on the quarter-hour so the dashboard's existing
