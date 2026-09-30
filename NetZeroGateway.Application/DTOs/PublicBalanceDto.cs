@@ -16,5 +16,10 @@ public class PublicBalanceDto
     /// <summary>Null means the provider has no such concept, never zero.</summary>
     public decimal? CreditLimit { get; set; }
 
+    /// <summary>
+    /// Business display zone (Dhaka, UTC+6), not UTC — this endpoint has no Angular
+    /// client to convert it, so ChannelBalanceService pre-converts via AppTime before
+    /// returning it (hotfix batch 9, Task 3).
+    /// </summary>
     public DateTimeOffset? LastCheckedAt { get; set; }
 }

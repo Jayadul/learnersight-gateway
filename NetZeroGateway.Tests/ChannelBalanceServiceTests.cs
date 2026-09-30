@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using NetZeroGateway.Application.Interfaces;
 using NetZeroGateway.Application.Services;
@@ -67,6 +68,7 @@ public class ChannelBalanceServiceTests
         FakeConfigRepo repo, ChannelBalanceResult result) =>
         new(repo, new PlainTextEncryption(),
             [new StubBalanceProvider(Provider.Reve, result)],
+            new ConfigurationBuilder().Build(),
             NullLogger<ChannelBalanceService>.Instance);
 
     [Fact]
@@ -116,6 +118,24 @@ public class ChannelBalanceServiceTests
         Assert.Null(dto.Available);
         Assert.False(dto.IsStale);
         Assert.Equal("unreachable", dto.Error);
+    }
+
+    [Fact]
+    public async Task The_public_balance_endpoint_reports_lastCheckedAt_in_Dhaka_time()
+    {
+        // Hotfix batch 9, Task 3: GET /balance is read directly by third-party
+        // integrators, with no Angular date pipe to convert it — the service itself
+        // must hand back the business display zone (+06:00), not raw UTC.
+        var config = SmsChannel();
+        config.LabelSlug = "smsdefault";
+        var repo = new FakeConfigRepo(config);
+        var service = Build(repo, ChannelBalanceResult.Ok(500m));
+
+        var dto = await service.GetByLabelAsync("smsdefault");
+
+        Assert.NotNull(dto);
+        Assert.NotNull(dto!.LastCheckedAt);
+        Assert.Equal(TimeSpan.FromHours(6), dto.LastCheckedAt!.Value.Offset);
     }
 
     [Fact]

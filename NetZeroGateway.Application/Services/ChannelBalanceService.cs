@@ -1,9 +1,11 @@
 using System.Text.Json;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using NetZeroGateway.Application.DTOs;
 using NetZeroGateway.Application.Exceptions;
 using NetZeroGateway.Application.Interfaces;
 using NetZeroGateway.Application.Strategies;
+using NetZeroGateway.Application.Utilities;
 using NetZeroGateway.Domain.Entities;
 
 namespace NetZeroGateway.Application.Services;
@@ -19,6 +21,7 @@ public class ChannelBalanceService(
     IChannelConfigRepository repo,
     IEncryptionService enc,
     IEnumerable<IChannelBalanceProvider> providers,
+    IConfiguration appConfig,
     ILogger<ChannelBalanceService> logger
 ) : IChannelBalanceService
 {
@@ -145,7 +148,13 @@ public class ChannelBalanceService(
             Label = config.Label,
             Balance = config.Balance,
             CreditLimit = config.BalanceCreditLimit,
-            LastCheckedAt = config.BalanceCheckedAt
+            // Hotfix batch 9, Task 3: this endpoint is consumed directly by third-party
+            // integrators, not through the Angular app's date pipe, so it is the one API
+            // response that pre-converts to the business display zone rather than staying
+            // UTC on the wire.
+            LastCheckedAt = config.BalanceCheckedAt is null
+                ? null
+                : AppTime.ToAppTime(config.BalanceCheckedAt.Value, AppTime.Resolve(appConfig))
         };
     }
 

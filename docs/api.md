@@ -51,7 +51,9 @@ live provider call, so anyone who can guess or learn a label can trigger unlimit
 REVE/Chithi balance checks through it. Flagged for the record; team-lead-approved.
 
 Response: `{ "label": "SMS Default", "balance": 1234.50, "creditLimit": null,
-"lastCheckedAt": "2026-09-13T10:00:00Z" }`. Unknown label, inactive channel, or a channel
+"lastCheckedAt": "2026-09-13T16:00:00+06:00" }` — `lastCheckedAt` is Dhaka time (hotfix
+batch 9, Task 3), the one exception to the wire-format-stays-UTC rule since this endpoint
+has no Angular client to convert it for display. Unknown label, inactive channel, or a channel
 type that doesn't support balance all return the same generic shape — `404` with
 `{ "status": "error", "message": "Unknown or unsupported label" }` — never REVE's
 `{Status,Text}` shape, since this endpoint isn't bound to REVE compatibility the way
