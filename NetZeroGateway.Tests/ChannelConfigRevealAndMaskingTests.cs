@@ -65,6 +65,7 @@ public class ChannelConfigRevealAndMaskingTests
     private static ChannelConfigService Build(ChannelConfig config) => new(
         new MutableChannelConfigRepository(config),
         new FakeFallbackPolicyRepository(),
+        new FakeChannelTemplateRepository(),
         new PlainTextEncryption(),
         new NoOpGatewayCredentialService());
 

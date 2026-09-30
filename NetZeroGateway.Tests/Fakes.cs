@@ -185,6 +185,23 @@ internal sealed class FakeFallbackPolicyRepository(params FallbackPolicy[] polic
     public Task<int> SaveChangesAsync() => Task.FromResult(0);
 }
 
+internal sealed class FakeChannelTemplateRepository(params ChannelTemplate[] templates)
+    : IChannelTemplateRepository
+{
+    public Task<List<ChannelTemplate>> GetAllByChannelAsync(Guid channelConfigId)
+        => Task.FromResult(templates.Where(t => t.ChannelConfigId == channelConfigId).ToList());
+    public Task<ChannelTemplate?> GetByChannelAndNameAsync(Guid channelConfigId, string name)
+        => Task.FromResult(templates.FirstOrDefault(t =>
+            t.ChannelConfigId == channelConfigId && t.Name.Equals(name, StringComparison.OrdinalIgnoreCase)));
+    public Task<ChannelTemplate?> GetByIdAsync(Guid id) => Unused.Fail<Task<ChannelTemplate?>>();
+    public Task<List<ChannelTemplate>> GetAllAsync() => Unused.Fail<Task<List<ChannelTemplate>>>();
+    public Task<List<ChannelTemplate>> FindAsync(Expression<Func<ChannelTemplate, bool>> p) => Unused.Fail<Task<List<ChannelTemplate>>>();
+    public Task AddAsync(ChannelTemplate entity) => Unused.Fail<Task>();
+    public void Update(ChannelTemplate entity) => Unused.Fail<bool>();
+    public void Delete(ChannelTemplate entity) => Unused.Fail<bool>();
+    public Task<int> SaveChangesAsync() => Task.FromResult(0);
+}
+
 /// <summary>Returns the jobs a request already has, and records anything added.</summary>
 internal sealed class FakeJobRepositoryWithExisting(List<DispatchJob> existing) : IDispatchJobRepository
 {

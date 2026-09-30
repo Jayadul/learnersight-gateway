@@ -30,6 +30,9 @@
       "ChannelConfig": {
         "Roles": [ "SuperAdmin" ]
       },
+      "ChannelTemplate": {
+        "Roles": [ "SuperAdmin" ]
+      },
       "ChannelBalance": {},
       "StatusSync": {},
       "DispatchJobRecipient": {},

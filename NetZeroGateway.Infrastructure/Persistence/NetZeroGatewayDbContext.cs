@@ -16,6 +16,7 @@ public class NetZeroGatewayDbContext(DbContextOptions<NetZeroGatewayDbContext> o
     public DbSet<GatewayCredential> GatewayCredentials => Set<GatewayCredential>();
     public DbSet<DispatchJobRecipient> DispatchJobRecipients => Set<DispatchJobRecipient>();
     public DbSet<ResendAttempt> ResendAttempts => Set<ResendAttempt>();
+    public DbSet<ChannelTemplate> ChannelTemplates => Set<ChannelTemplate>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -167,6 +168,32 @@ public class NetZeroGatewayDbContext(DbContextOptions<NetZeroGatewayDbContext> o
              .WithMany()
              .HasForeignKey(x => x.FallbackChannelConfigId)
              .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        mb.Entity<ChannelTemplate>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            e.Property(x => x.VariableLabels)
+             .HasColumnType("jsonb")
+             .HasConversion(
+                 v => System.Text.Json.JsonSerializer.Serialize(
+                     v, (System.Text.Json.JsonSerializerOptions?)null),
+                 v => System.Text.Json.JsonSerializer.Deserialize<List<string>>(
+                     v, (System.Text.Json.JsonSerializerOptions?)null) ?? new())
+             .Metadata.SetValueComparer(
+                 new Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer<List<string>>(
+                     (a, b) => a != null && b != null && a.SequenceEqual(b),
+                     v => v.Aggregate(0, (acc, s) => HashCode.Combine(acc, s.GetHashCode())),
+                     v => v.ToList()));
+            // Cascade: a template is sub-data of its channel's config, not an audit
+            // record — unlike DispatchJob's Restrict, nothing needs it to outlive the
+            // channel.
+            e.HasOne(x => x.ChannelConfig)
+             .WithMany()
+             .HasForeignKey(x => x.ChannelConfigId)
+             .OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => new { x.ChannelConfigId, x.Name }).IsUnique();
         });
 
         mb.Entity<ApiLog>(e =>

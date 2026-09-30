@@ -10,6 +10,7 @@ namespace NetZeroGateway.Application.Services;
 public class ChannelConfigService(
     IChannelConfigRepository repo,
     IFallbackPolicyRepository policyRepo,
+    IChannelTemplateRepository templateRepo,
     IEncryptionService enc,
     IGatewayCredentialService gatewayCredentials
 ) : IChannelConfigService
@@ -263,19 +264,39 @@ public class ChannelConfigService(
             ? await repo.GetAllAsync()
             : await repo.GetAllByChannelTypeAsync(filter.Value);
 
-        return list.Select(c => new ChannelOptionDto
+        var result = new List<ChannelOptionDto>();
+        foreach (var c in list)
         {
-            Id = c.Id,
-            Label = c.Label,
-            LabelSlug = c.LabelSlug,
-            ChannelType = c.ChannelType,
-            IsActive = c.IsActive,
-            IsDefault = c.IsDefault,
-            // Only a dedicated Template channel counts: a templateToken left on a regular
-            // channel from before batch 6 is no longer offered for template sends.
-            HasTemplateToken = c.Provider == Provider.NetZeroInboxTemplate && HasTemplateToken(c),
-            IsTemplateOnly = c.Provider == Provider.NetZeroInboxTemplate
-        }).ToList();
+            var isTemplateOnly = c.Provider == Provider.NetZeroInboxTemplate;
+            result.Add(new ChannelOptionDto
+            {
+                Id = c.Id,
+                Label = c.Label,
+                LabelSlug = c.LabelSlug,
+                ChannelType = c.ChannelType,
+                IsActive = c.IsActive,
+                IsDefault = c.IsDefault,
+                // Only a dedicated Template channel counts: a templateToken left on a
+                // regular channel from before batch 6 is no longer offered for template sends.
+                HasTemplateToken = isTemplateOnly && HasTemplateToken(c),
+                IsTemplateOnly = isTemplateOnly,
+                // Registered templates (Task 1) feed Manual Send's dropdown — empty for
+                // every non-Template channel, so this stays a single extra query only
+                // when it can possibly matter.
+                Templates = isTemplateOnly
+                    ? (await templateRepo.GetAllByChannelAsync(c.Id)).Select(t => new ChannelTemplateDto
+                    {
+                        Id = t.Id,
+                        ChannelConfigId = t.ChannelConfigId,
+                        Name = t.Name,
+                        VariableLabels = t.VariableLabels,
+                        CreatedAt = t.CreatedAt,
+                        UpdatedAt = t.UpdatedAt
+                    }).ToList()
+                    : []
+            });
+        }
+        return result;
     }
 
     /// <summary>

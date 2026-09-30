@@ -39,6 +39,7 @@ public class BackupExportService(
         var users = await db.AdminUsers.AsNoTracking().ToListAsync(ct);
         var channels = await db.ChannelConfigs.AsNoTracking().ToListAsync(ct);
         var policies = await db.FallbackPolicies.AsNoTracking().ToListAsync(ct);
+        var templates = await db.ChannelTemplates.AsNoTracking().ToListAsync(ct);
 
         using var wb = new XLWorkbook();
 
@@ -132,6 +133,15 @@ public class BackupExportService(
             p.IsGlobal,
             p.Description,
             CreatedAt = Local(p.CreatedAt),
+        }));
+
+        AddSheet(wb, "ChannelTemplates", templates.Select(t => new
+        {
+            Id = t.Id.ToString(),
+            ChannelConfigId = t.ChannelConfigId.ToString(),
+            t.Name,
+            VariableLabels = string.Join(",", t.VariableLabels),
+            CreatedAt = Local(t.CreatedAt),
         }));
 
         using var ms = new MemoryStream();

@@ -28,4 +28,10 @@ public class ChannelOptionDto
     /// ordinary text or media sends leave it out.
     /// </summary>
     public bool IsTemplateOnly { get; set; }
+    /// <summary>
+    /// Templates registered on this channel (hotfix batch 9, Task 1) — empty for every
+    /// channel except a Template one, so Manual Send can offer a dropdown of known
+    /// templates instead of the old free-text field.
+    /// </summary>
+    public List<ChannelTemplateDto> Templates { get; set; } = [];
 }

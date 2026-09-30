@@ -47,6 +47,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IFallbackPolicyRepository, FallbackPolicyRepository>();
         services.AddScoped<IMediaFileRepository, MediaFileRepository>();
         services.AddScoped<IGatewayCredentialRepository, GatewayCredentialRepository>();
+        services.AddScoped<IChannelTemplateRepository, ChannelTemplateRepository>();
 
         // Media file storage (local disk / Docker volume)
         services.AddScoped<IMediaStorageService, LocalMediaStorageService>();
@@ -211,6 +212,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAdminUserService, AdminUserService>();
         services.AddScoped<IMediaLibraryService, MediaLibraryService>();
         services.AddScoped<IGatewayCredentialService, GatewayCredentialService>();
+        services.AddScoped<IChannelTemplateService, ChannelTemplateService>();
         return services;
     }
 

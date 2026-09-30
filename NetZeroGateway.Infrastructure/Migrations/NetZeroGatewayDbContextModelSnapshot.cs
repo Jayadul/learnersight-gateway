@@ -243,6 +243,46 @@ namespace NetZeroGateway.Infrastructure.Migrations
                     b.ToTable("channel_configs", (string)null);
                 });
 
+            modelBuilder.Entity("NetZeroGateway.Domain.Entities.ChannelTemplate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ChannelConfigId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("channel_config_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("VariableLabels")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("variable_labels");
+
+                    b.HasKey("Id")
+                        .HasName("pk_channel_templates");
+
+                    b.HasIndex("ChannelConfigId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("ix_channel_templates_channel_config_id_name");
+
+                    b.ToTable("channel_templates", (string)null);
+                });
+
             modelBuilder.Entity("NetZeroGateway.Domain.Entities.DispatchJob", b =>
                 {
                     b.Property<Guid>("Id")
@@ -735,6 +775,18 @@ namespace NetZeroGateway.Infrastructure.Migrations
                         .HasDatabaseName("ix_resend_attempts_dispatch_job_recipient_id");
 
                     b.ToTable("resend_attempts", (string)null);
+                });
+
+            modelBuilder.Entity("NetZeroGateway.Domain.Entities.ChannelTemplate", b =>
+                {
+                    b.HasOne("NetZeroGateway.Domain.Entities.ChannelConfig", "ChannelConfig")
+                        .WithMany()
+                        .HasForeignKey("ChannelConfigId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_channel_templates_channel_configs_channel_config_id");
+
+                    b.Navigation("ChannelConfig");
                 });
 
             modelBuilder.Entity("NetZeroGateway.Domain.Entities.DispatchJob", b =>
