@@ -11,7 +11,7 @@ public class ApiLogRepository(NetZeroGatewayDbContext db)
     public async Task<(List<ApiLog> Items, int Total)> GetPagedAsync(
         int page, int size,
         DateTimeOffset? from, DateTimeOffset? to,
-        int? responseStatus, string? channel, string? callerIp = null)
+        int? responseStatus, string? channel, string? callerIp = null, string? number = null)
     {
         var q = _set.AsQueryable();
         if (from is not null) q = q.Where(l => l.RequestedAt >= from);
@@ -28,6 +28,14 @@ public class ApiLogRepository(NetZeroGatewayDbContext db)
         {
             var ip = callerIp.Trim();
             q = q.Where(l => l.CallerIp.Contains(ip));
+        }
+        // ToUser is comma-joined for a batched send (hotfix batch 9, Task 7) — substring
+        // match so searching one number finds it inside "8801..,8801..,8801.." too, not
+        // only a row where it was the sole recipient.
+        if (!string.IsNullOrWhiteSpace(number))
+        {
+            var n = number.Trim();
+            q = q.Where(l => l.ToUser != null && l.ToUser.Contains(n));
         }
 
         var total = await q.CountAsync();
