@@ -60,9 +60,9 @@
       "JwtRefreshTokenValue": "refresh"
     },
     "Swagger": {
-      "GatewayTitle": "NetZeroGateway — Gateway API",
+      "GatewayTitle": "Net ZerO Gateway — Gateway API",
       "GatewayDescription": "POST /sendtext — multi-channel message dispatch endpoint.",
-      "AdminTitle": "NetZeroGateway — Admin API",
+      "AdminTitle": "Net ZerO Gateway — Admin API",
       "AdminDescription": "Admin panel: channel configs, logs, dashboard, users, fallback policies.",
       "SecuritySchemeId": "Bearer"
     }

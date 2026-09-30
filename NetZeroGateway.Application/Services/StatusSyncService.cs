@@ -58,7 +58,7 @@ public class StatusSyncService(
         {
             throw new InvalidOperationException(
                 $"Provider '{config.Provider}' does not offer a delivery status lookup. "
-                + "Status sync is available for REVE, Chithi and NetZero Voice channels.");
+                + "Status sync is available for REVE, Chithi and Net ZerO Voice channels.");
         }
 
         var (from, to, allWaiting) = ResolveWindow(request);

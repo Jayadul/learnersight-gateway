@@ -137,7 +137,7 @@ try
             c.SwaggerEndpoint("/swagger/gateway/swagger.json", "Gateway API");
             c.SwaggerEndpoint("/swagger/admin/swagger.json", "Admin API");
             c.RoutePrefix = "swagger";
-            c.DocumentTitle = "NetZeroGateway API";
+            c.DocumentTitle = "Net ZerO Gateway API";
         });
     }
 
