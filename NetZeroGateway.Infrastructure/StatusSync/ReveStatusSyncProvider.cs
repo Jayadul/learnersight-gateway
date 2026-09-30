@@ -45,7 +45,11 @@ public class ReveStatusSyncProvider(
                 continue;
             }
 
-            var state = MapState(r.Text);
+            // A rejected lookup is not a failed delivery (hotfix batch 9, Task 4) — REVE
+            // returns REJECTD for a bad/already-answered/expired message id just as
+            // readily as for any other query-level problem, none of which say the SMS
+            // failed to arrive. Same treatment Chithi's aged-out ids already get.
+            var state = r.IsLookupRejected ? DeliveryStatus.Unknown : MapState(r.Text);
             var raw = JsonSerializer.Serialize(r);
 
             foreach (var row in group)
@@ -62,9 +66,11 @@ public class ReveStatusSyncProvider(
     }
 
     /// <summary>
-    /// DELIVRD is the only success. Recognised terminal failures are failures, and
-    /// anything unrecognised stays Unknown rather than being guessed into Failed — the
-    /// raw payload is stored either way so a new state is visible for review.
+    /// Only called once <see cref="ReveStatusResponse.IsLookupRejected"/> is already
+    /// ruled out, so REJECTD never reaches here — DELIVRD is the only success, the
+    /// remaining recognised terminal words are real delivery failures, and anything
+    /// unrecognised stays Unknown rather than being guessed into Failed. The raw payload
+    /// is stored either way so a new state is visible for review.
     /// <para>
     /// The in-flight states matter as much as the terminal ones. REVE answers SENT while
     /// a message is with the carrier, and mapping that to Unknown strands it: the sync
@@ -76,8 +82,8 @@ public class ReveStatusSyncProvider(
     {
         "DELIVRD" => DeliveryStatus.Delivered,
 
-        // Terminal failures.
-        "REJECTD" or "EXPIRED" or "UNDELIV" or "DELETED" => DeliveryStatus.Failed,
+        // Terminal failures actually about the SMS itself, not the status query.
+        "EXPIRED" or "UNDELIV" or "DELETED" => DeliveryStatus.Failed,
 
         // Still on its way — ask again next run rather than settling on an answer.
         "SENT" or "ACCEPTD" or "ENROUTE" or "PENDING" => DeliveryStatus.Pending,

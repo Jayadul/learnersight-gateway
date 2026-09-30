@@ -183,7 +183,15 @@ Conflating the two writes "undelivered" against messages that arrived.
 
 An unrecognised state is recorded `Unknown`, never guessed into `Failed`, and the raw
 payload is stored either way. Chithi ages its reference ids out, so a rejected lookup
-(`FAILED` with an empty `smsinfo`) is `Unknown` rather than a delivery failure.
+(`FAILED` with an empty `smsinfo`) is `Unknown` rather than a delivery failure. **REVE's
+`REJECTD` is the same category of problem (hotfix batch 9, Task 4)** — the vendor returns
+it for six different `Status` codes (bad apikey, wrong password, missing/already-queried
+message id, internal server error, auth failure, generic "request failed"), none of which
+say anything about the SMS itself; it used to be mapped straight to `Failed`, which wrote
+a delivery failure against messages REVE had genuinely accepted (`ACCEPTD`) once the
+sync re-asked about an id it had already answered. `ReveStatusResponse.IsLookupRejected`
+now routes it to `Unknown`, same as Chithi's aged-out ids; `EXPIRED`/`UNDELIV`/`DELETED`
+remain real terminal failures.
 
 REVE returns one id per batched job, so its lookups are grouped by that id — a
 500-recipient batch is one call, not 500 identical ones.

@@ -74,19 +74,50 @@ public class StatusSyncProviderTests
         Assert.NotNull(rows[0].LastCheckedAt);
     }
 
-    [Fact]
-    public async Task REVE_maps_REJECTD_to_failed_and_keeps_the_numeric_code()
+    [Theory]
+    [InlineData("114")] // message id missing, or already queried once before
+    [InlineData("109")] // no apikey
+    [InlineData("108")] // wrong password
+    [InlineData("101")] // internal server error
+    [InlineData("-42")] // auth failed
+    [InlineData("1")]   // generic "request failed"
+    public async Task REVE_treats_a_rejected_lookup_as_unknown_not_a_delivery_failure(string statusCode)
     {
+        // Hotfix batch 9, Task 4: every one of REVE's own documented REJECTD codes is a
+        // rejection of the STATUS QUERY, never a statement that the SMS failed —
+        // confirmed live against a resend REVE had actually accepted (ACCEPTD) that
+        // later read back Status 114/REJECTD and was being recorded Failed on that
+        // alone. Blanket-mapping REJECTD to Failed was the bug; every one of these codes
+        // must land Unknown instead, exactly like Chithi's aged-out reference ids.
         var provider = new ReveStatusSyncProvider(
-            new FakeReveStatusClient(new ReveStatusResponse { Status = "114", Text = "REJECTD" }),
+            new FakeReveStatusClient(new ReveStatusResponse { Status = statusCode, Text = "REJECTD" }),
+            NullLogger<ReveStatusSyncProvider>.Instance);
+        var rows = new List<DispatchJobRecipient> { Row() };
+
+        await provider.SyncAsync(ReveCfg(), rows, DispatchedAt, DispatchedAt);
+
+        Assert.Equal(DeliveryStatus.Unknown, rows[0].DeliveryStatus);
+        // The raw payload is kept so the rejected code stays visible for review.
+        Assert.Contains(statusCode, rows[0].RawStatusResponse);
+        Assert.NotNull(rows[0].LastCheckedAt);
+    }
+
+    [Theory]
+    [InlineData("EXPIRED")]
+    [InlineData("UNDELIV")]
+    [InlineData("DELETED")]
+    public async Task REVE_still_maps_a_genuine_terminal_failure_word_to_failed(string text)
+    {
+        // Unlike REJECTD, these words describe what happened to the SMS itself, not the
+        // status query — they must keep failing the row.
+        var provider = new ReveStatusSyncProvider(
+            new FakeReveStatusClient(new ReveStatusResponse { Status = "0", Text = text }),
             NullLogger<ReveStatusSyncProvider>.Instance);
         var rows = new List<DispatchJobRecipient> { Row() };
 
         await provider.SyncAsync(ReveCfg(), rows, DispatchedAt, DispatchedAt);
 
         Assert.Equal(DeliveryStatus.Failed, rows[0].DeliveryStatus);
-        // The raw payload is kept so an unrecognised code stays visible for review.
-        Assert.Contains("114", rows[0].RawStatusResponse);
     }
 
     [Fact]
