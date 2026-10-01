@@ -282,6 +282,64 @@ public class StatusSyncProviderTests
     }
 
     [Fact]
+    public async Task Voice_captures_start_connect_and_end_time_for_a_connected_call()
+    {
+        // Hotfix batch 9, Task 8: the report already carries these; they were parsed and
+        // then discarded. A call that never connected would report no ConnectTime at all
+        // (covered separately below), but this one did.
+        var connectTime = ReportTime(DispatchedAt.AddMinutes(1).AddSeconds(5));
+        var endTime = ReportTime(DispatchedAt.AddMinutes(2));
+        var provider = VoiceProvider(new NetZeroVoiceReportResponse
+        {
+            Status = "success",
+            Data =
+            [
+                new NetZeroVoiceCallRecord
+                {
+                    Destination = "8801748848039",
+                    StartTime = ReportTime(DispatchedAt.AddMinutes(1)),
+                    ConnectTime = connectTime,
+                    EndTime = endTime,
+                    CallState = "CALL SUCCESS"
+                }
+            ]
+        });
+        var rows = new List<DispatchJobRecipient> { Row() };
+
+        await provider.SyncAsync(VoiceCfg(), rows, DispatchedAt.AddHours(-1), DispatchedAt.AddHours(1));
+
+        Assert.NotNull(rows[0].CallStartTime);
+        Assert.NotNull(rows[0].CallConnectTime);
+        Assert.NotNull(rows[0].CallEndTime);
+        Assert.True(rows[0].CallEndTime > rows[0].CallConnectTime);
+    }
+
+    [Fact]
+    public async Task Voice_leaves_ConnectTime_null_for_a_call_that_never_connected()
+    {
+        var provider = VoiceProvider(new NetZeroVoiceReportResponse
+        {
+            Status = "success",
+            Data =
+            [
+                new NetZeroVoiceCallRecord
+                {
+                    Destination = "8801748848039",
+                    StartTime = ReportTime(DispatchedAt.AddMinutes(1)),
+                    ConnectTime = null,
+                    CallState = "CALL FAILED"
+                }
+            ]
+        });
+        var rows = new List<DispatchJobRecipient> { Row() };
+
+        await provider.SyncAsync(VoiceCfg(), rows, DispatchedAt.AddHours(-1), DispatchedAt.AddHours(1));
+
+        Assert.NotNull(rows[0].CallStartTime);
+        Assert.Null(rows[0].CallConnectTime);
+    }
+
+    [Fact]
     public async Task Voice_leaves_a_record_outside_the_tolerance_unmatched()
     {
         // Same number, but hours from the dispatch — a different call entirely.

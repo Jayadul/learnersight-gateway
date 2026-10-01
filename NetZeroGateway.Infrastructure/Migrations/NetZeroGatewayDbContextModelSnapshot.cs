@@ -389,6 +389,18 @@ namespace NetZeroGateway.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<DateTimeOffset?>("CallConnectTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("call_connect_time");
+
+                    b.Property<DateTimeOffset?>("CallEndTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("call_end_time");
+
+                    b.Property<DateTimeOffset?>("CallStartTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("call_start_time");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");

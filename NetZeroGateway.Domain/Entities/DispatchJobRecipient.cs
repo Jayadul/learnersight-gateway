@@ -38,6 +38,20 @@ public class DispatchJobRecipient : BaseEntity
 
     public DateTimeOffset? LastCheckedAt { get; set; }
 
+    // ── Voice call timing (hotfix batch 9, Task 8) ──────────────────────────
+    // From the combined report's StartTime/EndTime/ConnectTime — null for every non-Voice
+    // channel, and ConnectTime stays null for a Voice call that never connected (busy,
+    // no answer), since the provider itself never reports one for those.
+
+    /// <summary>When the provider started dialling.</summary>
+    public DateTimeOffset? CallStartTime { get; set; }
+
+    /// <summary>When the call was actually answered — null if it never connected.</summary>
+    public DateTimeOffset? CallConnectTime { get; set; }
+
+    /// <summary>When the call ended.</summary>
+    public DateTimeOffset? CallEndTime { get; set; }
+
     /// <summary>
     /// The recipient row this one was created to retry, when it came from a resend.
     /// A resend never mutates the row that failed: it creates a fresh job and fresh

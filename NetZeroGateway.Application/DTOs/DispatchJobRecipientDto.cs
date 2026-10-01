@@ -22,6 +22,13 @@ public class DispatchJobRecipientDto
     public DateTimeOffset? LastCheckedAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 
+    /// <summary>Voice only (hotfix batch 9, Task 8) — null for every other channel type.</summary>
+    public DateTimeOffset? CallStartTime { get; set; }
+    /// <summary>Voice only; null when the call never connected.</summary>
+    public DateTimeOffset? CallConnectTime { get; set; }
+    /// <summary>Voice only.</summary>
+    public DateTimeOffset? CallEndTime { get; set; }
+
     public ChannelType ChannelType { get; set; }
     /// <summary>Name of the channel that actually sent this job.</summary>
     public string? ChannelLabel { get; set; }

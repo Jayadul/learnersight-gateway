@@ -139,6 +139,12 @@ public class NetZeroVoiceStatusSyncProvider(
                 groupRows[i].DeliveryStatus = MapState(match.CallState);
                 groupRows[i].RawStatusResponse = JsonSerializer.Serialize(match);
                 groupRows[i].LastCheckedAt = DateTimeOffset.UtcNow;
+                // Hotfix batch 9, Task 8: the report carries these for every matched call;
+                // ConnectTime comes back null from the provider itself for a call that
+                // never connected, so there is nothing to guess here.
+                groupRows[i].CallStartTime = candidates[i].Start;
+                groupRows[i].CallConnectTime = ParseReportTime(match.ConnectTime, tz);
+                groupRows[i].CallEndTime = ParseReportTime(match.EndTime, tz);
                 updated++;
             }
         }
