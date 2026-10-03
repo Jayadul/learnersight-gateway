@@ -221,6 +221,32 @@ public class FallbackHandlerServiceTests
     }
 
     [Fact]
+    public async Task A_failed_template_send_never_gets_a_fallback()
+    {
+        // Hotfix batch 9, Task 10: a policy's fallback channel cannot resend a template
+        // payload as if it were free text, so a Template channel's failures are skipped
+        // outright — even with an active policy that would otherwise cover them.
+        var templateChannel = Backup();
+        templateChannel.Id = PrimaryConfigId;
+        templateChannel.Provider = Provider.NetZeroInboxTemplate;
+
+        var jobs = new FakeJobRepositoryWithExisting([FailedPrimary()]);
+        var service = new FallbackHandlerService(
+            jobs,
+            new FakeDispatchJobRecipientRepository(),
+            new FakeMessageRequestRepository(Request(isMultiChannel: false)),
+            new FakeFallbackPolicyRepository(SameTypePolicy()),
+            new FakeChannelConfigRepository(templateChannel),
+            new PlainTextEncryption(),
+            new FakeSenderFactory(new CapturingSender(ChannelType.WP)),
+            NullLogger<FallbackHandlerService>.Instance);
+
+        await service.HandleAsync(RequestId);
+
+        Assert.Empty(jobs.Added);
+    }
+
+    [Fact]
     public async Task An_inactive_fallback_channel_is_skipped_not_used()
     {
         var inactive = Backup();

@@ -16,6 +16,7 @@ public class ChannelDispatchService(
     IChannelConfigRepository configRepo,
     IEncryptionService enc,
     IChannelSenderFactory senderFactory,
+    IWhatsAppTemplateSender templateSender,
     IFallbackHandlerService fallbackHandler,
     ILogger<ChannelDispatchService> logger
 ) : IChannelDispatchService
@@ -62,6 +63,16 @@ public class ChannelDispatchService(
 
             var cfg = JsonSerializer.Deserialize<Dictionary<string, string>>(
                 enc.Decrypt(config.ConfigJson)) ?? [];
+
+            // A template job shares ChannelType.WP with ordinary text/media — TemplateName
+            // is what marks it (hotfix batch 9, Task 10). Routed here rather than through
+            // IChannelSenderFactory for the same reason Manual Send's template send
+            // already is: see IWhatsAppTemplateSender's own doc comment.
+            if (job.TemplateName is not null)
+            {
+                await DispatchTemplateAsync(messageRequestId, config.Id, job, cfg, numbers);
+                continue;
+            }
 
             switch (job.ChannelType)
             {
@@ -121,6 +132,54 @@ public class ChannelDispatchService(
             var dispatchJob = await CreateJobAsync(requestId, configId, job, number);
             await PaceAsync(delaySeconds, job.ChannelType);
             await sender.SendAsync(dispatchJob, cfg);
+            await jobRepo.SaveChangesAsync();
+            await RecordRecipientsAsync(dispatchJob, [number]);
+        }
+    }
+
+    // ── WhatsApp Template — one call per number, synchronous (hotfix batch 9, Task 10) ──
+    /// <summary>
+    /// Mirrors ManualSendService.SendTemplateAsync's call shape so a template reaches the
+    /// same vendor API the same way regardless of entry point. No media (the tag shape
+    /// does not carry a URL — see TemplateParserService), and never through
+    /// IChannelSenderFactory: a template is a structured payload, not free text.
+    /// </summary>
+    private async Task DispatchTemplateAsync(
+        Guid requestId, Guid configId, ParsedChannelJob job,
+        Dictionary<string, string> cfg, List<string> numbers)
+    {
+        if (!cfg.TryGetValue("templateToken", out var token) || string.IsNullOrWhiteSpace(token))
+        {
+            logger.LogWarning(
+                "[DISPATCH] Template channel {ConfigId} has no Template API Token configured — skipping",
+                configId);
+            return;
+        }
+
+        foreach (var number in numbers)
+        {
+            var dispatchJob = await CreateJobAsync(requestId, configId, job, number);
+
+            // The vendor's template API wants E.164, unlike the canonical stored form
+            // every other call on this channel uses — same conversion Manual Send applies.
+            var e164 = RecipientFormat.ToPlus(number);
+            var result = await templateSender.SendAsync(
+                token, e164, job.TemplateName!, job.TemplateVariables ?? [],
+                mediaUrl: null, ProviderEndpoint.BaseUrlOf(cfg));
+
+            dispatchJob.ProviderRawResponse = result.RawResponse;
+            if (result.IsSuccess)
+            {
+                dispatchJob.Status = JobStatus.Sent;
+                dispatchJob.SentAt = DateTimeOffset.UtcNow;
+                dispatchJob.ProviderMessageId = result.MessageId;
+            }
+            else
+            {
+                dispatchJob.Status = JobStatus.Failed;
+                dispatchJob.FailureReason = result.Error;
+            }
+            jobRepo.Update(dispatchJob);
             await jobRepo.SaveChangesAsync();
             await RecordRecipientsAsync(dispatchJob, [number]);
         }

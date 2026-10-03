@@ -39,6 +39,7 @@ public class DispatchJobRecipientTests
             new FakeChannelConfigRepository(config),
             new PlainTextEncryption(),
             new FakeSenderFactory(new ResultSender(channelType, outcome, providerMessageId)),
+            new NoOpTemplateSender(),
             new NoOpFallbackHandler(),
             NullLogger<ChannelDispatchService>.Instance);
 
@@ -112,6 +113,7 @@ public class DispatchJobRecipientTests
             new FakeChannelConfigRepository(config),
             new PlainTextEncryption(),
             new FakeSenderFactory(new PerRecipientSender()),
+            new NoOpTemplateSender(),
             new NoOpFallbackHandler(),
             NullLogger<ChannelDispatchService>.Instance);
 

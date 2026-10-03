@@ -117,19 +117,32 @@ channels are unchanged. What follows describes the original design; where it say
 Provider member" or "a field on the v1 channel", read it with this note.
 
 **WhatsApp Template send (R3.4)** is a NetZero Inbox (v1)-specific capability, not a new
-`Provider` enum member and not reachable through `/sendtext`'s tag grammar — a template
-(name + ordered variables, optional media) is a structured payload that does not fit a
-free-text tag, and does not need fallback/retry semantics. It bypasses
-`IChannelSenderFactory` entirely (that resolves on `(ChannelType, Provider, HandlesMedia)`,
-which has no slot for "template vs freeform text") via its own
-`IWhatsAppTemplateSender` interface, called directly from `ManualSendService` —
-admin-triggered and synchronous, closer to `IChannelBalanceProvider` than to a dispatch
-sender. Recipients still convert to the vendor's `+8801700000001` shape via the same
-`RecipientFormat.ToPlus` the regular v1 send already uses. The channel's config carries a
-separate `templateToken` field, distinct from the regular send `token` — masked the same
-way (R3.4's partial-mask rule matches on the field-name shape, not an exact list) — and
-`GET /api/manual-send/channels` reports whether a channel has one via `hasTemplateToken`,
-without exposing the token itself.
+`Provider` enum member. A template (name + ordered variables, text only) is a structured
+payload that does not fit a free-text tag, so it bypasses `IChannelSenderFactory` entirely
+(that resolves on `(ChannelType, Provider, HandlesMedia)`, which has no slot for "template
+vs freeform text") via its own `IWhatsAppTemplateSender` interface — called directly from
+`ManualSendService` (admin-triggered, synchronous) and, since hotfix batch 9 Task 10, from
+`ChannelDispatchService` for the gateway's own `template` tag
+(`[template:label::Template_Name||Var1||Var2]`, registered templates only — see Task 1's
+registry below and [api.md](api.md)). Either way it never goes through fallback:
+`FallbackHandlerService` skips a failed job outright when its channel's provider is
+`NetZeroInboxTemplate`, since a fallback channel cannot resend a template payload as
+freeform text. Recipients still convert to the vendor's `+8801700000001` shape via the
+same `RecipientFormat.ToPlus` the regular v1 send already uses. The channel's config
+carries a separate `templateToken` field, distinct from the regular send `token` — masked
+the same way (R3.4's partial-mask rule matches on the field-name shape, not an exact
+list) — and `GET /api/manual-send/channels` reports whether a channel has one via
+`hasTemplateToken`, without exposing the token itself.
+
+**Registered templates (hotfix batch 9, Task 1)** — a `ChannelTemplate` row per
+(channel, name) with ordered variable labels, CRUD under
+`/api/channel-configs/{id}/templates` (SuperAdmin), surfaced read-only via
+`GET /api/manual-send/channels`'s `templates[]` for any admin role. The `template` tag is
+validated against this registry at accept time (unknown name, or a variable count that
+doesn't match → `101 REJECTD`, same as an unresolvable label) rather than failing
+invisibly against Meta's API during background dispatch. A template with no registry
+entry on its channel can still be sent from Manual Send (free text, unchanged), just not
+through the tag.
 
 **Verified against the real vendor in hotfix batch 4** — batch 3 shipped this untested
 against the actual API. Two real gaps surfaced: the vendor's query-string duplicates of

@@ -13,6 +13,7 @@ public class SendTextOrchestratorService(
     ITemplateParserService parser,
     IMessageRequestRepository msgRepo,
     IChannelConfigRepository configRepo,
+    IChannelTemplateRepository templateRepo,
     IGatewayCredentialRepository credentialRepo,
     IEncryptionService enc,
     IServiceScopeFactory scopeFactory,
@@ -44,6 +45,13 @@ public class SendTextOrchestratorService(
             logger.LogWarning(
                 "[GATEWAY] Rejected — {Reason} ToUser={ToUser}", labelError, request.ToUser);
             return SendTextResponse.Rejected(labelError);
+        }
+
+        if (await InvalidTemplateAsync(jobs) is { } templateError)
+        {
+            logger.LogWarning(
+                "[GATEWAY] Rejected — {Reason} ToUser={ToUser}", templateError, request.ToUser);
+            return SendTextResponse.Rejected(templateError);
         }
 
         var msgRequest = new MessageRequest
@@ -109,6 +117,45 @@ public class SendTextOrchestratorService(
             if (await configRepo.GetActiveBySlugAsync(job.ChannelType, slug) is null)
                 return $"No active {job.ChannelType} channel is labelled '{slug}'. "
                      + "The label must match an active channel's slug in the admin panel exactly.";
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Hotfix batch 9, Task 10: rejects a <c>template</c> tag at accept time, same as an
+    /// unresolvable label — a template name that does not exist, or the wrong variable
+    /// count, cannot be allowed through only to fail invisibly against Meta's API during
+    /// background dispatch. Checked against the channel's own registry (Task 1).
+    /// </summary>
+    private async Task<string?> InvalidTemplateAsync(List<ParsedChannelJob> jobs)
+    {
+        foreach (var job in jobs)
+        {
+            if (job.TemplateName is not { } name) continue;
+
+            if (string.IsNullOrWhiteSpace(name))
+                return "A template tag must name the template: "
+                     + "[template:label::Template_Name||Variable1||Variable2].";
+
+            // The label already resolved to an active WP channel (UnresolvableLabelAsync
+            // ran first) — every template tag carries a label, so this is never null.
+            var channel = await configRepo.GetActiveBySlugAsync(ChannelType.WP, job.ChannelLabelSlug!);
+            if (channel is null) continue;
+
+            if (channel.Provider != Domain.Enums.Provider.NetZeroInboxTemplate)
+                return $"'{channel.Label}' is not a WhatsApp Template channel. "
+                     + "Point the template tag at a channel set up for templates.";
+
+            var template = await templateRepo.GetByChannelAndNameAsync(channel.Id, name);
+            if (template is null)
+                return $"No template named '{name}' is registered on channel '{channel.Label}'. "
+                     + "Register it there first, under Channels.";
+
+            var expected = template.VariableLabels.Count;
+            var got = job.TemplateVariables?.Count ?? 0;
+            if (expected != got)
+                return $"Template '{name}' expects {expected} variable(s) but the tag provided {got}.";
         }
 
         return null;

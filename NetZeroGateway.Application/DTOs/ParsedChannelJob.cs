@@ -23,4 +23,12 @@ public class ParsedChannelJob
     /// deliberately not persisted; null means "use the channel's configured lot".
     /// </summary>
     public string? LotNumber { get; set; }
+    /// <summary>
+    /// Set only by a <c>template</c> tag (hotfix batch 9, Task 10) — the pre-approved
+    /// template's exact name. Non-null is what marks this job as a template send rather
+    /// than ordinary WhatsApp text/media, since both share <see cref="ChannelType.WP"/>.
+    /// </summary>
+    public string? TemplateName { get; set; }
+    /// <summary>Ordered template variable values, in the order the tag listed them.</summary>
+    public List<string>? TemplateVariables { get; set; }
 }

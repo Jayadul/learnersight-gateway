@@ -3,14 +3,14 @@ using NetZeroGateway.Application.DTOs;
 namespace NetZeroGateway.Application.Strategies;
 
 /// <summary>
-/// Sends a Meta pre-approved WhatsApp template through NetZero Inbox (hotfix batch 3).
-/// Deliberately its own small interface rather than a widened <c>IChannelSender</c>: a
-/// template send does not go through the dispatch/fallback pipeline
-/// (<see cref="IChannelSenderFactory"/> resolves on ChannelType+Provider+HandlesMedia,
-/// which has no slot for "template vs freeform text", and bolting one on risks two
-/// senders colliding on the same key) or need fallback/retry semantics — it is an
-/// admin-triggered, one-off provider call, closer to <c>IChannelBalanceProvider</c> than
-/// to a dispatch sender.
+/// Sends a Meta pre-approved WhatsApp template through NetZero Inbox (hotfix batch 3;
+/// reachable via the <c>template</c> /sendtext tag since hotfix batch 9, Task 10, in
+/// addition to Manual Send). Deliberately its own small interface rather than a widened
+/// <c>IChannelSender</c>: a template send never goes through <see cref="IChannelSenderFactory"/>
+/// (which resolves on ChannelType+Provider+HandlesMedia, with no slot for "template vs
+/// freeform text", and bolting one on risks two senders colliding on the same key) or
+/// need fallback/retry semantics — callers (ManualSendService, ChannelDispatchService)
+/// skip FallbackHandlerService for it explicitly rather than relying on it to fail safe.
 /// </summary>
 public interface IWhatsAppTemplateSender
 {

@@ -40,6 +40,7 @@ public class ChannelDispatchServiceLotNumberTests
             new FakeChannelConfigRepository(voiceConfig),
             new PlainTextEncryption(),
             new FakeSenderFactory(sender),
+            new NoOpTemplateSender(),
             new NoOpFallbackHandler(),
             NullLogger<ChannelDispatchService>.Instance);
 

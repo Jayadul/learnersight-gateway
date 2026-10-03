@@ -122,6 +122,13 @@ public partial class TemplateParserService : ITemplateParserService
 
             "call" => BuildVoice(content, slug),
 
+            // Hotfix batch 9, Task 10: [template:label::Template_Name||Var1||Var2]. Uses
+            // the same ChannelType.WP as "wp" — a non-null TemplateName is what marks
+            // this a template job, since WhatsApp Template is a channel config, not a
+            // separate ChannelType. The combined "-wp:" form only ever pairs sms with wp
+            // (see the left-leg ChannelType check above), so this can never combine.
+            "template" => BuildTemplate(content, slug),
+
             _ => null
         };
     }
@@ -166,6 +173,35 @@ public partial class TemplateParserService : ITemplateParserService
     }
 
     /// <summary>
+    /// <c>Template_Name||Variable1||Variable2</c> — every <c>||</c>-separated segment
+    /// after the first is a variable, in order. Unlike <see cref="SplitValue"/> (one
+    /// split, used where a tag carries at most two parts), a template can have any
+    /// number of variables, so every segment matters.
+    /// <para>
+    /// Content-level validation (an empty name, the wrong variable count for the
+    /// registered template) happens later in SendTextOrchestratorService against the
+    /// channel's own registry (Task 1) — this only splits the string.
+    /// </para>
+    /// </summary>
+    private static ParsedChannelJob BuildTemplate(string content, string slug)
+    {
+        var parts = content.Split(ValueSeparator, StringSplitOptions.None);
+        var name = parts[0].Trim();
+        var variables = parts.Skip(1).Select(v => v.Trim()).ToList();
+
+        return new ParsedChannelJob
+        {
+            ChannelType = ChannelType.WP,
+            Message = variables.Count > 0
+                ? $"Template '{name}' with {variables.Count} variable(s)"
+                : $"Template '{name}'",
+            TemplateName = name,
+            TemplateVariables = variables,
+            ChannelLabelSlug = slug
+        };
+    }
+
+    /// <summary>
     /// Splits <c>sms:revemain</c> into ("sms", "revemain"). The slug is null when the
     /// segment carries no label at all, which is no longer a valid tag.
     /// </summary>
@@ -194,6 +230,10 @@ public partial class TemplateParserService : ITemplateParserService
             "sms" or "wp" =>
                 $"The channel label is now required: [{descriptor}:yourlabel::your message].",
 
+            "template" =>
+                "The channel label is now required: "
+                + "[template:yourlabel::Template_Name||Variable1||Variable2].",
+
             "smswp" or "sms-wp" =>
                 "Combined sends now label each leg: [sms:yourlabel-wp:yourlabel::text].",
 
@@ -210,13 +250,14 @@ public partial class TemplateParserService : ITemplateParserService
                 + "digits only, matching a channel's slug in the admin panel exactly.",
 
             _ when slug is not null =>
-                $"'{name}' is not a channel type. Use sms, wp or call.",
+                $"'{name}' is not a channel type. Use sms, wp, call or template.",
 
             _ => "Every tag must name its channel type and label.",
         };
 
         return $"Unknown channel tag '{descriptor}'. {hint} "
              + "Valid tags are [sms:label::text], [wp:label::text], [wp:label::text||url], "
-             + "[sms:label-wp:label::text] and [call:label::campaignId||lotNumber].";
+             + "[sms:label-wp:label::text], [call:label::campaignId||lotNumber] and "
+             + "[template:label::Template_Name||Variable1||Variable2].";
     }
 }

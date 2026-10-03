@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using NetZeroGateway.Application.DTOs;
 using NetZeroGateway.Application.Interfaces;
 using NetZeroGateway.Application.Services;
 using NetZeroGateway.Application.Strategies;
@@ -164,6 +165,16 @@ internal sealed class FakeMessageRequestRepository(MessageRequest? byId = null) 
 internal sealed class NoOpFallbackHandler : IFallbackHandlerService
 {
     public Task HandleAsync(Guid messageRequestId) => Task.CompletedTask;
+}
+
+/// <summary>Stands in where a test's jobs never include a template tag.</summary>
+internal sealed class NoOpTemplateSender : IWhatsAppTemplateSender
+{
+    public Task<WhatsAppTemplateSendResult> SendAsync(
+        string templateToken, string toNumber, string templateName,
+        List<string> exampleArr, string? mediaUrl, string? baseUrl,
+        CancellationToken ct = default)
+        => Unused.Fail<Task<WhatsAppTemplateSendResult>>();
 }
 
 internal sealed class FakeFallbackPolicyRepository(params FallbackPolicy[] policies)

@@ -46,6 +46,20 @@ public class FallbackHandlerService(
 
         foreach (var job in failedPrimary)
         {
+            // A WhatsApp Template send never gets a fallback (hotfix batch 9, Task 10) —
+            // its own interface's doc comment explains why; a policy's fallback channel
+            // cannot resend a template payload as if it were free text. Checked by the
+            // failed job's own channel rather than threading a flag through dispatch, so
+            // this holds regardless of what added the job.
+            var failedChannel = await configRepo.GetByIdAsync(job.ChannelConfigId);
+            if (failedChannel?.Provider == Provider.NetZeroInboxTemplate)
+            {
+                logger.LogInformation(
+                    "[FALLBACK] Skipped — WhatsApp Template sends have no fallback. "
+                    + "Number={Number} | Job={JobId}", job.ToNumber, job.Id);
+                continue;
+            }
+
             // A policy scoped to one channel only covers failures on that channel;
             // an unscoped policy still covers every channel of its type. When both apply the
             // scoped one is the more specific rule and wins: without the ordering the choice

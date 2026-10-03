@@ -97,6 +97,7 @@ alphanumeric, unique within its channel type.
 | `[wp:waprimary::text\|\|url]` | WhatsApp media — same tag; the URL is what selects media |
 | `[sms:a-wp:b::text]` | SMS **and** WhatsApp, one named channel per leg (media goes on the WP leg) |
 | `[call:voicemain::campaignId\|\|lotNumber]` | Voice — the campaign to dial, then the lot within it. Omitting `\|\|lotNumber` still parses and falls back to the channel's configured lot, but the integration guide documents only the explicit form |
+| `[template:watemplate::order_confirmation\|\|Jane Doe\|\|ORD-123]` | WhatsApp Template (hotfix batch 9, Task 10) — a Meta pre-approved template; the first `\|\|`-separated value is the template name, each one after is a variable in order |
 | *(no tag)* | Plain SMS with the whole body, on the **default** SMS channel |
 
 Rules:
@@ -107,9 +108,13 @@ Rules:
   default.
 - Channel type is read from the tag keyword, so `label_slug` only needs to be unique
   **within** a channel type — there is no global uniqueness constraint.
-- Combined tags only ever pair `sms:` and `wp:`; `call:` never combines. Parsing splits on
-  the literal `-wp:`, which is unambiguous because `sms`/`wp`/`call` are reserved and a
-  slug cannot contain a hyphen or a colon.
+- Combined tags only ever pair `sms:` and `wp:`; `call:` and `template:` never combine.
+  Parsing splits on the literal `-wp:`, which is unambiguous because `sms`/`wp`/`call`/
+  `template` are reserved and a slug cannot contain a hyphen or a colon.
+- A `template` tag's channel must be a WhatsApp Template channel, and its name must match
+  a template already registered there (admin panel → Channels) with the same number of
+  variables the tag supplies — checked at accept time, same as a label. Text only, no
+  media; never gets a fallback retry even if the channel has a policy configured.
 - Only **active** channels are addressable. An unknown label, or one naming an inactive
   channel, **rejects the whole request** rather than falling back to the default — a typo
   must never bill a channel the sender did not name.
