@@ -333,6 +333,19 @@ A fallback that fails too ends the chain: fallback jobs never trigger another fa
 Fallback runs from the send pipeline only. A recipient resend goes to the channel the
 operator picked and has no fallback of its own.
 
+**`IsGlobal` cannot silently exclude a policy any more (hotfix batch 9, Task 9).** The
+policy-matching query used to also require `is_global = true`, a separate flag the admin
+UI's "Apply this rule to all channels" toggle defaulted to **off** for every new policy —
+so a policy an admin had correctly scoped to one channel via the Trigger Channel picker
+(the mechanism this whole section describes) was invisible to fallback resolution unless
+they also opted into a toggle that read as contradictory for a rule they had just scoped.
+Proved live: an active policy scoped to the exact channel that failed produced
+`[FALLBACK] No active policy covers...` and no retry. `GetActivePoliciesAsync` (renamed
+from `GetActiveGlobalPoliciesAsync`) now returns every active policy regardless of
+`is_global`, letting the scoping logic above — which never needed the flag — do all the
+work it already did correctly. `IsGlobal` is now a read-only, derived display value
+(`trigger_channel_config_id IS NULL`), not an admin-set switch; the UI toggle was removed.
+
 The pacing delay of the fallback channel applies to the retry too, so a burst of
 failures cannot outrun the rate limit the delay exists to respect.
 

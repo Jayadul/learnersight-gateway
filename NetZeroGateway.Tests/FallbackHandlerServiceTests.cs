@@ -45,7 +45,12 @@ public class FallbackHandlerServiceTests
         TriggerChannelConfigId = PrimaryConfigId,
         FallbackChannelConfigId = BackupConfigId,
         IsActive = true,
-        IsGlobal = true,
+        // Hotfix batch 9, Task 9: IsGlobal=false is what a normal, channel-scoped policy
+        // actually looks like in the live DB — the admin UI's "Apply this rule to all
+        // channels" toggle defaulted off, so every test in this file used to only prove
+        // the matching logic worked for a combination (scoped + IsGlobal=true) nothing
+        // real ever produced. False here, matching reality, is the regression guard.
+        IsGlobal = false,
     };
 
     private static (FallbackHandlerService Service, FakeJobRepositoryWithExisting Jobs,
@@ -74,6 +79,28 @@ public class FallbackHandlerServiceTests
         ToUser = "8801700000001",
         IsMultiChannel = isMultiChannel,
     };
+
+    [Fact]
+    public async Task A_channel_scoped_policy_fires_even_when_not_flagged_IsGlobal()
+    {
+        // The actual hotfix batch 9, Task 9 bug: GetActiveGlobalPoliciesAsync used to also
+        // require IsGlobal==true, a flag the admin UI's "Apply this rule to all channels"
+        // toggle defaults OFF for every new policy — so a policy an admin had correctly
+        // scoped to one failing channel, exactly as the Trigger Channel picker above that
+        // toggle already lets them do, was silently never found. Proved live against the
+        // real stack before this fix: an active, correctly-scoped policy produced
+        // "[FALLBACK] No active policy covers..." and zero fallback jobs.
+        var policy = SameTypePolicy();
+        Assert.False(policy.IsGlobal);
+
+        var (service, jobs, _) = Build(Request(isMultiChannel: false), policy);
+
+        await service.HandleAsync(RequestId);
+
+        var fallback = Assert.Single(jobs.Added);
+        Assert.True(fallback.IsFallback);
+        Assert.Equal(BackupConfigId, fallback.ChannelConfigId);
+    }
 
     [Fact]
     public async Task A_single_channel_send_still_gets_its_fallback()

@@ -11,6 +11,5 @@ public class CreateFallbackPolicyRequest
     public Guid? FallbackChannelConfigId { get; set; }
     /// <summary>Required to let a policy fall back to a different channel type.</summary>
     public bool AllowCrossChannel { get; set; }
-    public bool IsGlobal { get; set; } = true;
     public string? Description { get; set; }
 }

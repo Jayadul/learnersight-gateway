@@ -16,6 +16,12 @@ public class FallbackPolicyDto
     /// <summary>Display labels so the UI need not re-resolve the ids.</summary>
     public string? TriggerChannelLabel { get; set; }
     public string? FallbackChannelLabel { get; set; }
+    /// <summary>
+    /// Read-only, derived from <see cref="TriggerChannelConfigId"/> being null (hotfix
+    /// batch 9, Task 9) — it used to be an admin-set flag independent of scoping, which
+    /// defaulted off in the UI and silently hid a correctly-scoped active policy from
+    /// fallback resolution entirely. Display only; not accepted on create/update.
+    /// </summary>
     public bool IsGlobal { get; set; }
     public string? Description { get; set; }
     public DateTimeOffset CreatedAt { get; set; }

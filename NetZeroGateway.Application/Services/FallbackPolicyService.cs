@@ -26,11 +26,11 @@ public class FallbackPolicyService(
             TriggerChannelConfigId = req.TriggerChannelConfigId,
             FallbackChannelConfigId = req.FallbackChannelConfigId,
             AllowCrossChannel = req.AllowCrossChannel,
-            IsGlobal = req.IsGlobal,
             Description = req.Description,
             IsActive = false
         };
         await ValidateAsync(e);
+        e.IsGlobal = e.TriggerChannelConfigId is null;
         await repo.AddAsync(e);
         await repo.SaveChangesAsync();
         // Re-read so the channel navigations are loaded — ToDto reads its labels from
@@ -43,12 +43,13 @@ public class FallbackPolicyService(
         var e = await repo.GetByIdAsync(id)
             ?? throw new NotFoundException($"Policy {id} not found.");
         e.Name = req.Name; e.TriggerChannel = req.TriggerChannel;
-        e.FallbackChannel = req.FallbackChannel; e.IsGlobal = req.IsGlobal;
+        e.FallbackChannel = req.FallbackChannel;
         e.IsActive = req.IsActive; e.Description = req.Description;
         e.TriggerChannelConfigId = req.TriggerChannelConfigId;
         e.FallbackChannelConfigId = req.FallbackChannelConfigId;
         e.AllowCrossChannel = req.AllowCrossChannel;
         await ValidateAsync(e);
+        e.IsGlobal = e.TriggerChannelConfigId is null;
         repo.Update(e);
         await repo.SaveChangesAsync();
         // Same reason as CreateAsync, plus: if the edit repointed a channel, the

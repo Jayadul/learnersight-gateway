@@ -42,7 +42,7 @@ public class FallbackHandlerService(
             return;
         }
 
-        var policies = await policyRepo.GetActiveGlobalPoliciesAsync();
+        var policies = await policyRepo.GetActivePoliciesAsync();
 
         foreach (var job in failedPrimary)
         {

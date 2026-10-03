@@ -169,8 +169,8 @@ internal sealed class NoOpFallbackHandler : IFallbackHandlerService
 internal sealed class FakeFallbackPolicyRepository(params FallbackPolicy[] policies)
     : IFallbackPolicyRepository
 {
-    public Task<List<FallbackPolicy>> GetActiveGlobalPoliciesAsync()
-        => Task.FromResult(policies.Where(p => p.IsActive && p.IsGlobal).ToList());
+    public Task<List<FallbackPolicy>> GetActivePoliciesAsync()
+        => Task.FromResult(policies.Where(p => p.IsActive).ToList());
 
     public Task<FallbackPolicy?> GetActiveByTriggerChannelAsync(ChannelType triggerChannel)
         => Unused.Fail<Task<FallbackPolicy?>>();
