@@ -205,8 +205,10 @@ public class NetZeroGatewayDbContext(DbContextOptions<NetZeroGatewayDbContext> o
             e.Property(x => x.CallerIp).HasMaxLength(50).IsRequired();
             // Three channel names at most, so a short bounded column rather than text.
             e.Property(x => x.RequestedChannels).HasMaxLength(100);
+            e.Property(x => x.GatewayResult).HasMaxLength(20);
             e.HasIndex(x => x.RequestedAt);
             e.HasIndex(x => x.ResponseStatus);
+            e.HasIndex(x => x.GatewayResult);
         });
 
         mb.Entity<GatewayCredential>(e =>

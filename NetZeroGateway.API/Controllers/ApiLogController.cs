@@ -15,7 +15,9 @@ public class ApiLogController(IApiLogService service) : ControllerBase
         [FromQuery] string? channel,
         [FromQuery] string? callerIp,
         [FromQuery] string? number,
+        [FromQuery] string? gatewayResult,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 10)
-        => Ok(await service.GetPagedAsync(page, pageSize, dateFrom, dateTo, responseStatus, channel, callerIp, number));
+        => Ok(await service.GetPagedAsync(
+            page, pageSize, dateFrom, dateTo, responseStatus, channel, callerIp, number, gatewayResult));
 }

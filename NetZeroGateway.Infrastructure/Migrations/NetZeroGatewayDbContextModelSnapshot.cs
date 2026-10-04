@@ -100,6 +100,11 @@ namespace NetZeroGateway.Infrastructure.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("duration_ms");
 
+                    b.Property<string>("GatewayResult")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("gateway_result");
+
                     b.Property<Guid?>("MessageRequestId")
                         .HasColumnType("uuid")
                         .HasColumnName("message_request_id");
@@ -137,6 +142,9 @@ namespace NetZeroGateway.Infrastructure.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_api_logs");
+
+                    b.HasIndex("GatewayResult")
+                        .HasDatabaseName("ix_api_logs_gateway_result");
 
                     b.HasIndex("RequestedAt")
                         .HasDatabaseName("ix_api_logs_requested_at");

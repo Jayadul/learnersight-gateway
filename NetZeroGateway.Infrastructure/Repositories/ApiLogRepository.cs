@@ -11,7 +11,8 @@ public class ApiLogRepository(NetZeroGatewayDbContext db)
     public async Task<(List<ApiLog> Items, int Total)> GetPagedAsync(
         int page, int size,
         DateTimeOffset? from, DateTimeOffset? to,
-        int? responseStatus, string? channel, string? callerIp = null, string? number = null)
+        int? responseStatus, string? channel, string? callerIp = null, string? number = null,
+        string? gatewayResult = null)
     {
         var q = _set.AsQueryable();
         if (from is not null) q = q.Where(l => l.RequestedAt >= from);
@@ -37,6 +38,11 @@ public class ApiLogRepository(NetZeroGatewayDbContext db)
             var n = number.Trim();
             q = q.Where(l => l.ToUser != null && l.ToUser.Contains(n));
         }
+        // The gateway-level outcome (hotfix batch 9, Task 12) — every /sendtext call
+        // returns HTTP 200 regardless, so this is the only way to actually find a
+        // rejected request; responseStatus above cannot distinguish them.
+        if (!string.IsNullOrWhiteSpace(gatewayResult))
+            q = q.Where(l => l.GatewayResult == gatewayResult);
 
         var total = await q.CountAsync();
         var items = await q.OrderByDescending(l => l.RequestedAt)

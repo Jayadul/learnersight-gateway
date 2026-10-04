@@ -8,10 +8,11 @@ public class ApiLogService(IApiLogRepository repo) : IApiLogService
     public async Task<PagedResult<ApiLogDto>> GetPagedAsync(
         int page, int size,
         DateTimeOffset? from, DateTimeOffset? to,
-        int? responseStatus, string? channel, string? callerIp = null, string? number = null)
+        int? responseStatus, string? channel, string? callerIp = null, string? number = null,
+        string? gatewayResult = null)
     {
         var (items, total) = await repo.GetPagedAsync(
-            page, size, from, to, responseStatus, channel, callerIp, number);
+            page, size, from, to, responseStatus, channel, callerIp, number, gatewayResult);
 
         return new PagedResult<ApiLogDto>
         {
@@ -26,7 +27,8 @@ public class ApiLogService(IApiLogRepository repo) : IApiLogService
                 DurationMs = l.DurationMs,
                 RequestedAt = l.RequestedAt,
                 MessageRequestId = l.MessageRequestId,
-                RequestedChannels = l.RequestedChannels
+                RequestedChannels = l.RequestedChannels,
+                GatewayResult = l.GatewayResult
             }).ToList(),
             TotalCount = total,
             Page = page,

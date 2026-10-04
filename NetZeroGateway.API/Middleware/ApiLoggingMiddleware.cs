@@ -91,6 +91,7 @@ public class ApiLoggingMiddleware(RequestDelegate next, ILogger<ApiLoggingMiddle
         catch { /* never break pipeline */ }
 
         var messageRequestId = ExtractMessageId(respBody);
+        var gatewayResult = ExtractGatewayResult(respBody);
 
         try
         {
@@ -106,7 +107,8 @@ public class ApiLoggingMiddleware(RequestDelegate next, ILogger<ApiLoggingMiddle
                 DurationMs = sw.ElapsedMilliseconds,
                 RequestedAt = DateTimeOffset.UtcNow,
                 MessageRequestId = messageRequestId,
-                RequestedChannels = requestedChannels
+                RequestedChannels = requestedChannels,
+                GatewayResult = gatewayResult
             });
             await repo.SaveChangesAsync();
             logger.LogInformation("[API_LOG] {Status} {Ms}ms | To={To} | IP={Ip}",
@@ -154,6 +156,21 @@ public class ApiLoggingMiddleware(RequestDelegate next, ILogger<ApiLoggingMiddle
                    && Guid.TryParse(el.GetString(), out var id)
                 ? id
                 : null;
+        }
+        catch { return null; }
+    }
+
+    /// <summary>
+    /// The response body's own <c>Text</c> field ("ACCEPTD"/"REJECTD") — hotfix batch 9,
+    /// Task 12. Every /sendtext call returns HTTP 200 regardless of outcome, so this is
+    /// the only thing that actually tells a rejected request apart from an accepted one.
+    /// </summary>
+    private static string? ExtractGatewayResult(string responseBody)
+    {
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(responseBody);
+            return doc.RootElement.TryGetProperty("Text", out var el) ? el.GetString() : null;
         }
         catch { return null; }
     }

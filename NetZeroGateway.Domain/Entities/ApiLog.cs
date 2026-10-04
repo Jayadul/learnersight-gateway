@@ -18,4 +18,15 @@ public class ApiLog : BaseEntity
     /// before this column existed, and on requests rejected before parsing.
     /// </summary>
     public string? RequestedChannels { get; set; }
+
+    /// <summary>
+    /// The gateway-level outcome — "ACCEPTD" or "REJECTD", the response body's own
+    /// <c>Text</c> field (hotfix batch 9, Task 12). Every /sendtext call returns HTTP 200
+    /// regardless of outcome (the REVE-compatible contract carries its real status inside
+    /// the JSON body, not the status line), so <see cref="ResponseStatus"/> alone cannot
+    /// tell a rejected request apart from an accepted one — this is what actually makes a
+    /// failed request findable and filterable. Null on a row written before this column
+    /// existed, or if the response body was ever something other than the gateway shape.
+    /// </summary>
+    public string? GatewayResult { get; set; }
 }

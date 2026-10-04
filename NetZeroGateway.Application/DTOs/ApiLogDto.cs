@@ -12,4 +12,10 @@ public class ApiLogDto
     public Guid? MessageRequestId { get; set; }
     /// <summary>Channel types the request asked for, e.g. "SMS, WhatsApp". Null when it was rejected before parsing.</summary>
     public string? RequestedChannels { get; set; }
+    /// <summary>
+    /// "ACCEPTD" or "REJECTD" — the actual gateway-level outcome (hotfix batch 9, Task
+    /// 12). ResponseStatus is HTTP 200 for every /sendtext call regardless, so this is
+    /// what tells a rejected request apart from an accepted one.
+    /// </summary>
+    public string? GatewayResult { get; set; }
 }
