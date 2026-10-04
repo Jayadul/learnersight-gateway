@@ -177,6 +177,16 @@ internal sealed class NoOpTemplateSender : IWhatsAppTemplateSender
         => Unused.Fail<Task<WhatsAppTemplateSendResult>>();
 }
 
+/// <summary>Returns a fixed, configurable outcome — for tests asserting what gets written as a result.</summary>
+internal sealed class StubTemplateSender(WhatsAppTemplateSendResult result) : IWhatsAppTemplateSender
+{
+    public Task<WhatsAppTemplateSendResult> SendAsync(
+        string templateToken, string toNumber, string templateName,
+        List<string> exampleArr, string? mediaUrl, string? baseUrl,
+        CancellationToken ct = default)
+        => Task.FromResult(result);
+}
+
 internal sealed class FakeFallbackPolicyRepository(params FallbackPolicy[] policies)
     : IFallbackPolicyRepository
 {

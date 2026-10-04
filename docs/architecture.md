@@ -144,6 +144,16 @@ invisibly against Meta's API during background dispatch. A template with no regi
 entry on its channel can still be sent from Manual Send (free text, unchanged), just not
 through the tag.
 
+**Template sends were already logged (hotfix batch 9, Task 15 investigated this and found
+nothing to fix in Manual Send).** `ManualSendService.SendTemplateAsync`'s hand-rolled
+DispatchJob/DispatchJobRecipient writes have always landed in the same tables Message Logs
+reads — confirmed live against real historical sends predating this hotfix batch. The
+actual gap was `/sendtext` having no template tag at all until Task 10; now that it does,
+it writes through the same shared `ChannelDispatchService` helpers every other channel
+type uses, so both entry points log identically. No code change was needed here beyond
+Task 10 itself; a regression test now pins Manual Send's write path since nothing
+previously covered it.
+
 **Verified against the real vendor in hotfix batch 4** — batch 3 shipped this untested
 against the actual API. Two real gaps surfaced: the vendor's query-string duplicates of
 `Content-Type`/`Authorization` (first assumed to be Postman export noise) turned out to
