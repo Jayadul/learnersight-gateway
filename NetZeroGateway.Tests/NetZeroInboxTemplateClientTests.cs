@@ -71,6 +71,36 @@ public class NetZeroInboxTemplateClientTests
     }
 
     [Fact]
+    public async Task Every_variable_lands_in_order_including_a_blank_one_hotfix_batch_9_task_14()
+    {
+        // Verifies the exact concern Task 14 raised: array ordering, empty-string
+        // handling, type coercion. Four variables, one deliberately blank in the middle —
+        // if anything in the pipeline ever switched to RemoveEmptyEntries, or reordered,
+        // or coerced, this is where it would show up, since this captures the literal
+        // bytes sent to the vendor.
+        var handler = new CapturingHandler();
+        var http = new HttpClient(handler) { BaseAddress = new Uri("https://inbox.netzero.com.bd") };
+        var client = new NetZeroInboxClient(
+            http, new ConfigurationBuilder().Build(), NullLogger<NetZeroInboxClient>.Instance);
+
+        var variables = new List<string> { "Jane Doe", "ORD-123", "", "Dhaka" };
+        await client.SendTemplateAsync(
+            "tmpl-token-1", "+8801749090963", "order_confirmation", variables, null);
+
+        using var doc = JsonDocument.Parse(handler.CapturedBody!);
+        var sent = doc.RootElement.GetProperty("exampleArr")
+            .EnumerateArray().Select(e => e.GetString()).ToList();
+
+        // Exact order, exact count, the blank entry neither dropped nor shifting the
+        // positions of the variables after it — every element is also still a JSON
+        // string (never a bare number/bool slipping through unquoted).
+        Assert.Equal(["Jane Doe", "ORD-123", "", "Dhaka"], sent);
+        Assert.All(
+            doc.RootElement.GetProperty("exampleArr").EnumerateArray(),
+            e => Assert.Equal(JsonValueKind.String, e.ValueKind));
+    }
+
+    [Fact]
     public async Task A_real_successful_response_is_read_as_success_with_the_real_message_id()
     {
         // The exact bug found live: success:true plus a nested messages array, not the

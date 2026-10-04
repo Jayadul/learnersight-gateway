@@ -279,6 +279,60 @@ public class TemplateParserServiceTests
         Assert.Contains("'email' is not a channel type", error);
     }
 
+    // ── Template (hotfix batch 9, Task 10) ──────────────────────────────────
+
+    [Fact]
+    public void Template_tag_splits_name_and_variables_in_order()
+    {
+        var job = Assert.Single(ParseOk("[template:watemplate::order_confirmation||Jane Doe||ORD-123]"));
+
+        Assert.Equal(ChannelType.WP, job.ChannelType);
+        Assert.Equal("watemplate", job.ChannelLabelSlug);
+        Assert.Equal("order_confirmation", job.TemplateName);
+        Assert.Equal(["Jane Doe", "ORD-123"], job.TemplateVariables);
+    }
+
+    [Fact]
+    public void Template_tag_with_no_variables_parses_to_an_empty_list_not_null()
+    {
+        var job = Assert.Single(ParseOk("[template:watemplate::hello_world]"));
+
+        Assert.Equal("hello_world", job.TemplateName);
+        Assert.Empty(job.TemplateVariables!);
+    }
+
+    [Fact]
+    public void Template_tag_preserves_order_and_count_with_a_blank_variable_in_the_middle()
+    {
+        // Hotfix batch 9, Task 14: the exact failure mode to rule out is
+        // StringSplitOptions.RemoveEmptyEntries silently dropping a blank variable and
+        // shifting every variable after it out of position.
+        var job = Assert.Single(
+            ParseOk("[template:watemplate::order_confirmation||Jane Doe||||Dhaka]"));
+
+        Assert.Equal(["Jane Doe", "", "Dhaka"], job.TemplateVariables);
+    }
+
+    [Fact]
+    public void Template_tag_requires_a_label_same_as_every_other_tag()
+    {
+        var error = ParseRejected("[template::order_confirmation||a]");
+
+        Assert.Contains("channel label is now required", error);
+        Assert.Contains("[template:yourlabel::Template_Name", error);
+    }
+
+    [Fact]
+    public void Template_cannot_combine_via_the_sms_wp_form()
+    {
+        // The combined form only ever pairs sms: and wp: — a template leg fails the
+        // "left side must be SMS" check and is rejected as malformed, same as any other
+        // invalid combination, rather than silently becoming a text send.
+        var error = ParseRejected("[template:a-wp:b::order_confirmation||x]");
+
+        Assert.Contains("Unknown channel tag", error);
+    }
+
     // ── Removed Release 2 grammar ─────────────────────────────────────────
     // These all worked in 2.0 and are gone. Each rejection names its replacement,
     // because anyone hitting one is mid-migration rather than guessing.
