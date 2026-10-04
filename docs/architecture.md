@@ -372,6 +372,27 @@ work it already did correctly. `IsGlobal` is now a read-only, derived display va
 The pacing delay of the fallback channel applies to the retry too, so a burst of
 failures cannot outrun the rate limit the delay exists to respect.
 
+**A fallback's raw response and reference id never mix with the primary's (hotfix
+batch 9, Task 17).** Reported as "fallback SMS raw response and messageId don't
+match" — but every real fallback `DispatchJobRecipient` row in the live DB had its own
+`ProviderReferenceId` matching its own `RawStatusResponse`/job's `ProviderRawResponse`;
+primary and fallback attempts always get separate rows via separate `DispatchJob`s, and
+nothing in the write path cross-assigns between them. Proved live: a real primary
+failure followed by a real fallback success showed the fallback row's reference id
+(`OK-19302`) and raw response (`{"...","Message_ID":"OK-19302"}`) in agreement.
+
+What the report actually caught was the two pre-R3 rows the 2026-09-20 backfill
+migration created (see that migration's own doc comment) that happen to be `IsFallback`.
+That migration deliberately set `provider_reference_id = 'backfilled'` and left
+`raw_status_response` NULL — "marked distinctly ... so nobody mistakes a guess for
+confirmed delivery." `DispatchJobRecipientService.ResolveRawResponse`'s later job-level
+fallback (the "wrong provider reply" fix) then filled that NULL with the job's real
+`ProviderRawResponse`, which carries the job's real `Message_ID` — contradicting the
+`ProviderReferenceId` field still showing the literal string `"backfilled"` right next
+to it. `ResolveRawResponse` now short-circuits for `ProviderReferenceId == "backfilled"`
+and returns an honest "this predates per-recipient tracking" note instead, restoring the
+original migration's intent for these two historical rows.
+
 ## Channel tags
 
 Every tag is `[type:label::content]` — the type keyword picks the channel, the label

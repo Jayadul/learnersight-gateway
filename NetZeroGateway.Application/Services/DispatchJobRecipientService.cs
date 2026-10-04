@@ -73,8 +73,35 @@ public class DispatchJobRecipientService(
     /// refused before it was made, or the call threw) there is no provider text to display, so the
     /// row says so and gives the reason instead of an empty field.
     /// </summary>
+    /// <summary>
+    /// Marks a recipient row reconstructed by the one-time 2026-09-20 backfill migration
+    /// (pre-R3 history that predates per-recipient tracking) — see its own doc comment.
+    /// Deliberately not a genuine provider reference, so nobody mistakes a guess for
+    /// confirmed delivery.
+    /// </summary>
+    private const string BackfilledSentinel = "backfilled";
+
     public static string? ResolveRawResponse(DispatchJobRecipient r)
     {
+        // Hotfix batch 9, Task 17: the bug the team lead actually saw. A backfilled row's
+        // own RawStatusResponse is deliberately NULL (nothing per-recipient was ever
+        // captured for it), so ResolveProviderReply's job-level fallback below filled it
+        // with the job's real raw response — which carries the job's real Message_ID
+        // right next to a ProviderReferenceId field still showing the literal string
+        // "backfilled". The two fields visibly contradicted each other on exactly the
+        // rows the original migration meant to mark as an honest guess, not confirmed
+        // data. Short-circuit before that fallback runs for these rows.
+        if (r.ProviderReferenceId == BackfilledSentinel)
+        {
+            return JsonSerializer.Serialize(new
+            {
+                backfilled = true,
+                note = "This row predates per-recipient tracking (reconstructed from the job "
+                     + "on 2026-09-20) — the provider's exact reply for this specific number "
+                     + "was never captured, so there is no raw response to show."
+            });
+        }
+
         var raw = ResolveProviderReply(r);
         if (raw is not null) return raw;
 

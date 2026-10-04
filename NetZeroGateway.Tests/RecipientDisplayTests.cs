@@ -67,4 +67,64 @@ public class RecipientDisplayTests
 
         Assert.Null(DispatchJobRecipientService.ResolveRawResponse(row));
     }
+
+    /// <summary>
+    /// Hotfix batch 9, Task 17: what was actually reported as "fallback SMS raw response and
+    /// messageId don't match" turned out to be a pre-R3 backfilled row, not a live fallback send
+    /// (confirmed against the live DB — every real dispatch_job_recipients row from a fallback
+    /// job that exists today is one of these two). The 2026-09-20 backfill migration deliberately
+    /// set provider_reference_id = "backfilled" and left raw_status_response NULL so nobody
+    /// mistakes a guess for confirmed delivery — but ResolveProviderReply's later job-level
+    /// fallback (added for the "wrong provider reply" fix) then filled the blank with the job's
+    /// real raw response, which carries the job's real Message_ID right next to a
+    /// ProviderReferenceId field still showing "backfilled". The two fields visibly contradicted
+    /// each other, which is exactly the "don't match" symptom.
+    /// </summary>
+    [Fact]
+    public void A_backfilled_row_does_not_leak_the_jobs_real_message_id_as_its_raw_response()
+    {
+        var row = new DispatchJobRecipient
+        {
+            Recipient = "8801700000001",
+            ProviderReferenceId = "backfilled",
+            RawStatusResponse = null,
+            DeliveryStatus = DeliveryStatus.Delivered,
+            DispatchJob = new DispatchJob
+            {
+                Status = JobStatus.Sent,
+                ProviderMessageId = "1217197838",
+                ProviderRawResponse = """{"Status":"0","Text":"ACCEPTD","Message_ID":"1217197838"}""",
+            }
+        };
+
+        var shown = DispatchJobRecipientService.ResolveRawResponse(row);
+
+        Assert.NotNull(shown);
+        Assert.DoesNotContain("1217197838", shown);
+        using var doc = JsonDocument.Parse(shown!);
+        Assert.True(doc.RootElement.GetProperty("backfilled").GetBoolean());
+    }
+
+    [Fact]
+    public void A_genuine_fallback_rows_own_reference_id_still_matches_its_own_raw_response()
+    {
+        var row = new DispatchJobRecipient
+        {
+            Recipient = "8801700000001",
+            ProviderReferenceId = "9988776655",
+            RawStatusResponse = null,
+            DeliveryStatus = DeliveryStatus.Delivered,
+            DispatchJob = new DispatchJob
+            {
+                Status = JobStatus.Sent,
+                IsFallback = true,
+                ProviderMessageId = "9988776655",
+                ProviderRawResponse = """{"Status":"0","Text":"ACCEPTD","Message_ID":"9988776655"}""",
+            }
+        };
+
+        var shown = DispatchJobRecipientService.ResolveRawResponse(row);
+
+        Assert.Contains("9988776655", shown);
+    }
 }
