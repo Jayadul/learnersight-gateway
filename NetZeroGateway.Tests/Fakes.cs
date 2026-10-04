@@ -88,6 +88,7 @@ internal sealed class FakeDispatchJobRepository : IDispatchJobRepository
 
     public Task<List<DispatchJob>> GetByMessageRequestIdAsync(Guid id) => Unused.Fail<Task<List<DispatchJob>>>();
     public Task<List<DispatchJob>> GetFailedWithChannelAsync() => Unused.Fail<Task<List<DispatchJob>>>();
+    public Task<bool> ExistsForChannelAsync(Guid channelConfigId) => Unused.Fail<Task<bool>>();
     public Task<DispatchJob?> GetByIdAsync(Guid id) => Unused.Fail<Task<DispatchJob?>>();
     public Task<List<DispatchJob>> GetAllAsync() => Unused.Fail<Task<List<DispatchJob>>>();
     public Task<List<DispatchJob>> FindAsync(Expression<Func<DispatchJob, bool>> p) => Unused.Fail<Task<List<DispatchJob>>>();
@@ -230,6 +231,7 @@ internal sealed class FakeJobRepositoryWithExisting(List<DispatchJob> existing) 
 
     public Task<List<DispatchJob>> GetByMessageRequestIdAsync(Guid id) => Task.FromResult(existing);
     public Task<List<DispatchJob>> GetFailedWithChannelAsync() => Unused.Fail<Task<List<DispatchJob>>>();
+    public Task<bool> ExistsForChannelAsync(Guid channelConfigId) => Unused.Fail<Task<bool>>();
 
     public Task AddAsync(DispatchJob entity)
     {

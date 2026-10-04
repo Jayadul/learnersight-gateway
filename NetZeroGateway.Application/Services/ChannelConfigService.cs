@@ -11,6 +11,7 @@ public class ChannelConfigService(
     IChannelConfigRepository repo,
     IFallbackPolicyRepository policyRepo,
     IChannelTemplateRepository templateRepo,
+    IDispatchJobRepository jobRepo,
     IEncryptionService enc,
     IGatewayCredentialService gatewayCredentials
 ) : IChannelConfigService
@@ -138,6 +139,15 @@ public class ChannelConfigService(
             throw new InvalidOperationException(
                 $"This channel is used by fallback rule(s): {string.Join(", ", referencing)}. "
                 + "Update or remove them first, then delete this channel.");
+
+        // The dispatch_jobs FK is Restrict too (hotfix batch 9, Task 16) — a channel that
+        // has ever sent anything would otherwise fail this with a raw DB constraint
+        // violation instead of a message the admin can act on. Deactivating keeps the
+        // channel out of rotation without losing the audit trail a hard delete would.
+        if (await jobRepo.ExistsForChannelAsync(id))
+            throw new InvalidOperationException(
+                $"'{entity.Label}' has sent message(s) and cannot be deleted, to keep that "
+                + "history intact. Deactivate it instead to stop it from being used.");
 
         repo.Delete(entity);
         await repo.SaveChangesAsync();

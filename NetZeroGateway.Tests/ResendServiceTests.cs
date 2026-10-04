@@ -61,6 +61,7 @@ public class ResendServiceTests
         public void Update(DispatchJob e) { }
         public Task<List<DispatchJob>> GetByMessageRequestIdAsync(Guid id) => Unused.Fail<Task<List<DispatchJob>>>();
         public Task<List<DispatchJob>> GetFailedWithChannelAsync() => Unused.Fail<Task<List<DispatchJob>>>();
+        public Task<bool> ExistsForChannelAsync(Guid channelConfigId) => Unused.Fail<Task<bool>>();
         public Task<List<DispatchJob>> GetAllAsync() => Unused.Fail<Task<List<DispatchJob>>>();
         public Task<List<DispatchJob>> FindAsync(Expression<Func<DispatchJob, bool>> p) => Unused.Fail<Task<List<DispatchJob>>>();
         public void Delete(DispatchJob e) => Unused.Fail<bool>();

@@ -20,4 +20,7 @@ public class DispatchJobRepository(NetZeroGatewayDbContext db)
         => _set.Include(j => j.ChannelConfig)
                .Where(j => j.Status == JobStatus.Failed && j.FailureReason != null)
                .ToListAsync();
+
+    public Task<bool> ExistsForChannelAsync(Guid channelConfigId)
+        => _set.AnyAsync(j => j.ChannelConfigId == channelConfigId);
 }
