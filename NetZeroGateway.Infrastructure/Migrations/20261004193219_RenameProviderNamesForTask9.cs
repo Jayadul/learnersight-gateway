@@ -7,7 +7,7 @@ namespace NetZeroGateway.Infrastructure.Migrations
     /// <summary>
     /// Hotfix batch 9, Tasks 5/6: the provider catalog rename
     /// (NetZeroInbox/Qr/Template/Voice -> WA Meta/WA Devices QR/WA Meta Template/Net ZerO
-    /// call Broadcast) only ever reached the Add/Edit dropdown and brand-new channels —
+    /// call Boardcast) only ever reached the Add/Edit dropdown and brand-new channels —
     /// Seed:ChannelConfigs looks existing rows up by (channel_type, label), not by provider,
     /// so renaming provider_name in config does nothing for a channel that already exists.
     /// Renames provider_name on the 4 rows still carrying the exact old default text, the
@@ -19,11 +19,10 @@ namespace NetZeroGateway.Infrastructure.Migrations
     public partial class RenameProviderNamesForTask9 : Migration
     {
         /// <summary>
-        /// "Broadcast" is the team lead's default pending final confirmation (the task
-        /// flagged "Boardcast" as a likely typo) — matches the frontend catalog's label in
-        /// config-form-dialog.component.ts. Change both if the lead picks "Boardcast".
+        /// Confirmed by the team lead via Seed:ChannelConfigs: "Boardcast", not "Broadcast" —
+        /// matches the frontend catalog's label in config-form-dialog.component.ts.
         /// </summary>
-        private const string VoiceProviderName = "Net ZerO call Broadcast";
+        private const string VoiceProviderName = "Net ZerO call Boardcast";
 
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
