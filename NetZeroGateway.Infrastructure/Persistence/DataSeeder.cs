@@ -223,6 +223,24 @@ public static class DataSeeder
                 .FirstOrDefaultAsync(c => c.ChannelType == channelType
                                        && c.Label == item.Label);
 
+            // A relabelled seed entry names its old label(s) in FormerLabels so the existing
+            // row is renamed in place, keeping its id, history and slug (tags use the slug).
+            if (existing is null && item.FormerLabels.Count > 0)
+            {
+                existing = await db.ChannelConfigs
+                    .Where(c => c.ChannelType == channelType
+                             && item.FormerLabels.Contains(c.Label))
+                    .OrderBy(c => c.CreatedAt)
+                    .FirstOrDefaultAsync();
+                if (existing is not null)
+                {
+                    logger.LogInformation(
+                        "[SEED] ChannelConfig RENAME: {Type} / {Old} -> {Label}",
+                        channelType, existing.Label, item.Label);
+                    existing.Label = item.Label;
+                }
+            }
+
             if (existing is null)
             {
                 // Includes entries added earlier in this same pass: they are not persisted
@@ -478,6 +496,11 @@ file sealed class SeedChannelConfig
     /// </summary>
     public bool IsActive { get; set; } = true;
     public string Label { get; set; } = "";
+    /// <summary>
+    /// Optional. Earlier labels of this channel. When no row carries <see cref="Label"/>,
+    /// a row with one of these is renamed instead of a duplicate being added.
+    /// </summary>
+    public List<string> FormerLabels { get; set; } = [];
     public Dictionary<string, string> Config { get; set; } = [];
 }
 
